@@ -11,6 +11,7 @@ dependencies = [
   "elasticsearch>=9.0,<10",
   "google-genai>=1.32",
   "openai>=1.50",
+  "langchain>=0.3.21,<2",  # required by opentelemetry-instrumentation-genai-langchain (it skips itself when `langchain` is absent)
   "langchain-core>=0.3",
   "langchain-openai>=0.3",
   "langchain-google-genai>=2.1",
