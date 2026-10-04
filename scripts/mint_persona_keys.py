@@ -12,12 +12,12 @@ from app.config import Settings  # noqa: E402
 from app.dls import CATALOG_ROLE_DESCRIPTOR, persona_role_descriptor  # noqa: E402
 from app.personas import PERSONAS  # noqa: E402
 
-try:
-    s = Settings()
-    es = Elasticsearch(s.obs_es_url, api_key=s.obs_es_admin_key)
-    out_path = Path(__file__).resolve().parent.parent / "backend" / s.persona_keys_path
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+s = Settings()
+es = Elasticsearch(s.obs_es_url, api_key=s.obs_es_admin_key)
+out_path = Path(__file__).resolve().parent.parent / "backend" / s.persona_keys_path
+out_path.parent.mkdir(parents=True, exist_ok=True)
 
+try:
     # Get old keys before creating new ones
     old_key_ids = {old["id"] for old in es.security.get_api_key(name="glassbox-*", owner=True).get("api_keys", [])}
 
@@ -30,15 +30,32 @@ try:
         keys[name] = resp["encoded"]
         new_key_ids.add(resp["id"])
 
-    # Only after all keys succeed, invalidate old ones (don't delete the ones we just created)
-    to_delete = old_key_ids - new_key_ids
-    if to_delete:
-        es.security.invalidate_api_key(ids=list(to_delete))
+    try:
+        # Write keys safely with 0o600 mode
+        fd = os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with open(fd, "w") as f:
+                json.dump(keys, f)
+            # Ensure file has 0o600 even if it pre-existed as 0644
+            os.fchmod(fd, 0o600)
+        except Exception:
+            os.close(fd)
+            raise
 
-    # Write keys safely with 0o600 mode (no 0644 window)
-    with open(os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
-        json.dump(keys, f)
-    print("minted keys for:", ", ".join(keys), "->", out_path.name)
+        # Only after successful write, invalidate old ones
+        to_delete = old_key_ids - new_key_ids
+        if to_delete:
+            es.security.invalidate_api_key(ids=list(to_delete))
+
+        print("minted keys for:", ", ".join(keys), "->", out_path.name)
+    except Exception as e:
+        # Best-effort invalidate just-created keys on write/invalidation failure
+        if new_key_ids:
+            try:
+                es.security.invalidate_api_key(ids=list(new_key_ids))
+            except Exception:
+                pass
+        raise
 except Exception as e:
     print(f"{type(e).__name__}: {e}", file=sys.stderr)
     sys.exit(1)
