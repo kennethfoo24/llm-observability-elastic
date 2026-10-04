@@ -4,6 +4,7 @@ from elasticsearch import Elasticsearch
 from app.config import Settings
 from app.dls import load_keys
 from app.index_def import INDEX_NAME
+from app.retrieval import Retriever
 
 pytestmark = pytest.mark.integration
 
@@ -21,8 +22,9 @@ def test_employee_cannot_see_restricted_docs_but_exec_can():
     keys = load_keys(Settings().persona_keys_path)
     emp = {h["_id"] for h in _search(keys["employee"], {"match": {"content": "severance reorganisation salary"}})}
     exe = {h["_id"] for h in _search(keys["exec"], {"match": {"content": "severance reorganisation salary"}})}
-    # Employees see at least one doc (e.g., pto-policy for "paid time off")
-    assert len(emp) > 0
+    # Positive control: a query that MUST hit an employee-visible doc.
+    pto = {h["_id"] for h in _search(keys["employee"], {"match": {"content": "paid time off"}})}
+    assert "pto-policy" in pto
     # Employees cannot see restricted docs
     assert "project-aurora" not in emp and "salary-bands" not in emp
     # Executives see the restricted docs
@@ -40,3 +42,31 @@ def test_catalog_key_never_returns_content():
     hits_all = _search(keys["catalog"], {"match_all": {}}, source=["title", "classification", "allowed_roles"])
     assert len(hits_all) > 0
     assert all("content" not in h["_source"] for h in hits_all)
+
+
+AURORA_Q = "what is the Project Aurora severance budget"
+
+
+def _retriever():
+    s = Settings()
+    return Retriever(s.obs_es_url, load_keys(s.persona_keys_path), s.index_name)
+
+
+def _assert_no_content_anywhere(result):
+    for ghost in result.hidden:
+        assert not hasattr(ghost, "content") and set(vars(ghost)) == {"id", "title", "classification"}
+
+
+def test_retriever_employee_never_gets_aurora_content_but_sees_it_as_hidden():
+    res = _retriever().search("employee", AURORA_Q)
+    assert "project-aurora" not in {d.id for d in res.docs}
+    assert "project-aurora" in {g.id for g in res.hidden}
+    _assert_no_content_anywhere(res)
+
+
+def test_retriever_exec_gets_aurora_doc_with_content():
+    res = _retriever().search("exec", AURORA_Q)
+    aurora = [d for d in res.docs if d.id == "project-aurora"]
+    assert aurora and aurora[0].content
+    assert "project-aurora" not in {g.id for g in res.hidden}
+    _assert_no_content_anywhere(res)
