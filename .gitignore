@@ -1,0 +1,9 @@
+elasticsearch.txt
+.env
+*.env
+secrets/
+*-sa-key.json
+node_modules/
+__pycache__/
+.venv/
+dist/
