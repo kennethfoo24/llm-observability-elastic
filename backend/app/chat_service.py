@@ -108,8 +108,10 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
             res = deps.sdk.generate(spec, built.system, built.user)
 
     cost = compute_cost(spec.model_id, res.input_tokens, res.output_tokens, res.thinking_tokens, deps.prices)
+    # output_tokens is the billed total (visible output + thinking); thinking_tokens breaks the part out.
     set_root_attrs(app__genai__cost_usd=cost.total_usd, app__genai__input_tokens=res.input_tokens,
                    app__genai__output_tokens=res.output_tokens + res.thinking_tokens,
+                   app__genai__thinking_tokens=res.thinking_tokens,
                    app__genai__cost_basis=cost.basis)
     return {**base, "answer": res.text, "blocked": False, "block_reason": [], "docs": _docs(ret),
             "hidden": _hidden(ret),

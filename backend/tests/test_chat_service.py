@@ -202,3 +202,46 @@ def test_mixed_salary_and_email_blocks_with_all_reasons_listed():
     out = run_chat(REQ, d)
     assert out["blocked"] and out["block_reason"] == ["pii_salary", "pii_email"]
     assert d.retriever.calls == 0
+
+
+def _root_attrs(fn):
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    with provider.get_tracer("test").start_as_current_span("POST /api/chat"):
+        fn()
+    spans = [s for s in exporter.get_finished_spans() if s.name == "POST /api/chat"]
+    assert len(spans) == 1
+    return dict(spans[0].attributes)
+
+
+class ThinkingSdk(FakeSdk):
+    def generate(self, spec, system, user):
+        self.calls += 1
+        return LLMResult("ok", spec.model_id, 1000, 100, 50, "sdk")
+
+
+def test_root_span_carries_pillar4_attributes_on_success():
+    attrs = _root_attrs(lambda: run_chat(REQ, _deps(sdk=ThinkingSdk())))
+    assert attrs["app.persona"] == "employee"
+    assert attrs["app.genai.engine"] == "sdk" and attrs["app.genai.model"] == "gemini-3.1-flash-lite"
+    assert attrs["app.genai.cost_usd"] == pytest.approx(1000 * 0.25 / 1e6 + 150 * 1.5 / 1e6)
+    assert attrs["app.genai.input_tokens"] == 1000
+    # output_tokens is the billed total: visible output + thinking tokens
+    assert attrs["app.genai.output_tokens"] == 150 and attrs["app.genai.thinking_tokens"] == 50
+
+
+def test_root_span_thinking_tokens_zero_in_langchain_mode():
+    attrs = _root_attrs(lambda: run_chat(ChatRequest("pto?", "employee", "flash-lite", "langchain"), _deps()))
+    assert attrs["app.genai.thinking_tokens"] == 0 and attrs["app.genai.engine"] == "langchain"
+    assert attrs["app.genai.output_tokens"] == 10
+
+
+def test_root_span_marks_blocked_requests():
+    d = _deps(guard=FakeGuardrail("FLAGGED", reasons=["prompt_injection"]))
+    attrs = _root_attrs(lambda: run_chat(REQ, d))
+    assert attrs["app.blocked"] is True and attrs["app.genai.cost_usd"] == 0.0
+    assert attrs["app.persona"] == "employee" and attrs["app.genai.engine"] == "sdk"

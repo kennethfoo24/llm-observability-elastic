@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     obs_es_url: str
     obs_es_admin_key: str
     obs_kibana_url: str
+    obs_es_guardrail_key: str = ""  # optional ML-infer-only key for the inline guardrail; falls back to admin
     obs_otlp_url: str = ""
     sec_es_url: str = ""
     sec_es_admin_key: str = ""
@@ -30,6 +31,10 @@ class Settings(BaseSettings):
     guardrail_timeout_s: float = 1.5
     max_message_chars: int = 4000
     app_password: str = ""
+
+    @property
+    def guardrail_es_key(self) -> str:
+        return self.obs_es_guardrail_key or self.obs_es_admin_key
 
 
 @lru_cache

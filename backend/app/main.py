@@ -4,13 +4,14 @@ from typing import Literal
 
 from elasticsearch import Elasticsearch
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from .chat_service import ChatRequest, Deps, run_chat
 from .config import Settings, get_settings
-from .cost import UnknownModel
+from .cost import UnknownModel, load_prices
 from .dls import load_keys
 from .guardrail import Guardrail
 from .llm_langchain import LangChainEngine
@@ -20,6 +21,9 @@ from .personas import PERSONAS
 from .retrieval import Retriever
 
 logger = logging.getLogger("app.main")
+
+
+MAX_MESSAGE_CHARS = Settings.model_fields["max_message_chars"].default
 
 
 class ChatBody(BaseModel):
@@ -34,13 +38,13 @@ class ChatBody(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("message must not be empty")
-        if len(v) > 4000:
+        if len(v) > MAX_MESSAGE_CHARS:
             raise ValueError("message too long")
         return v
 
 
 def _default_deps(s: Settings, gate: GemmaGate) -> Deps:
-    es = Elasticsearch(s.obs_es_url, api_key=s.obs_es_admin_key, request_timeout=20)
+    es = Elasticsearch(s.obs_es_url, api_key=s.guardrail_es_key, request_timeout=20)
     return Deps(
         retriever=Retriever(s.obs_es_url, load_keys(s.persona_keys_path), s.index_name),
         guardrail=Guardrail(es, s.injection_model_id, s.ner_model_id, s.guardrail_timeout_s),
@@ -53,9 +57,21 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
     deps = deps or _default_deps(s, gate)
     if deps.gate is None:
         deps.gate = gate
+    priced = (deps.prices if deps.prices is not None else load_prices())["models"]
+    unpriced = sorted(m.model_id for m in deps.models.values() if m.model_id not in priced)
+    if unpriced:
+        raise RuntimeError(f"models registered without a price entry in prices.yaml: {', '.join(unpriced)}")
     # FastAPI >= 0.14x auto-adds a second OTLP exporter from OTEL_* env, which duplicates every span
     # and log next to opentelemetry-instrument; the distro owns export.
-    app = FastAPI(title="Glass Box", telemetry={"auto_configure": False})
+    app = FastAPI(title="Glass Box", telemetry={"auto_configure": False},
+                  docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError):
+        # FastAPI's default body echoes the offending input (the whole prompt); return field paths only.
+        return JSONResponse({"error": "invalid_request",
+                             "fields": [".".join(str(p) for p in e["loc"]) for e in exc.errors()]},
+                            status_code=422)
 
     @app.middleware("http")
     async def password_gate(request: Request, call_next):

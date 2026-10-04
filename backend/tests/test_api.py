@@ -11,9 +11,9 @@ from app.retrieval import Doc, RetrievalResult
 
 SPECS = {"flash-lite": ModelSpec("flash-lite", "Flash-Lite", "vertex", "gemini-3.1-flash-lite"),
          "gemma": ModelSpec("gemma", "Gemma", "gemma", "google/gemma-4-31B-it"),
-         "noprice": ModelSpec("noprice", "NoPrice", "vertex", "not-in-prices"),
          "boom": ModelSpec("boom", "Boom", "vertex", "gemini-3.1-flash-lite")}
-PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
+PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5},
+                     "google/gemma-4-31B-it": {"gpu_hourly_usd": 6.0, "assumed_tokens_per_hour": 1_200_000}}}
 
 
 class Ret:
@@ -50,8 +50,10 @@ def client(monkeypatch):
         monkeypatch.setenv(k, v)
     Ret.calls = Sdk.calls = 0
     s = Settings(_env_file=None, app_password="demo-pw")
-    deps = Deps(Ret(), Guard(), Sdk(), None, SPECS, PRICES, emit_log=lambda **kw: None)
-    return TestClient(create_app(deps, s, gate=FakeGate()))
+    deps = Deps(Ret(), Guard(), Sdk(), None, dict(SPECS), PRICES, emit_log=lambda **kw: None)
+    c = TestClient(create_app(deps, s, gate=FakeGate()))
+    c.deps = deps
+    return c
 
 
 H = {"X-Demo-Password": "demo-pw"}
@@ -119,6 +121,8 @@ def test_gemma_offline_never_reaches_retriever_or_llm(client):
 
 
 def test_model_missing_from_prices_is_500_pricing_unavailable(client):
+    # Boot refuses unpriced models, so register one after startup to exercise the runtime fallback.
+    client.deps.models["noprice"] = ModelSpec("noprice", "NoPrice", "vertex", "not-in-prices")
     r = client.post("/api/chat", json={**BODY, "model": "noprice"}, headers=H)
     assert r.status_code == 500 and r.json() == {"error": "pricing_unavailable"}
 
@@ -143,3 +147,44 @@ def test_unicode_message_ok(client):
 def test_fastapi_native_otlp_autoconfigure_disabled(client):
     # Regression: FastAPI's own env-driven exporter duplicated every span next to opentelemetry-instrument.
     assert client.app._telemetry["auto_configure"] is False
+
+
+def test_validation_error_does_not_echo_input(client):
+    secret = "SECRET-" + "x" * 4100
+    r = client.post("/api/chat", json={**BODY, "message": secret}, headers=H)
+    assert r.status_code == 422
+    assert r.json() == {"error": "invalid_request", "fields": ["body.message"]}
+    assert "SECRET" not in r.text
+    r = client.post("/api/chat", json={**BODY, "engine": "SECRET-engine"}, headers=H)
+    assert r.status_code == 422 and "SECRET" not in r.text and r.json()["fields"] == ["body.engine"]
+
+
+def test_max_message_chars_default_is_the_validator_bound(client):
+    from app.config import Settings as S
+    limit = S.model_fields["max_message_chars"].default
+    assert client.post("/api/chat", json={**BODY, "message": "x" * limit}, headers=H).status_code == 200
+    assert client.post("/api/chat", json={**BODY, "message": "x" * (limit + 1)}, headers=H).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_interactive_docs_and_schema_are_disabled(client, path):
+    assert client.get(path).status_code == 404
+    assert client.get(path, headers=H).status_code == 404
+
+
+def test_boot_fails_clearly_when_a_registered_model_has_no_price(monkeypatch):
+    for k, v in {"OBS_ES_URL": "https://e", "OBS_ES_ADMIN_KEY": "k", "OBS_KIBANA_URL": "https://k"}.items():
+        monkeypatch.setenv(k, v)
+    specs = {**SPECS, "noprice": ModelSpec("noprice", "NoPrice", "vertex", "not-in-prices")}
+    deps = Deps(Ret(), Guard(), Sdk(), None, specs, PRICES, emit_log=lambda **kw: None)
+    with pytest.raises(RuntimeError, match="not-in-prices"):
+        create_app(deps, Settings(_env_file=None), gate=FakeGate())
+
+
+def test_shipped_models_are_all_priced(monkeypatch):
+    for k, v in {"OBS_ES_URL": "https://e", "OBS_ES_ADMIN_KEY": "k", "OBS_KIBANA_URL": "https://k"}.items():
+        monkeypatch.setenv(k, v)
+    from app.models import get_models
+    s = Settings(_env_file=None)
+    deps = Deps(Ret(), Guard(), Sdk(), None, get_models(s), None, emit_log=lambda **kw: None)
+    create_app(deps, s, gate=FakeGate())  # must not raise
