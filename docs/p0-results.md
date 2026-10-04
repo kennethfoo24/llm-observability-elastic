@@ -66,3 +66,12 @@ Spike: `scripts/spikes/gemini_ids.py` ("Reply with the single word: pong").
 - ES|QL: `attributes.security.threat_verdict` is `Unknown column`; only the whole `attributes.security` column (type `flattened`) can be selected, returning the object with string values. Sub-keys cannot be filtered/aggregated in ES|QL as-is, and `TO_DOUBLE(injection_score)` / `TO_INTEGER(person_count)` casts can only be applied to values extracted from that object (or after a mapping fix).
 - Proposed fix if ES|QL/dashboards need these fields (not applied; needs a decision): add explicit leaf mappings for `attributes.security.threat_verdict` (keyword), `threat_reasons` (keyword), `injection_score` (float), `person_count` (integer), `models_ok` (boolean) via a `logs-otel@custom` component template, or avoid ES|QL on these and use Query DSL aggs.
 - Pipeline now sets verdict `UNKNOWN` (with `models_ok: false`) when model results are absent and no PII matched.
+
+## F. Gemini usage_metadata: thinking tokens (google-genai 2.28.0, Vertex, location global)
+
+Prompt "How many r's are in strawberry? Think step by step." on `gemini-3.5-flash`:
+prompt_token_count=17, candidates_token_count=103, thoughts_token_count=309, total_token_count=429.
+17 + 103 + 309 = 429, so `candidates_token_count` EXCLUDES thoughts; thinking tokens are reported separately.
+Consequence: `SdkEngine.generate` keeps `thinking_tokens = thoughts_token_count` (no zeroing); cost.py must bill
+thinking tokens at the output rate in addition to output_tokens. A trivial "Say pong" on flash also reported 75 thought tokens.
+`gemini-3.1-flash-lite` reports `thoughts_token_count=None` (treated as 0) for the same prompt (total = prompt + candidates).
