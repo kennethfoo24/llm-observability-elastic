@@ -1,5 +1,7 @@
+import contextvars
+import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 
 from opentelemetry import trace
@@ -7,6 +9,8 @@ from opentelemetry import trace
 from .pii import find_pii
 
 tracer = trace.get_tracer("glassbox.guardrail")
+logger = logging.getLogger(__name__)
+POOL_WORKERS = 16
 
 
 @dataclass
@@ -41,33 +45,55 @@ def aggregate_verdict(injection_label: str, injection_score: float, entities: li
 class Guardrail:
     def __init__(self, es, injection_model: str, ner_model: str, timeout_s: float):
         self._es, self._inj, self._ner, self._timeout = es, injection_model, ner_model, timeout_s
-        self._pool = ThreadPoolExecutor(max_workers=4)
+        self._pool = ThreadPoolExecutor(max_workers=POOL_WORKERS)
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=False, cancel_futures=True)
 
     def _infer(self, model_id: str, text: str) -> dict:
-        r = self._es.ml.infer_trained_model(model_id=model_id, docs=[{"text_field": text}])
+        r = self._es.options(request_timeout=self._timeout).ml.infer_trained_model(
+            model_id=model_id, docs=[{"text_field": text}])
         return r["inference_results"][0]
+
+    def _submit(self, model_id: str, text: str):
+        ctx = contextvars.copy_context()
+        return self._pool.submit(ctx.run, self._infer, model_id, text)
 
     def check(self, text: str) -> GuardrailResult:
         start = time.perf_counter()
         with tracer.start_as_current_span("guardrail.check") as span:
             pii = find_pii(text)
-            label, score, entities, status = "SAFE", 0.0, [], "ok"
-            futures = [self._pool.submit(self._infer, self._inj, text),
-                       self._pool.submit(self._infer, self._ner, text)]
-            try:
-                inj = futures[0].result(timeout=self._timeout)
-                ner = futures[1].result(timeout=self._timeout)
-                label = inj.get("predicted_value", "SAFE")
-                score = float(inj.get("prediction_probability", 0.0))
-                entities = ner.get("entities", [])
-            except (FutureTimeout, Exception):  # noqa: BLE001 - fail open by design
-                status = "degraded"
-                for f in futures:
+            label, score, entities = "SAFE", 0.0, []
+            futures = {"injection": self._submit(self._inj, text),
+                       "ner": self._submit(self._ner, text)}
+            done, _ = wait(list(futures.values()), timeout=self._timeout)
+            degraded: list[str] = []
+            for name, f in futures.items():
+                if f not in done:
                     f.cancel()
+                    degraded.append(f"{name}:timeout")
+                    continue
+                exc = f.exception()
+                if exc is not None:
+                    logger.warning("guardrail model call failed", exc_info=exc)
+                    span.record_exception(exc)
+                    degraded.append(f"{name}:{type(exc).__name__}")
+                    continue
+                res = f.result()
+                if name == "injection":
+                    label = res.get("predicted_value", "SAFE")
+                    score = float(res.get("prediction_probability", 0.0))
+                else:
+                    entities = res.get("entities", [])
+            status = "degraded" if degraded else "ok"
             verdict = aggregate_verdict(label, score, entities, pii)
             ms = int((time.perf_counter() - start) * 1000)
             span.set_attribute("guardrail.status", status)
             span.set_attribute("guardrail.verdict", verdict.verdict)
             span.set_attribute("guardrail.injection_score", verdict.injection_score)
             span.set_attribute("guardrail.reasons", ",".join(verdict.reasons))
+            span.set_attribute("guardrail.person_count", verdict.person_count)
+            span.set_attribute("guardrail.latency_ms", ms)
+            if degraded:
+                span.set_attribute("guardrail.degraded_reason", ",".join(degraded))
             return GuardrailResult(verdict, status, ms)
