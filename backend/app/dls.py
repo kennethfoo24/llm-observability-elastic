@@ -23,7 +23,9 @@ CATALOG_ROLE_DESCRIPTOR = {
         "indices": [{
             "names": [INDEX_NAME],
             "privileges": ["read"],
-            "field_security": {"grant": ["title", "classification", "allowed_roles"]},
+            # FLS hides non-granted fields from queries, not just _source. Grant content fields
+            # so catalog role can search by content; app always filters _source to exclude them.
+            "field_security": {"grant": ["title", "classification", "allowed_roles", "content", "content_semantic"]},
         }],
     }
 }
