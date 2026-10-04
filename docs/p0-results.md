@@ -129,6 +129,11 @@ Observation: `attributes.security.injection_score` is about 0.99999 for BENIGN p
 - Gemma path (VM stopped).
 - Kibana APM UI screenshot (non-interactive session); trace verified through the `traces-*` data stream instead.
 
+### H6. Correction to H1 (final-review fix wave): Dockerfile instrumentation set
+- `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=openai` (H1) disabled BOTH `elastic-opentelemetry-instrumentation-openai` and the official `opentelemetry-instrumentation-genai-openai`, because they register under the same entry-point name `openai`. Gemma / openai-client calls would therefore have produced no gen_ai spans. The env var is removed; instead the image runs `pip uninstall -y elastic-opentelemetry-instrumentation-openai` after `edot-bootstrap --action=install`, so the official instrumentor is the only `openai` entry point.
+- `|| true` after edot-bootstrap is gone and the build now fails unless `opentelemetry-instrumentation-fastapi` and `opentelemetry-instrumentation-genai-openai` are installed (and the Elastic openai one is not).
+- Verified in the rebuilt image (`glassbox-backend:dev`): `pip list` shows `opentelemetry-instrumentation-fastapi 0.65b0` and `opentelemetry-instrumentation-genai-openai 1.2b0` and no `elastic-opentelemetry-instrumentation-openai`; the `openai` entry point resolves to `opentelemetry.instrumentation.genai.openai:OpenAIInstrumentor`. Not verified live: an actual Gemma span (VM stopped).
+
 ## I. Guardrail output typing and key scope (final-review fix wave, 2026-10-04)
 
 ### I1. `injection_score` semantics (fixed)
