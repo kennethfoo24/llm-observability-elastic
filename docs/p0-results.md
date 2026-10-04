@@ -57,3 +57,12 @@ Spike: `scripts/spikes/gemini_ids.py` ("Reply with the single word: pong").
 - **GUARD_PREFIX for Task 7 = `attributes.security`** (the `attributes` object is mapped and searchable, as shown by `attributes.genai.prompt_text`). Alternative (not needed): map top-level `security` via a `logs-otel@custom` component template.
 - `logs@custom` should be KEPT and reused by Task 7: its install_pipeline.py GETs it first and appends the hook processor rather than overwriting.
 - Leftovers: two probe docs (OTLP probe; security probe) remain in the data stream.
+
+## E. Storage type of `attributes.security.*` (Task 7 follow-up)
+
+- Mapping in `logs-genai_guardrail.otel-default`: `attributes` is a `passthrough` object; `attributes.security` is mapped as a single `flattened` field (dynamic mapping of an unknown object under `attributes`), not as individual leaf fields.
+- Stored `_source` of a live doc shows `injection_score: '0.9999...'` and `person_count: '0'` as strings, while `_ingest/pipeline/_simulate` output has real numbers. So the pipeline emits numbers; the stringification happens after the pipeline, in the OTLP/otel ingest layer for flattened values (exact stage not visible from the API). `threat_reasons` remains an array.
+- Query DSL works on flattened sub-keys (verified `term attributes.security.threat_verdict: FLAGGED` and a `terms` agg on `attributes.security.threat_reasons`), but all leaves are keyword-typed: no numeric `range` on `injection_score`.
+- ES|QL: `attributes.security.threat_verdict` is `Unknown column`; only the whole `attributes.security` column (type `flattened`) can be selected, returning the object with string values. Sub-keys cannot be filtered/aggregated in ES|QL as-is, and `TO_DOUBLE(injection_score)` / `TO_INTEGER(person_count)` casts can only be applied to values extracted from that object (or after a mapping fix).
+- Proposed fix if ES|QL/dashboards need these fields (not applied; needs a decision): add explicit leaf mappings for `attributes.security.threat_verdict` (keyword), `threat_reasons` (keyword), `injection_score` (float), `person_count` (integer), `models_ok` (boolean) via a `logs-otel@custom` component template, or avoid ES|QL on these and use Query DSL aggs.
+- Pipeline now sets verdict `UNKNOWN` (with `models_ok: false`) when model results are absent and no PII matched.

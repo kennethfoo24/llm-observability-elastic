@@ -45,6 +45,52 @@ def test_pipeline_verdict_matches_shared_cases(case):
     reasons = _nested(src, f"{GUARD_PREFIX}.threat_reasons") if case["expected_reasons"] else []
     assert sorted(reasons) == sorted(case["expected_reasons"])
     assert "guard_tmp" not in src
+    assert _nested(src, f"{GUARD_PREFIX}.models_ok") is True
+    if case["expected_verdict"] == "CLEAN":
+        assert _nested(src, f"{GUARD_PREFIX}.threat_reasons") == []
+
+
+_OK_MODELS = {"injection": {"predicted_value": "SAFE", "prediction_probability": 0.01}, "ner": {"entities": []}}
+
+
+def _run(doc: dict) -> dict:
+    s = Settings()
+    es = Elasticsearch(s.obs_es_url, api_key=s.obs_es_admin_key)
+    out = es.ingest.simulate(pipeline=build_pipeline(include_inference=False), docs=[{"_source": doc}])["docs"][0]
+    assert "error" not in out, out
+    src = out["doc"]["_source"]
+    assert "guard_tmp" not in src
+    return _nested(src, GUARD_PREFIX)
+
+
+@pytest.mark.integration
+def test_flat_dotted_attribute_key_is_expanded():
+    g = _run({"attributes": {"genai.prompt_text": "email alex.tan@nimbus-corp.example"},
+              "guard_tmp": dict(_OK_MODELS)})
+    assert g["threat_verdict"] == "FLAGGED" and g["threat_reasons"] == ["pii_email"]
+
+
+@pytest.mark.integration
+def test_missing_prompt_field_is_unknown_without_error():
+    g = _run({"message": "no prompt here"})
+    assert g["threat_verdict"] == "UNKNOWN"
+
+
+@pytest.mark.integration
+def test_multi_pii_all_reasons():
+    prompt = "Mail a@b.example, NRIC S1234567D, call +65 9123 4567, pay 127,500"
+    g = _run({"attributes": {"genai": {"prompt_text": prompt}}, "guard_tmp": dict(_OK_MODELS)})
+    assert g["threat_verdict"] == "FLAGGED"
+    assert sorted(g["threat_reasons"]) == ["pii_email", "pii_nric", "pii_phone", "pii_salary"]
+
+
+@pytest.mark.integration
+def test_model_outage_is_unknown_not_clean_but_pii_still_flags():
+    clean = _run({"attributes": {"genai": {"prompt_text": "How many PTO days do I get?"}}})
+    assert clean["threat_verdict"] == "UNKNOWN" and clean["models_ok"] is False
+    pii = _run({"attributes": {"genai": {"prompt_text": "email alex.tan@nimbus-corp.example"}}})
+    assert pii["threat_verdict"] == "FLAGGED" and pii["threat_reasons"] == ["pii_email"]
+    assert pii["models_ok"] is False
 
 
 def test_hook_preserves_existing_processors_and_is_idempotent():

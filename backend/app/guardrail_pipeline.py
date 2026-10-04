@@ -9,6 +9,7 @@ HOOK_CONDITION = "ctx.data_stream?.dataset == 'genai_guardrail.otel' || ctx.data
 
 VERDICT_SCRIPT = """
 Map g = ctx.guard_tmp;
+if (g == null) { g = new HashMap(); ctx.guard_tmp = g; }
 List reasons = new ArrayList();
 double injScore = 0.0;
 String injLabel = 'UNKNOWN';
@@ -27,7 +28,9 @@ if (g.containsKey('ner') && g.ner != null && g.ner.entities != null) {
   }
 }
 if (people.size() >= 2) { reasons.add('pii_multiple_people'); }
-g.threat_verdict = reasons.isEmpty() ? 'CLEAN' : 'FLAGGED';
+boolean modelsOk = g.containsKey('injection') && g.injection != null && g.containsKey('ner') && g.ner != null;
+g.models_ok = modelsOk;
+g.threat_verdict = !reasons.isEmpty() ? 'FLAGGED' : (modelsOk ? 'CLEAN' : 'UNKNOWN');
 g.threat_reasons = reasons;
 g.injection_score = injScore;
 g.person_count = people.size();

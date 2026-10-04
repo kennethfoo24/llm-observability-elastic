@@ -15,8 +15,9 @@ try:
     existing = es.ingest.get_pipeline(id=HOOK_PIPELINE)[HOOK_PIPELINE]
 except NotFoundError:
     existing = None
-if existing:  # GET returns read-only metadata (created_date_millis, ...); PUT only accepts these
+if existing:  # GET returns read-only metadata (created_date_millis, ...); PUT rejects them
     existing = {k: v for k, v in existing.items()
-                if k in ("description", "processors", "on_failure", "version", "_meta", "deprecated")}
+                if k not in ("created_date_millis", "modified_date_millis")
+                and not (k.startswith("_") and k != "_meta")}
 es.ingest.put_pipeline(id=HOOK_PIPELINE, **build_hook(existing))
 print("installed", PIPELINE_ID, "and hooked it into", HOOK_PIPELINE)
