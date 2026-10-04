@@ -41,6 +41,8 @@ class Sdk:
 class FakeGate:
     def is_up(self): return False
 
+    def require(self): raise GemmaOffline("off")
+
 
 @pytest.fixture
 def client(monkeypatch):
@@ -109,6 +111,11 @@ def test_bad_engine_422(client):
 def test_gemma_offline_is_fast_503(client):
     r = client.post("/api/chat", json={**BODY, "model": "gemma"}, headers=H)
     assert r.status_code == 503 and r.json()["error"] == "gemma_offline" and "hint" in r.json()
+
+
+def test_gemma_offline_never_reaches_retriever_or_llm(client):
+    r = client.post("/api/chat", json={**BODY, "model": "gemma"}, headers=H)
+    assert r.status_code == 503 and Ret.calls == 0 and Sdk.calls == 0
 
 
 def test_model_missing_from_prices_is_500_pricing_unavailable(client):

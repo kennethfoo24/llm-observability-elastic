@@ -74,3 +74,14 @@ def test_unknown_persona_key_raises_keyerror():
     import pytest
     with pytest.raises(KeyError):
         r.search("intern", "x")
+
+
+def test_catalog_client_is_only_used_by_catalog_search_and_always_limits_source():
+    import inspect
+    import re
+    # Structural guard: the catalog client may be fetched in exactly one place.
+    uses = [name for name, fn in inspect.getmembers(Retriever, inspect.isfunction)
+            if re.search(r"_client\(\s*[\"']catalog[\"']", inspect.getsource(fn))]
+    assert uses == ["_catalog_search"]
+    _, made = _run_search()
+    assert made["cat-key"].calls and all("source_includes" in c for c in made["cat-key"].calls)

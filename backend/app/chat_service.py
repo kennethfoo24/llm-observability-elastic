@@ -15,6 +15,12 @@ from .telemetry import emit_prompt_log, set_root_attrs, trace_id_hex
 
 logger = logging.getLogger("app.chat_service")
 
+# Inline blocking policy. The async pipeline flags every reason below (and the X-ray shows the
+# FLAGGED verdict), but only a security-relevant subset stops the request. Ordinary HR questions
+# that merely mention a salary or several colleagues are flagged-but-allowed; everything in
+# BLOCKING_REASONS (prompt injection and direct identifiers) is blocked before retrieval or the LLM.
+BLOCKING_REASONS = {"prompt_injection", "pii_email", "pii_nric", "pii_ssn", "pii_phone"}
+
 
 @dataclass
 class ChatRequest:
@@ -33,6 +39,7 @@ class Deps:
     models: dict[str, ModelSpec]
     prices: dict | None = None
     emit_log: Callable = emit_prompt_log
+    gate: object | None = None  # GemmaGate-like; consulted first so an offline VM answers 503 fast
 
 
 @contextmanager
@@ -56,6 +63,8 @@ def _hidden(ret: RetrievalResult):
 def run_chat(req: ChatRequest, deps: Deps) -> dict:
     persona = get_persona(req.persona)
     spec = deps.models[req.model]
+    if spec.provider == "gemma" and deps.gate is not None:
+        deps.gate.require()  # raises GemmaOffline before any guardrail / ES / LLM work
     stages: list[dict] = []
     set_root_attrs(app__persona=persona.id, app__genai__model=spec.model_id, app__genai__engine=req.engine)
 
@@ -75,7 +84,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
     base = {"trace_id": trace_id_hex(), "persona": persona.id, "model": spec.model_id,
             "engine": req.engine, "guardrail": guard, "stages": stages}
 
-    if g.verdict.verdict == "FLAGGED":
+    if g.verdict.verdict == "FLAGGED" and set(g.verdict.reasons) & BLOCKING_REASONS:
         set_root_attrs(app__genai__cost_usd=0.0, app__blocked=True)
         return {**base, "answer": "", "blocked": True, "block_reason": g.verdict.reasons,
                 "docs": [], "hidden": [],

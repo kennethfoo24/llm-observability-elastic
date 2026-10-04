@@ -9,6 +9,7 @@ from app.retrieval import Doc, Ghost, RetrievalResult
 
 PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
 SPEC = ModelSpec("flash-lite", "Flash-Lite", "vertex", "gemini-3.1-flash-lite")
+GEMMA = ModelSpec("gemma", "Gemma", "gemma", "google/gemma-4-31B-it")
 CONTRACT_KEYS = {"answer", "blocked", "block_reason", "trace_id", "persona", "model", "engine", "docs",
                  "hidden", "usage", "cost_usd", "guardrail", "stages"}
 
@@ -53,11 +54,19 @@ class FakeLc:
         return ret, build_prompt(persona, question, ret.docs), LLMResult("lc answer", spec.model_id, 100, 10, 0, "langchain")
 
 
-def _deps(result=None, guard=None, sdk=None):
+class Gate:
+    def __init__(self, up): self.up = up
+
+    def require(self):
+        if not self.up:
+            raise GemmaOffline("off")
+
+
+def _deps(result=None, guard=None, sdk=None, gate=None):
     docs = [Doc("pto", "PTO", "public", "18 days", 2.0)]
     d = Deps(retriever=FakeRetriever(result or RetrievalResult(docs, [Ghost("aurora", "Aurora", "restricted")], 5)),
              guardrail=guard or FakeGuardrail(), sdk=sdk or FakeSdk(), langchain=FakeLc(),
-             models={"flash-lite": SPEC}, prices=PRICES, emit_log=LogSink())
+             models={"flash-lite": SPEC, "gemma": GEMMA}, prices=PRICES, emit_log=LogSink(), gate=gate)
     return d
 
 
@@ -148,3 +157,48 @@ def test_response_has_exact_contract_keys(engine, kind):
     assert set(out) == CONTRACT_KEYS
     assert set(out["usage"]) == {"input_tokens", "output_tokens", "thinking_tokens"}
     assert set(out["guardrail"]) == {"verdict", "reasons", "status", "latency_ms", "injection_score"}
+
+
+@pytest.mark.parametrize("engine", ["sdk", "langchain"])
+def test_gemma_offline_fails_fast_before_any_guardrail_or_retrieval_work(engine):
+    class CountingGuard(FakeGuardrail):
+        calls = 0
+        def check(self, text):
+            CountingGuard.calls += 1
+            return super().check(text)
+
+    d = _deps(guard=CountingGuard(), gate=Gate(up=False))
+    with pytest.raises(GemmaOffline):
+        run_chat(ChatRequest("pto?", "employee", "gemma", engine), d)
+    assert CountingGuard.calls == 0 and d.retriever.calls == 0 and d.sdk.calls == 0
+    assert d.emit_log.calls == []
+
+
+def test_gate_not_consulted_for_vertex_models():
+    class Boom:
+        def require(self): raise AssertionError("gate must not be called")
+    out = run_chat(REQ, _deps(gate=Boom()))
+    assert not out["blocked"]
+
+
+@pytest.mark.parametrize("reasons", [["pii_salary"], ["pii_multiple_people"], ["pii_salary", "pii_multiple_people"]])
+def test_non_security_flags_are_logged_but_do_not_block(reasons):
+    d = _deps(guard=FakeGuardrail("FLAGGED", reasons=reasons))
+    out = run_chat(REQ, d)
+    assert not out["blocked"] and out["block_reason"] == [] and out["answer"] == "18 days [pto]"
+    assert out["guardrail"]["verdict"] == "FLAGGED" and out["guardrail"]["reasons"] == reasons
+    assert d.retriever.calls == 1 and d.sdk.calls == 1 and len(d.emit_log.calls) == 1
+
+
+@pytest.mark.parametrize("reason", ["prompt_injection", "pii_email", "pii_nric", "pii_ssn", "pii_phone"])
+def test_security_reasons_block(reason):
+    d = _deps(guard=FakeGuardrail("FLAGGED", reasons=[reason]))
+    out = run_chat(REQ, d)
+    assert out["blocked"] and out["block_reason"] == [reason] and d.retriever.calls == 0 and d.sdk.calls == 0
+
+
+def test_mixed_salary_and_email_blocks_with_all_reasons_listed():
+    d = _deps(guard=FakeGuardrail("FLAGGED", reasons=["pii_salary", "pii_email"]))
+    out = run_chat(REQ, d)
+    assert out["blocked"] and out["block_reason"] == ["pii_salary", "pii_email"]
+    assert d.retriever.calls == 0

@@ -105,3 +105,13 @@ def test_gemini_tolerates_missing_usage_metadata(s):
 
     r = SdkEngine(s, _gate(), genai_client=NoUsage()).generate(get_models(s)["flash-lite"], "sys", "user")
     assert (r.text, r.input_tokens, r.output_tokens, r.thinking_tokens) == ("", 0, 0, 0)
+
+
+@pytest.mark.parametrize("exc", [httpx.InvalidURL("bad url"), OSError("ssl: weird")])
+def test_gate_treats_any_exception_as_offline(exc):
+    def boom(request):
+        raise exc
+    gate = GemmaGate("https://gemma/v1", "k", ttl_s=0.0, http=httpx.Client(transport=httpx.MockTransport(boom)))
+    assert gate.is_up() is False
+    with pytest.raises(GemmaOffline):
+        gate.require()

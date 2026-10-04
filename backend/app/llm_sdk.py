@@ -1,3 +1,4 @@
+import logging
 import time
 from dataclasses import dataclass
 
@@ -5,6 +6,8 @@ import httpx
 
 from .config import Settings
 from .models import ModelSpec
+
+logger = logging.getLogger("app.llm_sdk")
 
 
 @dataclass
@@ -34,7 +37,8 @@ class GemmaGate:
             return self._up
         try:
             self._up = self._http.get(self._url, headers={"Authorization": f"Bearer {self._key}"}).status_code == 200
-        except httpx.HTTPError:
+        except Exception:  # malformed URL, TLS or OS errors all mean "not serving", never a 500
+            logger.debug("gemma health probe failed", exc_info=True)
             self._up = False
         self._checked_at = time.monotonic()
         return self._up

@@ -77,6 +77,12 @@ class Retriever:
             self._clients[name] = self._factory(self._url, self._keys[name])
         return self._clients[name]
 
+    def _catalog_search(self, text: str) -> dict:
+        """The ONLY use of the catalog client. It can match on content but must never fetch it,
+        so source_includes is always set here."""
+        return self._client("catalog").search(
+            index=self._index, retriever=_rrf(text, 20), size=8, source_includes=CATALOG_SOURCE_INCLUDES)
+
     def search(self, persona_id: str, text: str) -> RetrievalResult:
         persona = get_persona(persona_id) if persona_id != "catalog" else None
         if persona is None or persona.id not in self._keys:
@@ -86,10 +92,7 @@ class Retriever:
             resp = self._client(persona.id).search(index=self._index, **build_query(text))
             docs = [Doc(h["_id"], h["_source"]["title"], h["_source"]["classification"],
                         h["_source"]["content"], h.get("_score") or 0.0) for h in resp["hits"]["hits"]]
-            # Catalog key can search content but must never fetch it in _source.
-            catalog = self._client("catalog").search(
-                index=self._index, retriever=_rrf(text, 20), size=8,
-                source_includes=CATALOG_SOURCE_INCLUDES)
+            catalog = self._catalog_search(text)
             hidden = split_hidden(catalog["hits"]["hits"], persona.role)
             span.set_attribute("retrieval.docs_returned", len(docs))
             span.set_attribute("retrieval.docs_hidden_by_dls", len(hidden))

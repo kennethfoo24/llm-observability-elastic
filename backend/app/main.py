@@ -44,13 +44,15 @@ def _default_deps(s: Settings, gate: GemmaGate) -> Deps:
     return Deps(
         retriever=Retriever(s.obs_es_url, load_keys(s.persona_keys_path), s.index_name),
         guardrail=Guardrail(es, s.injection_model_id, s.ner_model_id, s.guardrail_timeout_s),
-        sdk=SdkEngine(s, gate), langchain=LangChainEngine(s, gate), models=get_models(s))
+        sdk=SdkEngine(s, gate), langchain=LangChainEngine(s, gate), models=get_models(s), gate=gate)
 
 
 def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=None) -> FastAPI:
     s = settings or get_settings()
     gate = gate or GemmaGate(s.gemma_base_url, s.gemma_api_key)
     deps = deps or _default_deps(s, gate)
+    if deps.gate is None:
+        deps.gate = gate
     # FastAPI >= 0.14x auto-adds a second OTLP exporter from OTEL_* env, which duplicates every span
     # and log next to opentelemetry-instrument; the distro owns export.
     app = FastAPI(title="Glass Box", telemetry={"auto_configure": False})
