@@ -80,3 +80,28 @@ def test_gate_caches_result_for_ttl():
     gate = GemmaGate("https://g/v1", "k", ttl_s=60.0, http=httpx.Client(transport=httpx.MockTransport(handler)))
     gate.is_up(); gate.is_up()
     assert len(calls) == 1
+
+
+def test_gemma_tolerates_missing_usage_and_empty_choices(s):
+    class NoUsage(FakeOpenAI):
+        def create(self, model, messages):
+            return NS(choices=[NS(message=NS(content="hi"))], usage=None)
+
+    class NoChoices(FakeOpenAI):
+        def create(self, model, messages):
+            return NS(choices=[], usage=NS(prompt_tokens=7, completion_tokens=0))
+
+    spec = get_models(s)["gemma"]
+    r = SdkEngine(s, _gate(True), openai_client=NoUsage()).generate(spec, "sys", "user")
+    assert (r.text, r.input_tokens, r.output_tokens) == ("hi", 0, 0)
+    r = SdkEngine(s, _gate(True), openai_client=NoChoices()).generate(spec, "sys", "user")
+    assert (r.text, r.input_tokens, r.output_tokens) == ("", 7, 0)
+
+
+def test_gemini_tolerates_missing_usage_metadata(s):
+    class NoUsage(FakeGenai):
+        def generate_content(self, model, contents, config):
+            return NS(text=None, usage_metadata=None)
+
+    r = SdkEngine(s, _gate(), genai_client=NoUsage()).generate(get_models(s)["flash-lite"], "sys", "user")
+    assert (r.text, r.input_tokens, r.output_tokens, r.thinking_tokens) == ("", 0, 0, 0)

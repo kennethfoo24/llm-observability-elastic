@@ -48,3 +48,8 @@ def test_shipped_prices_have_no_zero_price_placeholders():
     for name, e in load_prices()["models"].items():
         if "input_per_mtok" in e:
             assert e["input_per_mtok"] > 0 and e["output_per_mtok"] > 0, name
+
+
+def test_empty_prices_table_is_respected_not_replaced_by_shipped_prices():
+    with pytest.raises(UnknownModel):
+        compute_cost("gemini-3.1-flash-lite", 1, 1, prices={"models": {}})

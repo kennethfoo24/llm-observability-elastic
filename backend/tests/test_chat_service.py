@@ -13,6 +13,11 @@ CONTRACT_KEYS = {"answer", "blocked", "block_reason", "trace_id", "persona", "mo
                  "hidden", "usage", "cost_usd", "guardrail", "stages"}
 
 
+class LogSink:
+    def __init__(self): self.calls = []
+    def __call__(self, **kw): self.calls.append(kw)
+
+
 class FakeRetriever:
     def __init__(self, result): self.result, self.calls = result, 0
 
@@ -50,11 +55,9 @@ class FakeLc:
 
 def _deps(result=None, guard=None, sdk=None):
     docs = [Doc("pto", "PTO", "public", "18 days", 2.0)]
-    logs = []
     d = Deps(retriever=FakeRetriever(result or RetrievalResult(docs, [Ghost("aurora", "Aurora", "restricted")], 5)),
              guardrail=guard or FakeGuardrail(), sdk=sdk or FakeSdk(), langchain=FakeLc(),
-             models={"flash-lite": SPEC}, prices=PRICES, emit_log=lambda **kw: logs.append(kw))
-    d.logs = logs
+             models={"flash-lite": SPEC}, prices=PRICES, emit_log=LogSink())
     return d
 
 
@@ -74,7 +77,7 @@ def test_happy_path_returns_xray_payload_and_cost():
 def test_prompt_log_emitted_for_every_request_including_blocked():
     d = _deps(guard=FakeGuardrail("FLAGGED", reasons=["prompt_injection"]))
     run_chat(REQ, d)
-    assert len(d.logs) == 1 and d.logs[0]["prompt"] == REQ.message and d.logs[0]["persona"] == "employee"
+    assert len(d.emit_log.calls) == 1 and d.emit_log.calls[0]["prompt"] == REQ.message and d.emit_log.calls[0]["persona"] == "employee"
 
 
 def test_flagged_prompt_is_blocked_before_retrieval_or_llm():
@@ -119,7 +122,7 @@ def test_guardrail_exception_fails_open_for_benign_prompt(caplog):
         out = run_chat(REQ, d)
     assert not out["blocked"] and out["answer"] == "18 days [pto]"
     assert out["guardrail"]["status"] == "degraded" and out["guardrail"]["verdict"] == "CLEAN"
-    assert len(d.logs) == 1 and d.logs[0]["status"] == "degraded"
+    assert len(d.emit_log.calls) == 1 and d.emit_log.calls[0]["status"] == "degraded"
     assert any(r.name == "app.chat_service" and r.exc_info for r in caplog.records)
 
 
@@ -129,7 +132,7 @@ def test_guardrail_exception_still_blocks_regex_pii():
     assert out["blocked"] and out["block_reason"] == ["pii_email"]
     assert out["guardrail"]["status"] == "degraded"
     assert d.retriever.calls == 0 and d.sdk.calls == 0
-    assert len(d.logs) == 1
+    assert len(d.emit_log.calls) == 1
 
 
 @pytest.mark.parametrize("engine,kind", [("sdk", "happy"), ("sdk", "blocked"), ("sdk", "nocontext"),

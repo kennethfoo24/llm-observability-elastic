@@ -2,12 +2,9 @@ import time
 from dataclasses import dataclass
 
 import httpx
-from opentelemetry import trace
 
 from .config import Settings
 from .models import ModelSpec
-
-tracer = trace.get_tracer("glassbox.llm")
 
 
 @dataclass
@@ -72,12 +69,16 @@ class SdkEngine:
             r = self._openai_client().chat.completions.create(
                 model=spec.model_id,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
-            return LLMResult(r.choices[0].message.content or "", spec.model_id,
-                             r.usage.prompt_tokens, r.usage.completion_tokens, 0, "sdk")
+            text = r.choices[0].message.content if r.choices else ""
+            u = r.usage
+            return LLMResult(text or "", spec.model_id, (u.prompt_tokens if u else 0) or 0,
+                             (u.completion_tokens if u else 0) or 0, 0, "sdk")
         from google.genai import types
         r = self._genai_client().models.generate_content(
             model=spec.model_id, contents=user,
             config=types.GenerateContentConfig(system_instruction=system))
         u = r.usage_metadata
+        if u is None:
+            return LLMResult(r.text or "", spec.model_id, 0, 0, 0, "sdk")
         return LLMResult(r.text or "", spec.model_id, u.prompt_token_count or 0,
                          u.candidates_token_count or 0, getattr(u, "thoughts_token_count", 0) or 0, "sdk")

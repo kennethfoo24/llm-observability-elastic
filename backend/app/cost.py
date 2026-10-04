@@ -32,7 +32,7 @@ def compute_cost(model_id: str, input_tokens: int, output_tokens: int,
                  thinking_tokens: int = 0, prices: dict | None = None) -> Cost:
     if min(input_tokens, output_tokens, thinking_tokens) < 0:
         raise ValueError("token counts must be non-negative")
-    table = (prices or load_prices())["models"]
+    table = (prices if prices is not None else load_prices())["models"]
     if model_id not in table:
         raise UnknownModel(model_id)
     entry = table[model_id]

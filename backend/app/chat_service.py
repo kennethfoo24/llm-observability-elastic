@@ -2,9 +2,7 @@ import logging
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-
-from opentelemetry import trace
+from dataclasses import dataclass
 
 from .cost import compute_cost
 from .guardrail import GuardrailResult, aggregate_verdict
@@ -15,7 +13,6 @@ from .prompt import NO_CONTEXT_ANSWER, build_prompt
 from .retrieval import RetrievalResult
 from .telemetry import emit_prompt_log, set_root_attrs, trace_id_hex
 
-tracer = trace.get_tracer("glassbox.chat")
 logger = logging.getLogger("app.chat_service")
 
 
@@ -36,7 +33,6 @@ class Deps:
     models: dict[str, ModelSpec]
     prices: dict | None = None
     emit_log: Callable = emit_prompt_log
-    logs: list = field(default_factory=list)
 
 
 @contextmanager
@@ -91,7 +87,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
         if not ret.docs:
             return _no_context(base, ret)
         with _timed(stages, "llm.generate"):  # prompt.build runs inside the chain
-            _, _built, res = deps.langchain.run(spec, persona, req.message, lambda _q: ret)
+            *_, res = deps.langchain.run(spec, persona, req.message, lambda _q: ret)
     else:
         with _timed(stages, "retrieval.hybrid"):
             ret = deps.retriever.search(persona.id, req.message)
