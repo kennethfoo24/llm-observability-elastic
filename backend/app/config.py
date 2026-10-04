@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     vertex_project: str = "elastic-sa"
     vertex_location: str = "global"
     gemini_flash_lite_id: str = "gemini-3.1-flash-lite"
-    gemini_flash_id: str = "gemini-3.8-flash"  # Task 1A: newest Flash returning OK in global
+    gemini_flash_id: str = "gemini-3.5-flash"  # in the 12-month-availability table of the Vertex model-versions page (fetched 2026-10-04); newer 3.6-3.8 are short-term-availability models
     gemma_base_url: str = "https://llm-34-126-172-79.nip.io/v1"
     gemma_api_key: str = ""
     gemma_model_id: str = "google/gemma-4-31B-it"
