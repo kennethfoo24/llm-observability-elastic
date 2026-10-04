@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     vertex_project: str = "elastic-sa"
     vertex_location: str = "global"
     gemini_flash_lite_id: str = "gemini-3.1-flash-lite"
-    gemini_flash_id: str = "gemini-3.5-flash"  # confirmed/overwritten by Task 1A
+    gemini_flash_id: str = "gemini-3.8-flash"  # Task 1A: newest Flash returning OK in global
     gemma_base_url: str = "https://llm-34-126-172-79.nip.io/v1"
     gemma_api_key: str = ""
     gemma_model_id: str = "google/gemma-4-31B-it"
