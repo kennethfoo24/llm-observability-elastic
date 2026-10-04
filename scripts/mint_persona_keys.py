@@ -32,16 +32,13 @@ def mint(es, out_path: Path) -> list[str]:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         # Ensure file has 0o600 even if it pre-existed as 0644 (must be before fdopen closes it)
-        os.fchmod(fd, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+        except BaseException:
+            os.close(fd)
+            raise
         with os.fdopen(fd, "w") as f:
             json.dump(keys, f)
-
-        # Only after successful write, invalidate old ones
-        to_delete = old_key_ids - new_key_ids
-        if to_delete:
-            es.security.invalidate_api_key(ids=list(to_delete))
-
-        return list(keys.keys())
     except Exception:
         # Best-effort invalidate just-created keys on any failure
         if new_key_ids:
@@ -50,6 +47,20 @@ def mint(es, out_path: Path) -> list[str]:
             except Exception:
                 pass
         raise
+
+    # File is fully written. Invalidate old keys independently: a failure here must
+    # NOT touch the new keys (the file is good).
+    to_delete = sorted(old_key_ids - new_key_ids)
+    if to_delete:
+        try:
+            es.security.invalidate_api_key(ids=to_delete)
+        except Exception as e:
+            raise RuntimeError(
+                f"persona keys written to {out_path.name} but failed to invalidate old keys "
+                f"{', '.join(to_delete)}; old keys remain active"
+            ) from e
+
+    return list(keys.keys())
 
 
 def main() -> int:

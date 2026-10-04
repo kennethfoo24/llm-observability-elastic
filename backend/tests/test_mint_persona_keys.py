@@ -2,10 +2,9 @@ import importlib.util
 import json
 import os
 import stat
-import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,6 +25,9 @@ class FakeSecurity:
         self.old_key_ids = old_key_ids or []
         self.created_ids = []
         self.invalidated_ids = []
+        self.events = []
+        self.out_path = None  # if set, record whether file exists at invalidate time
+        self.fail_invalidate_old = False
         self.fail_on_create_index = None  # If set, fail when creating this key index (0-based)
 
     def get_api_key(self, name=None, owner=None):
@@ -40,10 +42,16 @@ class FakeSecurity:
             raise Exception(f"Simulated failure on key {create_idx}")
         key_id = f"new-key-{create_idx}"
         self.created_ids.append(key_id)
-        return {"id": key_id, "encoded": f"fake-encoded-key-{create_idx}"}
+        self.events.append(f"create:{name}")
+        return {"id": key_id, "encoded": f"SECRET-ENC-{name}"}
 
     def invalidate_api_key(self, ids=None):
         """Track invalidated keys."""
+        if self.out_path is not None and self.out_path.exists():
+            self.events.append("file_written")
+        self.events.append("invalidate:" + ",".join(sorted(ids or [])))
+        if self.fail_invalidate_old and not any(i.startswith("new-key-") for i in ids or []):
+            raise ConnectionError("simulated invalidate failure")
         self.invalidated_ids.extend(ids or [])
 
 
@@ -71,8 +79,8 @@ def test_mint_happy_path():
         with open(out_path) as f:
             keys = json.load(f)
         assert set(keys.keys()) == {"employee", "manager", "hr", "exec", "catalog"}
-        assert keys["employee"] == "fake-encoded-key-0"
-        assert keys["catalog"] == "fake-encoded-key-4"
+        assert keys["employee"] == "SECRET-ENC-glassbox-employee"
+        assert keys["catalog"] == "SECRET-ENC-glassbox-catalog"
 
         # Check file mode is 0o600
         file_mode = stat.S_IMODE(os.stat(out_path).st_mode)
@@ -110,8 +118,9 @@ def test_mint_create_fails_on_third_key():
         es = FakeEs(old_key_ids=old_key_ids)
         es.security.fail_on_create_index = 2  # Fail on the 3rd key (0-indexed)
 
-        with pytest.raises(Exception, match="Simulated failure on key 2"):
+        with pytest.raises(Exception, match="Simulated failure on key 2") as exc:
             mint_module.mint(es, out_path)
+        assert "SECRET-ENC" not in str(exc.value)
 
         # Check that first 2 new keys were invalidated (cleanup on failure)
         assert "new-key-0" in es.security.invalidated_ids
@@ -135,8 +144,9 @@ def test_mint_file_write_failure():
         old_key_ids = ["old-1"]
         es = FakeEs(old_key_ids=old_key_ids)
 
-        with pytest.raises(Exception):
+        with pytest.raises(FileExistsError) as exc:
             mint_module.mint(es, out_path)
+        assert "SECRET-ENC" not in str(exc.value)
 
         # Check that new keys were invalidated (cleanup on failure)
         assert "new-key-0" in es.security.invalidated_ids
@@ -194,5 +204,61 @@ def test_main_no_key_values_in_output(capsys, monkeypatch):
         assert result == 0
         captured = capsys.readouterr()
         # Check that no fake-encoded values appear in output
-        assert "fake-encoded" not in captured.out
-        assert "fake-encoded" not in captured.err
+        assert "SECRET-ENC" not in captured.out
+        assert "SECRET-ENC" not in captured.err
+
+
+def test_mint_ordering_old_keys_invalidated_after_file_written():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "keys.json"
+        es = FakeEs(old_key_ids=["old-1", "old-2"])
+        es.security.out_path = out_path
+
+        mint_module.mint(es, out_path)
+
+        ev = es.security.events
+        assert ev[-2:] == ["file_written", "invalidate:old-1,old-2"]
+        assert [e for e in ev if e.startswith("create:")] == ev[:5]
+        invalidations = [e for e in ev if e.startswith("invalidate:")]
+        assert invalidations == ["invalidate:old-1,old-2"]
+        assert not any(i.startswith("new-key-") for i in es.security.invalidated_ids)
+
+
+def test_mint_invalidate_old_failure_keeps_new_keys_and_file():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "keys.json"
+        es = FakeEs(old_key_ids=["old-1", "old-2"])
+        es.security.fail_invalidate_old = True
+
+        with pytest.raises(RuntimeError) as exc:
+            mint_module.mint(es, out_path)
+
+        msg = str(exc.value)
+        assert "keys.json" in msg and "old-1" in msg and "old-2" in msg
+        assert "old keys remain active" in msg
+        assert "SECRET-ENC" not in msg
+        # New keys never invalidated; file intact with all new keys
+        assert not any(i.startswith("new-key-") for i in es.security.invalidated_ids)
+        keys = json.loads(out_path.read_text())
+        assert set(keys) == {"employee", "manager", "hr", "exec", "catalog"}
+        assert keys["hr"] == "SECRET-ENC-glassbox-hr"
+
+
+def test_main_invalidate_old_failure_prints_readable_error(capsys, monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "persona_keys.json"
+        es = FakeEs(old_key_ids=["old-1"])
+        es.security.fail_invalidate_old = True
+        mock_settings = MagicMock()
+        mock_settings.return_value.obs_es_url = "http://fake:9200"
+        mock_settings.return_value.obs_es_admin_key = "fake-key"
+        mock_settings.return_value.persona_keys_path = str(out_path)
+        monkeypatch.setattr(mint_module, "Settings", mock_settings)
+        monkeypatch.setattr(mint_module, "Elasticsearch", lambda *a, **k: es)
+
+        assert mint_module.main() == 1
+        captured = capsys.readouterr()
+        assert "RuntimeError: persona keys written to" in captured.err
+        assert "old-1" in captured.err
+        assert "Traceback" not in captured.err
+        assert "SECRET-ENC" not in captured.out + captured.err
