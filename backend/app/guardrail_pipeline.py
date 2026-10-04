@@ -11,11 +11,13 @@ VERDICT_SCRIPT = """
 Map g = ctx.guard_tmp;
 if (g == null) { g = new HashMap(); ctx.guard_tmp = g; }
 List reasons = new ArrayList();
-double injScore = 0.0;
+double injScore = 0.0;   // probability of the predicted label (drives the threshold test)
+double pInj = 0.0;       // P(injection): what gets stored; 0.0 when there is no prediction
 String injLabel = 'UNKNOWN';
 if (g.containsKey('injection') && g.injection != null) {
   injLabel = g.injection.predicted_value;
   injScore = g.injection.prediction_probability;
+  pInj = injLabel == 'INJECTION' ? injScore : 1.0 - injScore;
 }
 if (injLabel == 'INJECTION' && injScore >= params.injection_threshold) { reasons.add('prompt_injection'); }
 if (g.containsKey('rx') && g.rx != null) {
@@ -32,7 +34,7 @@ boolean modelsOk = g.containsKey('injection') && g.injection != null && g.contai
 g.models_ok = modelsOk;
 g.threat_verdict = !reasons.isEmpty() ? 'FLAGGED' : (modelsOk ? 'CLEAN' : 'UNKNOWN');
 g.threat_reasons = reasons;
-g.injection_score = injScore;
+g.injection_score = pInj;  // P(injection), not the confidence of the predicted class
 g.person_count = people.size();
 g.remove('ner');
 g.remove('rx');

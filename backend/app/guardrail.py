@@ -2,7 +2,7 @@ import contextvars
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from opentelemetry import trace
 
@@ -15,6 +15,8 @@ POOL_WORKERS = 16
 
 @dataclass
 class Verdict:
+    """injection_score is P(injection) in [0, 1]: ~0 for confident SAFE predictions, ~1 for confident
+    INJECTION ones, and 0.0 when the injection model gave no prediction."""
     verdict: str
     reasons: list[str] = field(default_factory=list)
     injection_score: float = 0.0
@@ -28,9 +30,17 @@ class GuardrailResult:
     latency_ms: int
 
 
+def injection_probability(label: str, label_probability: float) -> float:
+    """The model reports the probability of its *predicted* class; convert to P(injection)."""
+    return label_probability if label == "INJECTION" else 1.0 - label_probability
+
+
 def aggregate_verdict(injection_label: str, injection_score: float, entities: list[dict],
                       pii_hits: list[str], injection_threshold: float = 0.85,
                       ner_threshold: float = 0.8) -> Verdict:
+    # injection_score here is the probability of injection_label (what the model returns), which is
+    # what the threshold test needs; the returned Verdict carries it as-is. Guardrail.check overrides
+    # Verdict.injection_score with P(injection).
     reasons: list[str] = []
     if injection_label == "INJECTION" and injection_score >= injection_threshold:
         reasons.append("prompt_injection")
@@ -63,7 +73,7 @@ class Guardrail:
         start = time.perf_counter()
         with tracer.start_as_current_span("guardrail.check") as span:
             pii = find_pii(text)
-            label, score, entities = "SAFE", 0.0, []
+            label, score, entities, p_inj = "SAFE", 0.0, [], 0.0
             futures = {"injection": self._submit(self._inj, text),
                        "ner": self._submit(self._ner, text)}
             done, _ = wait(list(futures.values()), timeout=self._timeout)
@@ -83,10 +93,11 @@ class Guardrail:
                 if name == "injection":
                     label = res.get("predicted_value", "SAFE")
                     score = float(res.get("prediction_probability", 0.0))
+                    p_inj = injection_probability(label, score)
                 else:
                     entities = res.get("entities", [])
             status = "degraded" if degraded else "ok"
-            verdict = aggregate_verdict(label, score, entities, pii)
+            verdict = replace(aggregate_verdict(label, score, entities, pii), injection_score=p_inj)
             ms = int((time.perf_counter() - start) * 1000)
             span.set_attribute("guardrail.status", status)
             span.set_attribute("guardrail.verdict", verdict.verdict)

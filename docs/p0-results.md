@@ -128,3 +128,22 @@ Observation: `attributes.security.injection_score` is about 0.99999 for BENIGN p
 - DLS-backed employee vs exec retrieval (needs persona keys; blocked on the key-minting decision).
 - Gemma path (VM stopped).
 - Kibana APM UI screenshot (non-interactive session); trace verified through the `traces-*` data stream instead.
+
+## I. Guardrail output typing and key scope (final-review fix wave, 2026-10-04)
+
+### I1. `injection_score` semantics (fixed)
+- `attributes.security.injection_score` used to hold the confidence of the *predicted* class (about 0.99999 for benign prompts too, see H4). It now stores P(injection): `prob if label == INJECTION else 1 - prob`, in both `Guardrail.check` (`app/guardrail.py`, `injection_probability`) and `VERDICT_SCRIPT` (`g.injection_score = pInj`). The 0.85 threshold still tests the probability of the predicted label. With no injection prediction (model down) the score is `0.0`.
+- Verified with `_simulate`: SAFE 0.99999 gives about 1e-5, INJECTION 0.99 gives 0.99, both as real doubles; the updated `genai-guardrail` pipeline is installed live.
+
+### I2. Typed leaf fields: flat dotted keys under `attributes` (tried; NOT adopted)
+- Tried: the script wrote `ctx.attributes['security.threat_verdict']`, `...models_ok`, `...threat_reasons`, `...injection_score` (double), `...person_count` (int) as flat leaf keys (same shape as the working `genai.prompt_text`), without the final `rename`. `_simulate` of the installed pipeline produced correct typed output (verdict string, `injection_score` 0.99999890 double, `person_count` 0 int, `models_ok` true, reasons array).
+- Live check: reinstalled `genai-guardrail`, sent ONE probe log (injection + email prompt), waited about 40 s. Result on backing index `.ds-logs-genai_guardrail.otel-default-2026.10.04-000001` (mode `logsdb`, root `dynamic: false`):
+  - `attributes.security` is still mapped `flattened` (legacy mapping created by the earlier nested probe docs) and no `attributes.security.*` leaf mappings appeared.
+  - The new doc's stored source kept only `security.threat_reasons`; `threat_verdict`, `models_ok`, `injection_score` and `person_count` were absent, and `fields` returned nothing for the doc. So flat keys colliding with an existing `flattened` `security` field LOSE the scalar values (worse than the nested layout).
+  - ES|QL: `WHERE attributes.security.threat_verdict == "FLAGGED"` still fails with `Unknown column [attributes.security.threat_verdict]`; `KEEP attributes.security*` returns the `flattened` column (null for the new doc).
+- Conclusion: not usable against this backing index. The flat-key layout was reverted (nested `attributes.security` via `rename`, as before) and the pipeline reinstalled; only the P(injection) fix was kept. The one flat-key probe doc and all earlier probe docs were left in place (not deleted).
+- Not tested (needs actions outside this wave's authorisation): the flat-key layout on a FRESH backing index with no legacy flattened `security` mapping (e.g. after `POST logs-genai_guardrail.otel-default/_rollover`), where `security.*` would be dynamically mapped as leaves like `genai.prompt_text`. Dynamic typing there is unverified (numbers could still be mapped as double/long or float/keyword), so the safer alternative is the explicit one below.
+- Proposed alternative (NOT applied): a `logs-otel@custom` component template (or a dedicated `genai_guardrail` template) with explicit leaf mappings `attributes.security.threat_verdict` keyword, `threat_reasons` keyword, `injection_score` float, `person_count` integer, `models_ok` boolean, applied together with a rollover so the new backing index does not inherit `flattened`; then switch the pipeline to flat keys.
+
+### I3. App pod still holds the admin key (open)
+- `OBS_ES_GUARDRAIL_KEY` is now supported (`Settings.obs_es_guardrail_key`, falling back to the admin key via `Settings.guardrail_es_key`) so the inline guardrail client can use a narrower key, but none has been minted. Open item: mint a guardrail-only API key limited to ML inference (`monitor_inference` / `infer` on the two models, no index privileges) together with the persona keys, and set it in the pod env.
