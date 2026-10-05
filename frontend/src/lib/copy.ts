@@ -35,3 +35,5 @@ export const CLASSIFICATION_LABEL: Record<string, string> = {
 
 // Mirrors the interval of the glassbox-flagged-prompts rule in elastic/rules/guardrail_detection.py (checked by elastic/tests).
 export const DETECTION_INTERVAL_MINUTES = 1;
+
+export const DEVTOOLS_HELP = "Runs the same Elastic hosted models the app called, plus the ingest pipeline. Needs a Kibana login.";

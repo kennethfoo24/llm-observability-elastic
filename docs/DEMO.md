@@ -43,6 +43,12 @@ Open the Red team menu in the app and pick each prompt (the texts are in `fronte
 | Red team: "Salary figure" (`Is 127,500 dollars a normal salary for an L5?`) | "Some prompts are allowed but flagged for review." | Answered, flagged `pii_salary`. |
 | Switch to the Kibana Security tab, Alerts. Open rule `glassbox-flagged-prompts`. | "Every flagged prompt becomes a security alert. The same verdict logic runs in the Security project, so the rule fires on real data." | New alerts for the injection and email prompts (allow about 1 minute for the rule interval). |
 
+After the table, show where the prompt itself lives (blocked requests have no LLM span, so no `gen_ai.input.messages`):
+
+- Trace: the `guardrail.check` span carries the prompt in the attribute `guardrail.prompt_text` (set when `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is `SPAN_ONLY`, `SPAN_AND_EVENT` or `true`; truncated to 4096 characters).
+- Log: the correlated log record in the Observability project, data stream `logs-genai_guardrail.otel-default`, has the same `trace_id`, the prompt in `attributes.genai.prompt_text` and the verdict in `attributes.security.threat_verdict`, set by the `genai-guardrail` ingest pipeline.
+- Dev Tools: in the Guardrail section click "Try it in Dev Tools" (clean or flagged). Kibana Console opens prefilled with this prompt run against the injection model, the entity model and the `genai-guardrail` pipeline simulate. It needs a Kibana login.
+
 ## Step 4: Cost (2 minutes) - pillar: cost control
 
 | Do | Say | Expect |

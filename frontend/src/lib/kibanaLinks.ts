@@ -1,3 +1,4 @@
+import { compressToEncodedURIComponent } from "lz-string";
 // Pure Kibana deep-link builders. Base URLs come from /api/config, never from source.
 // Kibana keeps app state in the URL as rison (the same format its Share menu produces).
 
@@ -30,4 +31,48 @@ export function docDiscoverUrl(base: string, docId: string): string {
 
 export function costDashboardUrl(base: string): string {
   return `${base}/app/dashboards#/view/${DASHBOARD_ID}`;
+}
+
+export type GuardrailConfig = { models: { injection: string; ner: string }; pipeline: string };
+
+/** Longest Dev Tools share URL we will build; longer prompts are truncated in the payload. */
+export const MAX_DEVTOOLS_URL_CHARS = 8000;
+const CONSOLE_PREFIX = "/app/dev_tools#/console?load_from=data:text/plain,";
+
+const body = (v: unknown) => JSON.stringify(v, null, 2);
+
+/** The three Console requests for one prompt. JSON.stringify does all escaping. */
+export function devToolsConsoleText(prompt: string, g: GuardrailConfig, note?: string): string {
+  const docs = { docs: [{ text_field: prompt }] };
+  const simulate = { docs: [{ _source: { attributes: { "genai.prompt_text": prompt }, data_stream: { dataset: "genai_guardrail" } } }] };
+  return [
+    ...(note ? [`# ${note}`, ""] : []),
+    "# Prompt-injection model (DeBERTa), hosted on Elastic",
+    `POST _ml/trained_models/${g.models.injection}/_infer`,
+    body(docs),
+    "",
+    "# Named-entity model (DistilBERT NER), hosted on Elastic",
+    `POST _ml/trained_models/${g.models.ner}/_infer`,
+    body(docs),
+    "",
+    "# The full guardrail ingest pipeline: models + PII patterns + verdict script",
+    `POST _ingest/pipeline/${g.pipeline}/_simulate`,
+    body(simulate),
+    "",
+  ].join("\n");
+}
+
+/** Kibana Dev Tools Console deep link (the "Open in Console" share format: LZ-compressed text in load_from). */
+export function devToolsUrl(base: string, prompt: string, g: GuardrailConfig): string {
+  const build = (p: string, note?: string) => `${base}${CONSOLE_PREFIX}${compressToEncodedURIComponent(devToolsConsoleText(p, g, note))}`;
+  let url = build(prompt);
+  if (url.length <= MAX_DEVTOOLS_URL_CHARS) return url;
+  let keep = prompt.length;
+  while (keep > 0) {
+    keep = Math.floor(keep * 0.8);
+    const cut = Array.from(prompt.slice(0, keep)).join("");
+    url = build(cut, `Prompt truncated to ${cut.length} characters to fit the link. Paste the full prompt to try it in full.`);
+    if (url.length <= MAX_DEVTOOLS_URL_CHARS) break;
+  }
+  return url;
 }

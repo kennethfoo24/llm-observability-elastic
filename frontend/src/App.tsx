@@ -58,7 +58,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
         )
       }
       composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}
-      xray={<XRayDrawer msg={current} persona={personaObj} question={question} kibanaUrl={config?.kibana_url} securityKibanaUrl={config?.security_kibana_url} highlightDocId={highlightDocId} />}
+      xray={<XRayDrawer msg={current} persona={personaObj} question={question} kibanaUrl={config?.kibana_url} securityKibanaUrl={config?.security_kibana_url} guardrailConfig={config?.guardrail_models && config.guardrail_pipeline ? { models: config.guardrail_models, pipeline: config.guardrail_pipeline } : undefined} highlightDocId={highlightDocId} />}
       xrayOpen={xrayOpen}
       onXrayClose={closeXray}
     />

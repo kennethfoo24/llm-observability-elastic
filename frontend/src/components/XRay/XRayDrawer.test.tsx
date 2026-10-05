@@ -287,3 +287,26 @@ test("the cost section links to the cost dashboard, hidden without a Kibana URL"
   render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
   expect(screen.queryByRole("link", { name: /open cost dashboard/i })).toBeNull();
 });
+
+const gr = { models: { injection: "inj__model", ner: "ner__model" }, pipeline: "genai-guardrail" };
+
+test("Dev Tools link shows for clean and flagged verdicts, built from this message prompt", () => {
+  const { unmount } = render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response())} />);
+  const link = screen.getByRole("link", { name: /try it in dev tools/i });
+  expect(link.getAttribute("href")).toMatch(/^https:\/\/kb\.example\/app\/dev_tools#\/console\?load_from=data:text\/plain,/);
+  expect(screen.getByText(/needs a kibana login/i)).toBeInTheDocument();
+  unmount();
+  render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response({ guardrail: { verdict: "FLAGGED", reasons: ["pii_email"], status: "ok", latency_ms: 3, injection_score: 0.1 } }))} />);
+  expect(screen.getByRole("link", { name: /try it in dev tools/i })).toBeInTheDocument();
+});
+
+test("Dev Tools link is hidden without kibana url, guardrail config or prompt", () => {
+  const { unmount } = render(<XRayDrawer {...props} kibanaUrl={undefined} guardrailConfig={gr} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+  unmount();
+  const u2 = render(<XRayDrawer {...props} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+  u2.unmount();
+  render(<XRayDrawer {...props} question={undefined} guardrailConfig={gr} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+});

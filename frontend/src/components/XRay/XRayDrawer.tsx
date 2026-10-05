@@ -8,8 +8,9 @@ import { Retrieval } from "./Retrieval";
 import { Waterfall } from "./Waterfall";
 import type { AssistantMsg } from "../../state/chatState";
 import type { Persona } from "../../lib/types";
+import type { GuardrailConfig } from "../../lib/kibanaLinks";
 
-type Props = { msg: AssistantMsg | null; persona: Persona | undefined; question: string | undefined; kibanaUrl: string | undefined; securityKibanaUrl?: string | null; highlightDocId: string | null };
+type Props = { msg: AssistantMsg | null; persona: Persona | undefined; question: string | undefined; kibanaUrl: string | undefined; securityKibanaUrl?: string | null; guardrailConfig?: GuardrailConfig; highlightDocId: string | null };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const id = useId();
@@ -31,7 +32,7 @@ function Skeleton() {
   );
 }
 
-export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUrl, highlightDocId }: Props) {
+export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUrl, guardrailConfig, highlightDocId }: Props) {
   const r = msg?.response;
   return (
     <div className="min-w-0 pb-8">
@@ -56,7 +57,7 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
 
       {msg?.status === "done" && r && (
         <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 140, damping: 20 }}>
-          <Section title="Guardrail"><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
+          <Section title="Guardrail"><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} prompt={question} guardrailConfig={guardrailConfig} /></Section>
           <Section title="Trace">
             <Waterfall stages={r.stages} verdict={r.guardrail.verdict} scored={r.guardrail.injection_score !== null} />
             {kibanaUrl && r.trace_id ? (
