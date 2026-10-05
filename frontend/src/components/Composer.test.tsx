@@ -97,3 +97,38 @@ test("has no obvious accessibility violations", async () => {
   const { container } = render(<Harness onSend={vi.fn()} />);
   expect(await axe(container)).toHaveNoViolations();
 });
+
+test("a parent that ignores onSend does not leave the composer stuck", async () => {
+  const onSend = vi.fn();
+  render(<Harness onSend={onSend} initial="hello" />);
+  const box = screen.getByRole("textbox", { name: /your question/i });
+  fireEvent.keyDown(box, { key: "Enter" });
+  await Promise.resolve();
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(onSend).toHaveBeenCalledTimes(2);
+});
+
+test("Safari committing Enter (keyCode 229) does not send", () => {
+  const onSend = vi.fn();
+  render(<Harness onSend={onSend} initial="hello" />);
+  fireEvent.keyDown(screen.getByRole("textbox", { name: /your question/i }), { key: "Enter", keyCode: 229 });
+  expect(onSend).not.toHaveBeenCalled();
+});
+
+test("disabled Send explains why (empty and pending)", () => {
+  const { unmount } = render(<Harness onSend={vi.fn()} />);
+  expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Type a question to send");
+  unmount();
+  render(<Harness onSend={vi.fn()} pending initial="hi" />);
+  expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Waiting for the current answer");
+});
+
+test("over-limit Send is described as too long and counter is live", () => {
+  render(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
+  expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Question is too long");
+});
+
+test("near-limit counter is a polite live region", () => {
+  render(<Composer value={"x".repeat(3600)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
+  expect(screen.getByText("3600 / 4000")).toHaveAttribute("aria-live", "polite");
+});

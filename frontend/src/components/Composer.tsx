@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { PaperPlaneRight } from "@phosphor-icons/react";
 
 // Matches backend/app/main.py MAX_MESSAGE_CHARS (Settings.max_message_chars default 4000).
@@ -15,12 +15,8 @@ export function Composer({ value, onChange, onSend, asking, pending, extra }: Pr
   const sentRef = useRef(false);
   const trimmed = value.trim();
   const tooLong = value.length > MAX_CHARS;
+  const blockedReason = tooLong ? "Question is too long" : pending ? "Waiting for the current answer" : trimmed.length === 0 ? "Type a question to send" : null;
   const canSend = trimmed.length > 0 && !tooLong && !pending;
-
-  // Release the double-submit lock once the draft changes (parent cleared it or user edited) or pending flips.
-  useEffect(() => {
-    sentRef.current = false;
-  }, [value, pending]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -31,7 +27,11 @@ export function Composer({ value, onChange, onSend, asking, pending, extra }: Pr
 
   function submit() {
     if (!canSend || sentRef.current) return;
+    // Collapse submits within the same task into one; the parent's `pending` owns longer blocking.
     sentRef.current = true;
+    queueMicrotask(() => {
+      sentRef.current = false;
+    });
     onSend(trimmed);
   }
 
@@ -47,7 +47,7 @@ export function Composer({ value, onChange, onSend, asking, pending, extra }: Pr
           placeholder="Ask about HR policy"
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
               e.preventDefault();
               submit();
             }
@@ -55,16 +55,17 @@ export function Composer({ value, onChange, onSend, asking, pending, extra }: Pr
           className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-ink outline-none placeholder:text-muted"
         />
         <button
-          type="button" onClick={submit} disabled={!canSend}
+          type="button" onClick={submit} disabled={!canSend} aria-describedby={blockedReason ? "composer-send-reason" : undefined}
           className="grid h-10 shrink-0 place-items-center rounded-control bg-blue px-4 font-medium text-white transition hover:bg-blue-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue active:translate-y-px active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
         >
           <span className="flex items-center gap-2"><PaperPlaneRight size={16} weight="regular" aria-hidden /> Send</span>
         </button>
       </div>
+      {blockedReason && <span id="composer-send-reason" className="sr-only">{blockedReason}</span>}
       {tooLong ? (
         <p role="alert" className="mt-2 text-sm text-flag-ink">That question is too long. Keep it under {MAX_CHARS.toLocaleString("en-US")} characters.</p>
       ) : value.length >= COUNTER_FROM ? (
-        <p className="num mt-2 text-xs text-muted">{value.length} / {MAX_CHARS}</p>
+        <p aria-live="polite" className="num mt-2 text-xs text-muted">{value.length} / {MAX_CHARS}</p>
       ) : null}
     </div>
   );
