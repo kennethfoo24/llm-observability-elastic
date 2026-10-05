@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { auth } from "./lib/api";
@@ -108,8 +108,18 @@ test("an upstream error shows a recoverable inline error with a retry that works
   expect(await screen.findByText(/employees get 18 days/i)).toBeInTheDocument();
 });
 
-const mockSmall = (matches: boolean) =>
-  vi.spyOn(window, "matchMedia").mockImplementation((q: string) => ({ matches, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false }) as unknown as MediaQueryList);
+function mockViewport(wide: boolean) {
+  let matches = wide;
+  const listeners = new Set<(e: { matches: boolean }) => void>();
+  vi.spyOn(window, "matchMedia").mockImplementation((q: string) => ({
+    get matches() { return matches; }, media: q, onchange: null,
+    addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.add(cb),
+    removeEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.delete(cb),
+    addListener() {}, removeListener() {}, dispatchEvent: () => false,
+  }) as unknown as MediaQueryList);
+  return { set: (v: boolean) => { matches = v; act(() => listeners.forEach((cb) => cb({ matches: v }))); } };
+}
+const mockSmall = (small: boolean) => mockViewport(!small);
 
 async function askPto() {
   await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
@@ -189,4 +199,37 @@ test("reset clears the typed draft", async () => {
   await userEvent.type(box, "half typed");
   await userEvent.click(screen.getByRole("button", { name: /new conversation/i }));
   await waitFor(() => expect(box).toHaveValue(""));
+});
+
+test("below xl a citation click opens the sheet and highlights the cited document", async () => {
+  mockSmall(true);
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "pto-policy" }));
+  const dialog = await screen.findByRole("dialog", { name: "X-ray" });
+  expect(within(dialog).getByText("Paid Time Off Policy").closest("[data-highlighted]")).toHaveAttribute("data-highlighted", "true");
+});
+
+test("on desktop a citation click does not open the sheet", async () => {
+  mockSmall(false);
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "pto-policy" }));
+  expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull();
+});
+
+test("growing past xl closes the open sheet and releases the scroll lock", async () => {
+  const vp = mockSmall(true);
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  document.body.style.overflow = "";
+  await userEvent.click(screen.getByRole("button", { name: /^inspect$/i }));
+  await screen.findByRole("dialog", { name: "X-ray" });
+  expect(document.body.style.overflow).toBe("hidden");
+  vp.set(true);
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull());
+  expect(document.body.style.overflow).toBe("");
 });

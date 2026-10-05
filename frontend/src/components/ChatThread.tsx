@@ -5,13 +5,13 @@ import { UserMessage } from "./UserMessage";
 import type { Message } from "../state/chatState";
 
 type Props = {
-  messages: Message[]; selectedId: string | null; askAgainAs: string;
+  messages: Message[]; pending: boolean; selectedId: string | null; askAgainAs: string;
   personaName: (id: string) => string;
   onSelect: (id: string) => void; onCitation: (docId: string, msgId: string) => void;
   onRetry: (id: string) => void; onAskAgain: (text: string) => void;
 };
 
-export function ChatThread({ messages, selectedId, askAgainAs, personaName, onSelect, onCitation, onRetry, onAskAgain }: Props) {
+export function ChatThread({ messages, pending, selectedId, askAgainAs, personaName, onSelect, onCitation, onRetry, onAskAgain }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const last = messages[messages.length - 1];
   const lastStatus = last?.kind === "assistant" ? last.status : "";
@@ -37,8 +37,8 @@ export function ChatThread({ messages, selectedId, askAgainAs, personaName, onSe
             <span className="font-medium text-ink">{m.text}</span>
             {isLast && previousQuestion && previousQuestion.kind === "user" && (
               <button
-                type="button" onClick={() => onAskAgain(previousQuestion.text)}
-                className="flex items-center gap-2 rounded-control border border-line px-3 py-1.5 font-medium text-blue transition hover:bg-blue-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
+                type="button" disabled={pending} onClick={() => onAskAgain(previousQuestion.text)}
+                className="flex items-center gap-2 rounded-control border border-line px-3 py-1.5 font-medium text-blue transition hover:bg-blue-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 <ArrowBendDownRight size={16} aria-hidden /> Ask again as {askAgainAs}
               </button>

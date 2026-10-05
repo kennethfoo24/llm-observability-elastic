@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { ArrowSquareOut } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { CostPanel } from "./CostPanel";
@@ -10,7 +11,7 @@ import type { Persona } from "../../lib/types";
 type Props = { msg: AssistantMsg | null; persona: Persona | undefined; question: string | undefined; kibanaUrl: string | undefined; highlightDocId: string | null };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const id = `xr-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  const id = useId();
   return (
     <section aria-labelledby={id} className="min-w-0 border-t border-ink-line px-5 py-5 first:border-t-0">
       <h3 id={id} className="mb-3 text-sm font-semibold">{title}</h3>
@@ -59,10 +60,10 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, highlightDocId }
             <Waterfall stages={r.stages} verdict={r.guardrail.verdict} />
             {kibanaUrl && r.trace_id ? (
               <a
-                href={`${kibanaUrl}/app/apm/link-to/trace/${r.trace_id}`} target="_blank" rel="noreferrer noopener"
+                href={`${kibanaUrl}/app/apm/link-to/trace/${encodeURIComponent(r.trace_id)}`} target="_blank" rel="noreferrer noopener"
                 className="mt-4 inline-flex items-center gap-2 rounded-control border border-ink-line px-3 py-2 text-sm font-medium transition hover:bg-ink-2"
               >
-                <ArrowSquareOut size={16} aria-hidden /> Open trace in Kibana
+                <ArrowSquareOut size={16} aria-hidden /> Open trace in Kibana<span className="sr-only"> (opens in a new tab)</span>
               </a>
             ) : (
               <p className="mt-4 text-xs text-on-ink-muted">Trace link unavailable</p>

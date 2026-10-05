@@ -5,7 +5,7 @@ export type AssistantMsg = {
   id: string; kind: "assistant"; replyTo: string; persona: string; model: string; engine: Engine;
   status: "pending" | "done" | "error"; response?: ChatResponse; error?: { status: number; code: string; hint?: string };
 };
-export type DividerMsg = { id: string; kind: "divider"; text: string };
+export type DividerMsg = { id: string; kind: "divider"; text: string; fromPersona?: string };
 export type Message = UserMsg | AssistantMsg | DividerMsg;
 
 export type ChatState = {
@@ -48,10 +48,18 @@ export function reducer(state: ChatState, action: Action): ChatState {
   switch (action.type) {
     case "setPersona": {
       if (action.persona === state.persona) return state;
-      const messages =
-        state.messages.length === 0
-          ? state.messages
-          : [...state.messages, { id: newId(), kind: "divider" as const, text: `Now asking as ${action.label}` }];
+      const last = state.messages[state.messages.length - 1];
+      let messages: Message[];
+      if (state.messages.length === 0) messages = state.messages;
+      else if (last.kind === "divider") {
+        // arrowing through the radiogroup selects on every step: keep one divider, or none when we are back where we started
+        const from = last.fromPersona ?? "";
+        messages = action.persona === from
+          ? state.messages.slice(0, -1)
+          : [...state.messages.slice(0, -1), { ...last, text: `Now asking as ${action.label}` }];
+      } else {
+        messages = [...state.messages, { id: newId(), kind: "divider" as const, text: `Now asking as ${action.label}`, fromPersona: state.persona }];
+      }
       return { ...state, persona: action.persona, messages };
     }
     case "setModel":

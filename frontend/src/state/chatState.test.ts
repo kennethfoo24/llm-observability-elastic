@@ -143,3 +143,26 @@ test("retry on an error message re-opens it and the following receive adds cost 
   s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.003 }) });
   expect(s.spendUsd).toBeCloseTo(0.003);
 });
+
+test("arrowing through personas keeps one divider that names the latest persona", () => {
+  let s = reducer(start(), sendAction("hi"));
+  s = reducer(s, { type: "setPersona", persona: "hr", label: "B" });
+  s = reducer(s, { type: "setPersona", persona: "exec", label: "C" });
+  const dividers = s.messages.filter((m) => m.kind === "divider");
+  expect(dividers).toHaveLength(1);
+  expect(dividers[0]).toMatchObject({ text: "Now asking as C" });
+});
+
+test("switching back to the persona before the divider removes the divider", () => {
+  let s = reducer(start(), sendAction("hi"));
+  s = reducer(s, { type: "setPersona", persona: "hr", label: "B" });
+  s = reducer(s, { type: "setPersona", persona: "employee", label: "A" });
+  expect(s.messages.filter((m) => m.kind === "divider")).toHaveLength(0);
+  expect(s.persona).toBe("employee");
+});
+
+test("switching A to B to C to A leaves no divider", () => {
+  let s = reducer(start(), sendAction("hi"));
+  for (const [p, l] of [["hr", "B"], ["exec", "C"], ["employee", "A"]]) s = reducer(s, { type: "setPersona", persona: p, label: l });
+  expect(s.messages.filter((m) => m.kind === "divider")).toHaveLength(0);
+});

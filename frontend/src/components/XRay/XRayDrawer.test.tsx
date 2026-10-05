@@ -169,3 +169,19 @@ test("hostile content: long titles, long ids, 50 hidden docs and huge usage stay
   }
   expect(await axe(container)).toHaveNoViolations();
 });
+
+test("two drawers mounted together never share section ids", () => {
+  const { container } = render(<><XRayDrawer {...props} msg={msg(response())} /><XRayDrawer {...props} msg={msg(response())} /></>);
+  const ids = Array.from(container.querySelectorAll("[id]")).map((n) => n.id);
+  expect(new Set(ids).size).toBe(ids.length);
+  for (const sec of Array.from(container.querySelectorAll("section[aria-labelledby]"))) {
+    expect(container.querySelectorAll(`#${CSS.escape(sec.getAttribute("aria-labelledby")!)}`)).toHaveLength(1);
+  }
+});
+
+test("the Kibana link encodes the trace id and says it opens in a new tab", () => {
+  render(<XRayDrawer {...props} msg={msg(response({ trace_id: "a/b c" }))} />);
+  const link = screen.getByRole("link", { name: /open trace in kibana/i });
+  expect(link).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/a%2Fb%20c");
+  expect(link).toHaveTextContent("(opens in a new tab)");
+});

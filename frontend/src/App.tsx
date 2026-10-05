@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useBootstrap } from "./hooks/useBootstrap";
 import { useChatSession } from "./hooks/useChatSession";
 import { PasswordGate } from "./components/PasswordGate";
@@ -23,12 +24,16 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
   const session = useChatSession(personas, models, refreshModels, draftControl);
   const { state, dispatch, send, retry, askAgain, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj, personaName } = session;
   const [xrayOpen, setXrayOpen] = useState(false);
+  // the one source of truth for "is the x-ray a column or a sheet"; 80rem matches Tailwind's xl, so it follows the user's font size like the layout does
+  const xrayInline = useMediaQuery("(min-width: 80rem)");
+  const closeXray = () => setXrayOpen(false);
+  useEffect(() => { if (xrayInline) setXrayOpen(false); }, [xrayInline]);
   const asking = personaObj ? personaLabel(personaObj) : "";
   const hasMessages = state.messages.length > 0;
 
   return (
     <AppShell
-      header={<Header spendUsd={state.spendUsd} canReset={hasMessages} onReset={() => { dispatch({ type: "reset" }); setDraft(""); setXrayOpen(false); }} />}
+      header={<Header spendUsd={state.spendUsd} canReset={hasMessages} onReset={() => { dispatch({ type: "reset" }); setDraft(""); closeXray(); }} pending={pending} />}
       rail={
         <RailDisclosure persona={personaObj?.name ?? ""} model={models.find((m) => m.key === state.model)?.label ?? state.model}>
           <PersonaRail personas={personas} selected={state.persona} onSelect={(id) => { const p = personas.find((x) => x.id === id); if (p) dispatch({ type: "setPersona", persona: id, label: personaLabel(p) }); }} />
@@ -40,8 +45,9 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
       thread={
         hasMessages ? (
           <ChatThread
-            messages={state.messages} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
-            onSelect={(id) => { dispatch({ type: "select", id }); if (window.matchMedia("(max-width: 1279px)").matches) setXrayOpen(true); }} onCitation={selectCitation} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
+            messages={state.messages} pending={pending} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
+            onSelect={(id) => { dispatch({ type: "select", id }); if (!xrayInline) setXrayOpen(true); }}
+            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
           />
         ) : (
           <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
@@ -50,7 +56,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
       composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}
       xray={<XRayDrawer msg={current} persona={personaObj} question={question} kibanaUrl={config?.kibana_url} highlightDocId={highlightDocId} />}
       xrayOpen={xrayOpen}
-      onXrayClose={() => setXrayOpen(false)}
+      onXrayClose={closeXray}
     />
   );
 }
@@ -62,7 +68,7 @@ export function App() {
 
   if (boot.phase === "locked") return <PasswordGate onSubmit={boot.unlock} />;
   if (boot.phase === "loading")
-    return <main className="grid min-h-[100dvh] place-items-center text-muted" role="status" aria-busy="true">Loading</main>;
+    return <main className="grid min-h-[100dvh] place-items-center text-muted"><p role="status" aria-busy="true">Loading</p></main>;
   if (boot.phase === "error")
     return (
       <main className="grid min-h-[100dvh] place-items-center px-4">

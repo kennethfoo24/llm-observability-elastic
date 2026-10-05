@@ -39,6 +39,7 @@ test("a server failure shows an alert message with a retry button outside it, an
   expect(alert).not.toContainElement(retry);
   await userEvent.click(retry);
   expect(screen.getByRole("status")).toBeInTheDocument();
+  expect(screen.getByRole("main")).not.toHaveAttribute("role", "status");
   release();
   vi.unstubAllGlobals();
 });

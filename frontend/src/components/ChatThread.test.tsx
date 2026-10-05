@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { ChatThread } from "./ChatThread";
 import type { Message } from "../state/chatState";
 
-const base = { selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", exec: "Rachel Tan" } as Record<string, string>)[id] ?? id };
+const base = { pending: false, selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", exec: "Rachel Tan" } as Record<string, string>)[id] ?? id };
 
 const thread: Message[] = [
   { id: "m1", kind: "user", text: "What is the Project Aurora severance budget?", persona: "employee" },
@@ -63,4 +63,9 @@ test("scrolls to the end again when the pending answer lands", () => {
   rerender(<ChatThread {...base} messages={[pending[0], { ...(pending[1] as any), status: "error", error: { status: 502, code: "upstream_error" } }]} askAgainAs="x" />);
   expect(spy.mock.calls.length).toBeGreaterThan(before);
   delete (Element.prototype as any).scrollIntoView;
+});
+
+test("ask again is disabled while a request is pending", () => {
+  render(<ChatThread {...base} pending messages={thread} askAgainAs="Rachel Tan" />);
+  expect(screen.getByRole("button", { name: /ask again as rachel tan/i })).toBeDisabled();
 });
