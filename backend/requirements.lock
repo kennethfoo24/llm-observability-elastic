@@ -150,7 +150,9 @@ opentelemetry-exporter-otlp-proto-common==1.44.0
 opentelemetry-exporter-otlp-proto-grpc==1.44.0
     # via opentelemetry-exporter-otlp
 opentelemetry-exporter-otlp-proto-http==1.44.0
-    # via opentelemetry-exporter-otlp
+    # via
+    #   glassbox-backend (pyproject.toml)
+    #   opentelemetry-exporter-otlp
 opentelemetry-instrumentation==0.65b0
     # via
     #   elastic-opentelemetry

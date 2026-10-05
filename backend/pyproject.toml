@@ -16,6 +16,7 @@ dependencies = [
   "langchain-openai>=1.6",
   "langchain-google-genai>=4.4",
   "elastic-opentelemetry>=1.16",
+  "opentelemetry-exporter-otlp-proto-http",
   "opentelemetry-instrumentation-google-genai",
   "opentelemetry-instrumentation-genai-openai",
   "opentelemetry-instrumentation-genai-langchain",

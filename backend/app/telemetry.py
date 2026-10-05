@@ -26,3 +26,36 @@ def emit_prompt_log(*, prompt: str, persona: str, model: str, engine: str, statu
         "app.genai.engine": engine,
         "guardrail.status": status,
     })
+
+
+_HANDLERS: list[logging.Handler] = []
+
+
+def setup_guardrail_log_export(s, exporter_factory=None, simple: bool = False) -> list[logging.Handler]:
+    """Send guardrail prompt log records straight to the managed OTLP endpoints (Observability and Security).
+
+    The shared in-cluster log path writes to a fixed `logs.otel` index, so dataset routing and the guardrail
+    ingest pipeline would never run there; these records therefore bypass it (propagate=False)."""
+    from opentelemetry.exporter.otlp.proto.http import _log_exporter
+    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, SimpleLogRecordProcessor
+    from opentelemetry.sdk.resources import Resource
+
+    for h in _HANDLERS:
+        _log.removeHandler(h)
+    _HANDLERS.clear()
+    factory = exporter_factory or (lambda endpoint, key: _log_exporter.OTLPLogExporter(
+        endpoint=endpoint.rstrip("/") + "/v1/logs", headers={"Authorization": f"ApiKey {key}"}))
+    for endpoint, key in ((s.guardrail_log_obs_endpoint, s.guardrail_log_obs_key),
+                          (s.guardrail_log_sec_endpoint, s.guardrail_log_sec_key)):
+        if not endpoint or not key:
+            continue
+        provider = LoggerProvider(resource=Resource.create(
+            {"service.name": "glassbox-backend", "deployment.environment": "demo"}))
+        processor_cls = SimpleLogRecordProcessor if simple else BatchLogRecordProcessor
+        provider.add_log_record_processor(processor_cls(factory(endpoint, key)))
+        handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
+        _log.addHandler(handler)
+        _HANDLERS.append(handler)
+    _log.propagate = not _HANDLERS
+    return list(_HANDLERS)

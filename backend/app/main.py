@@ -23,6 +23,7 @@ from .models import get_models
 from .personas import PERSONAS
 from .retrieval import Retriever
 from .security import install_security
+from .telemetry import setup_guardrail_log_export
 
 logger = logging.getLogger("app.main")
 
@@ -66,6 +67,7 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
                static_dir: Path | None = None) -> FastAPI:
     s = settings or get_settings()
     gate = gate or GemmaGate(s.gemma_base_url, s.gemma_api_key)
+    setup_guardrail_log_export(s)
     deps = deps or _default_deps(s, gate)
     if deps.gate is None:
         deps.gate = gate
