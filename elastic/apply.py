@@ -35,6 +35,8 @@ def _put_pipelines(p: Project, dry: bool) -> None:
             _fail("pipeline put", status, body)
     status, existing = p.es("GET", f"/_ingest/pipeline/{HOOK_PIPELINE}")
     current = None
+    if status not in (200, 404):  # only 404 means "no hook yet"; anything else must not lead to a blind PUT
+        _fail("hook get", status, existing)
     if status == 200 and isinstance(existing, dict) and HOOK_PIPELINE in existing:
         current = {k: v for k, v in existing[HOOK_PIPELINE].items()
                    if k not in ("created_date_millis", "modified_date_millis")
@@ -76,9 +78,10 @@ def _import_dashboard(p: Project, dry: bool) -> None:
                           json.loads((DASH_DIR / "template.meta.json").read_text()))
     _say(f"[{p.name}] dashboard {DASHBOARD_ID}: import overwrite, {len(PANELS)} panels", dry)
     if not dry:
-        status, text = p.kb_import(ndjson)
-        if status != 200 or '"success":true' not in text.replace(" ", ""):
-            _fail("dashboard import", status, text)
+        status, result = p.kb_import(ndjson)
+        if status != 200 or not isinstance(result, dict) or result.get("success") is not True:
+            errors = result.get("errors") if isinstance(result, dict) else result
+            _fail("dashboard import", status, errors)
 
 
 def apply_project(p: Project, cost_threshold: float, dry_run: bool) -> None:
@@ -92,7 +95,7 @@ def apply_project(p: Project, cost_threshold: float, dry_run: bool) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--project", choices=["observability", "security", "all"], default="all")
+    ap.add_argument("--project", choices=["observability", "security", "all"], required=True)
     ap.add_argument("--cost-threshold", type=float, default=0.25)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()

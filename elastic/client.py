@@ -52,4 +52,7 @@ class Project:
     def kb_import(self, ndjson: str):
         r = self._http.post(self._kb + "/api/saved_objects/_import?overwrite=true", headers=self._headers(),
                             files={"file": ("glassbox.ndjson", ndjson.encode(), "application/ndjson")})
-        return r.status_code, r.text[:600]
+        try:
+            return r.status_code, r.json()
+        except ValueError:
+            return r.status_code, r.text[:300]

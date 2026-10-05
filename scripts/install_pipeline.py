@@ -17,6 +17,8 @@ args = ap.parse_args()
 s = Settings()
 if args.project == "security":
     url, key = s.sec_es_url, s.sec_es_admin_key
+    if not url or not key:
+        raise SystemExit("missing SEC_ES_URL or SEC_ES_ADMIN_KEY in backend/.env (needed for --project security)")
 else:
     url, key = s.obs_es_url, s.obs_es_admin_key
 if args.print_target:

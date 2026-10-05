@@ -15,11 +15,25 @@ def _dash(panels=PANELS):
     return lines[0], json.loads(lines[0]["attributes"]["panelsJSON"])
 
 
+def _assert_shape(p):
+    import re
+    # every plotted column is an alias produced by this query
+    for col in (p.x, p.y, p.split, *p.extra_y):
+        if col:
+            assert re.search(rf"\b{col} = ", p.esql), (p.title, col)
+    limit = re.search(r"LIMIT (\d+)", p.esql)
+    if limit:
+        assert int(limit.group(1)) <= 100, p.title
+    else:  # unbounded cardinality is only acceptable for a single-row metric or a time bucket axis
+        assert p.chart == "metric" or "BUCKET(" in p.esql, p.title
+    assert "STATS" in p.esql and ("| LIMIT" not in p.esql or p.esql.index("STATS") < p.esql.index("LIMIT")), p.title
+
+
 def test_every_panel_query_targets_this_service_and_has_a_bounded_limit():
     assert len(PANELS) >= 6
     for p in PANELS:
         assert 'service.name == "glassbox-backend"' in p.esql or "genai_guardrail" in p.esql, p.title
-        assert "LIMIT" in p.esql or "STATS" in p.esql, p.title
+        _assert_shape(p)
         assert not any(ch in p.title for ch in ("—", "–"))
         assert "thinking_tokens" not in p.esql and "TO_DOUBLE" not in p.esql
 

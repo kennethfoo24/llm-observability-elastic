@@ -92,3 +92,83 @@ def test_hook_merge_never_drops_existing_processors():
     apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
     procs = sent["body"]["processors"]
     assert procs[0] == {"set": {"field": "x", "value": 1}} and any("pipeline" in p for p in procs)
+
+
+def test_hook_get_failure_other_than_404_aborts_without_any_hook_put():
+    import pytest
+
+    for code in (401, 403, 500, 503):
+        puts = []
+
+        def handler(req, code=code):
+            if req.method == "GET" and "logs@custom" in req.url.path:
+                return httpx.Response(code, json={"error": "boom"})
+            if req.method != "GET":
+                puts.append(req.url.path)
+            return httpx.Response(200, json={"acknowledged": True, "success": True})
+
+        with pytest.raises(SystemExit):
+            apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
+        assert not any("logs@custom" in p for p in puts), code
+
+
+def test_hook_404_means_absent_and_creates_it():
+    sent = {}
+
+    def handler(req):
+        if req.method == "GET" and "logs@custom" in req.url.path:
+            return httpx.Response(404, json={})
+        if req.method == "PUT" and "logs@custom" in req.url.path:
+            sent["body"] = json.loads(req.content)
+        return httpx.Response(200, json={"acknowledged": True, "success": True})
+
+    apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
+    assert [list(p) for p in sent["body"]["processors"]] == [["pipeline"]]
+
+
+def test_rerun_with_hook_already_present_makes_no_hook_put_and_no_duplicate():
+    from app.guardrail_pipeline import build_hook
+    existing = build_hook({"processors": [{"set": {"field": "x", "value": 1}}]})
+    puts = []
+
+    def handler(req):
+        if req.method == "GET" and "logs@custom" in req.url.path:
+            return httpx.Response(200, json={"logs@custom": {**existing, "created_date_millis": 1}})
+        if req.method == "PUT" and "logs@custom" in req.url.path:
+            puts.append(json.loads(req.content))
+        return httpx.Response(200, json={"acknowledged": True, "success": True})
+
+    apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
+    assert puts == []
+    assert len(build_hook(existing)["processors"]) == 2
+
+
+def test_dashboard_import_failure_is_detected_from_parsed_json():
+    import pytest
+
+    def handler(req):
+        if req.url.path == "/api/saved_objects/_import":
+            return httpx.Response(200, json={"success": False, "errors": [{"id": "glassbox-overview"}]})
+        return httpx.Response(200, json={"acknowledged": True})
+
+    with pytest.raises(SystemExit):
+        apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
+
+
+def test_project_flag_is_required_and_bare_run_writes_nothing():
+    import subprocess
+    import sys
+    from elastic.client import ROOT
+    r = subprocess.run([sys.executable, "-m", "elastic.apply"], cwd=ROOT, capture_output=True, text=True, timeout=30)
+    assert r.returncode == 2 and "--project" in r.stderr and "pipeline" not in r.stdout
+
+
+def test_install_pipeline_security_without_sec_env_fails_clearly(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from elastic.client import ROOT
+    env = {"PATH": os.environ["PATH"], "OBS_ES_URL": "http://x", "OBS_ES_ADMIN_KEY": "k", "OBS_KIBANA_URL": "http://y"}
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "install_pipeline.py"), "--project", "security"],
+                       cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
+    assert r.returncode != 0 and "SEC_ES_URL" in r.stderr and "Traceback" not in r.stderr.split("SEC_ES_URL")[0][-200:]
