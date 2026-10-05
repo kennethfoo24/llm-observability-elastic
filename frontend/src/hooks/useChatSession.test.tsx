@@ -84,6 +84,18 @@ test("retry re-sends the original question with the original persona", async () 
   expect((result.current.state.messages.find((m) => m.kind === "assistant") as any).status).toBe("done");
 });
 
+test("retry with a model override sends that model and rebinds the message", async () => {
+  const chat = vi.spyOn(apiMod.api, "chat").mockRejectedValueOnce(new ApiError(503, "gemma_offline")).mockResolvedValue(ok());
+  const { result } = setup();
+  act(() => result.current.dispatch({ type: "setModel", model: "gemma" }));
+  await act(async () => { await result.current.send("hello"); });
+  const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
+  await act(async () => { await result.current.retry(id, "flash-lite"); });
+  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "flash-lite", engine: "sdk" });
+  const a = result.current.state.messages.find((m) => m.kind === "assistant") as any;
+  expect(a).toMatchObject({ status: "done", model: "flash-lite" });
+});
+
 test("selecting a citation selects that message and highlights the doc briefly", async () => {
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
   const { result } = setup();

@@ -45,9 +45,9 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
       thread={
         hasMessages ? (
           <ChatThread
-            messages={state.messages} pending={pending} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
+            messages={state.messages} models={models} pending={pending} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
             onSelect={(id) => { dispatch({ type: "select", id }); if (!xrayInline) setXrayOpen(true); }}
-            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
+            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id, modelKey) => void retry(id, modelKey)} onAskAgain={askAgain}
           />
         ) : (
           <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />

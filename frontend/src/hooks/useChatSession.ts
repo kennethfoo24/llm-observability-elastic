@@ -69,13 +69,14 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
     if (ok && draftRef.current.trim() === t) setDraftRef.current("");
   }, [run]);
 
-  const retry = useCallback(async (id: string) => {
+  /* `modelKey` re-asks with a different model (rebinding the message) when the original one is offline. */
+  const retry = useCallback(async (id: string, modelKey?: string) => {
     const s = stateRef.current;
     const a = s.messages.find((m) => m.kind === "assistant" && m.id === id) as AssistantMsg | undefined;
     const q = userMessageFor(s, id);
     if (!a || !q || pendingCount(s) > 0) return;
-    dispatch({ type: "retry", id });
-    await run(id, { message: q.text, persona: a.persona, model: a.model, engine: a.engine });
+    dispatch({ type: "retry", id, model: modelKey });
+    await run(id, { message: q.text, persona: a.persona, model: modelKey ?? a.model, engine: a.engine });
   }, [run]);
 
   const askAgain = useCallback((text: string) => { void send(text); }, [send]);

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { ChatThread } from "./ChatThread";
 import type { Message } from "../state/chatState";
 
-const base = { pending: false, selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", exec: "Rachel Tan" } as Record<string, string>)[id] ?? id };
+const base = { models: [], pending: false, selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", exec: "Rachel Tan" } as Record<string, string>)[id] ?? id };
 
 const thread: Message[] = [
   { id: "m1", kind: "user", text: "What is the Project Aurora severance budget?", persona: "employee" },

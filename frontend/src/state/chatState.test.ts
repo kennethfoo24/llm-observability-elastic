@@ -166,3 +166,22 @@ test("switching A to B to C to A leaves no divider", () => {
   for (const [p, l] of [["hr", "B"], ["exec", "C"], ["employee", "A"]]) s = reducer(s, { type: "setPersona", persona: p, label: l });
   expect(s.messages.filter((m) => m.kind === "divider")).toHaveLength(0);
 });
+
+test("retry can rebind the message to another model while keeping persona and engine", () => {
+  let s = reducer(start(), { type: "setModel", model: "gemma" });
+  s = reducer(s, { type: "setEngine", engine: "langchain" });
+  s = reducer(s, sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "fail", id, error: { status: 503, code: "gemma_offline" } });
+  s = reducer(s, { type: "retry", id, model: "flash-lite" });
+  expect(s.messages[1]).toMatchObject({ status: "pending", model: "flash-lite", persona: "employee", engine: "langchain" });
+});
+
+test("retry with a model override still only works from the error state", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  const after = reducer(s, { type: "retry", id, model: "gemma" });
+  expect(after).toBe(s);
+  s = reducer(s, { type: "receive", id, response: resp() });
+  expect(reducer(s, { type: "retry", id, model: "gemma" })).toBe(s);
+});

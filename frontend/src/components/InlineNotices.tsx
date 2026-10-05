@@ -43,14 +43,24 @@ export function errorMessage(code: string, status: number): string {
   return ERROR_COPY[code] ?? (status >= 500 ? ERROR_COPY.upstream_error : "Something went wrong.");
 }
 
-export function ErrorCard({ error, onRetry }: { error: { status: number; code: string; hint?: string }; onRetry: () => void }) {
+const BUTTON = "mt-3 flex items-center gap-2 rounded-control px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue";
+
+export function ErrorCard({ error, onRetry, alternative }: {
+  error: { status: number; code: string; hint?: string }; onRetry: () => void; alternative?: { label: string; onUse: () => void };
+}) {
   return (
     <div role="alert" className="rounded-card border border-line bg-surface p-4">
       <p className="flex items-center gap-2 font-medium text-ink"><WarningCircle size={20} className="text-flag-ink" aria-hidden /> {errorMessage(error.code, error.status)}</p>
       {error.hint && <p className="mt-1 text-sm text-muted">{error.hint}</p>}
-      <button type="button" onClick={onRetry} className="mt-3 flex items-center gap-2 rounded-control border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue">
-        <ArrowClockwise size={16} aria-hidden /> Try again
-      </button>
+      {alternative ? (
+        <button type="button" onClick={alternative.onUse} className={`${BUTTON} bg-blue text-white hover:bg-blue-strong`}>
+          <ArrowClockwise size={16} aria-hidden /> Try with {alternative.label}
+        </button>
+      ) : (
+        <button type="button" onClick={onRetry} className={`${BUTTON} border border-line text-ink hover:bg-canvas`}>
+          <ArrowClockwise size={16} aria-hidden /> Try again
+        </button>
+      )}
     </div>
   );
 }

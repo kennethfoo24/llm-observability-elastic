@@ -14,7 +14,11 @@ const response = (over: Partial<ChatResponse> = {}): ChatResponse => ({
 const msg = (over: Partial<AssistantMsg> = {}): AssistantMsg => ({
   id: "a1", kind: "assistant", replyTo: "u1", persona: "employee", model: "flash-lite", engine: "sdk", status: "done", response: response(), ...over,
 });
-const base = { selected: false, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), personaName: "Maya Lim" };
+const models = [
+  { key: "flash-lite", label: "Gemini Flash-Lite", provider: "vertex" as const, model_id: "g1", available: true },
+  { key: "gemma", label: "Gemma 4 31B (self-hosted)", provider: "gemma" as const, model_id: "gm", available: false },
+];
+const base = { models, selected: false, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), personaName: "Maya Lim" };
 
 test("a done answer shows text, a meta row and an Inspect control", async () => {
   const onSelect = vi.fn();
@@ -94,4 +98,25 @@ test("skeleton pulse is switched off under prefers-reduced-motion", () => {
 test("a timed out request shows the timeout copy", () => {
   render(<AssistantMessage {...base} msg={msg({ status: "error", error: { status: 0, code: "timeout" } })} />);
   expect(screen.getByRole("alert")).toHaveTextContent("The request took too long. Try again.");
+});
+
+test("when the failed message's model is offline the card offers the first available model instead of retrying it", async () => {
+  const onRetry = vi.fn();
+  render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ model: "gemma", status: "error", response: undefined, error: { status: 503, code: "gemma_offline" } })} />);
+  expect(screen.queryByRole("button", { name: /^try again$/i })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Try with Gemini Flash-Lite" }));
+  expect(onRetry).toHaveBeenCalledWith("a1", "flash-lite");
+});
+
+test("when the failed message's model is available the plain Try again is shown", async () => {
+  const onRetry = vi.fn();
+  render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ model: "flash-lite", status: "error", response: undefined, error: { status: 502, code: "upstream_error" } })} />);
+  expect(screen.queryByRole("button", { name: /try with/i })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: /^try again$/i }));
+  expect(onRetry).toHaveBeenCalledWith("a1");
+});
+
+test("when no model is available the plain Try again is shown", () => {
+  render(<AssistantMessage {...base} models={models.map((m) => ({ ...m, available: false }))} msg={msg({ model: "gemma", status: "error", response: undefined, error: { status: 503, code: "gemma_offline" } })} />);
+  expect(screen.getByRole("button", { name: /^try again$/i })).toBeInTheDocument();
 });

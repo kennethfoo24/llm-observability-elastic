@@ -3,15 +3,16 @@ import { ArrowBendDownRight } from "@phosphor-icons/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { UserMessage } from "./UserMessage";
 import type { Message } from "../state/chatState";
+import type { ModelInfo } from "../lib/types";
 
 type Props = {
-  messages: Message[]; pending: boolean; selectedId: string | null; askAgainAs: string;
+  messages: Message[]; models: ModelInfo[]; pending: boolean; selectedId: string | null; askAgainAs: string;
   personaName: (id: string) => string;
   onSelect: (id: string) => void; onCitation: (docId: string, msgId: string) => void;
-  onRetry: (id: string) => void; onAskAgain: (text: string) => void;
+  onRetry: (id: string, modelKey?: string) => void; onAskAgain: (text: string) => void;
 };
 
-export function ChatThread({ messages, pending, selectedId, askAgainAs, personaName, onSelect, onCitation, onRetry, onAskAgain }: Props) {
+export function ChatThread({ messages, models, pending, selectedId, askAgainAs, personaName, onSelect, onCitation, onRetry, onAskAgain }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const last = messages[messages.length - 1];
   const lastStatus = last?.kind === "assistant" ? last.status : "";
@@ -25,7 +26,7 @@ export function ChatThread({ messages, pending, selectedId, askAgainAs, personaN
         if (m.kind === "assistant")
           return (
             <AssistantMessage
-              key={m.id} msg={m} selected={m.id === selectedId} personaName={personaName(m.persona)}
+              key={m.id} msg={m} models={models} selected={m.id === selectedId} personaName={personaName(m.persona)}
               onSelect={onSelect} onCitation={onCitation} onRetry={onRetry}
             />
           );

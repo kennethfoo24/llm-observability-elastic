@@ -4,14 +4,18 @@ import { AnswerText } from "./AnswerText";
 import { BlockCard, DegradedNote, ErrorCard, FlagNote } from "./InlineNotices";
 import { formatCost, formatMs } from "../lib/format";
 import type { AssistantMsg } from "../state/chatState";
+import type { ModelInfo } from "../lib/types";
 
 type Props = {
-  msg: AssistantMsg; selected: boolean; personaName: string;
-  onSelect: (id: string) => void; onCitation: (docId: string, msgId: string) => void; onRetry: (id: string) => void;
+  msg: AssistantMsg; models: ModelInfo[]; selected: boolean; personaName: string;
+  onSelect: (id: string) => void; onCitation: (docId: string, msgId: string) => void; onRetry: (id: string, modelKey?: string) => void;
 };
 
-export function AssistantMessage({ msg, selected, personaName, onSelect, onCitation, onRetry }: Props) {
+export function AssistantMessage({ msg, models, selected, personaName, onSelect, onCitation, onRetry }: Props) {
   const r = msg.response;
+  // a failed message whose model is offline must not just retry that model: offer the first one that is up
+  const failedModel = models.find((m) => m.key === msg.model);
+  const alternative = failedModel && !failedModel.available ? models.find((m) => m.available) : undefined;
   const total = r ? r.stages.reduce((a, s) => a + s.ms, 0) : 0;
 
   return (
@@ -30,7 +34,7 @@ export function AssistantMessage({ msg, selected, personaName, onSelect, onCitat
         </div>
       )}
 
-      {msg.status === "error" && <ErrorCard error={msg.error ?? { status: 0, code: "unknown" }} onRetry={() => onRetry(msg.id)} />}
+      {msg.status === "error" && <ErrorCard error={msg.error ?? { status: 0, code: "unknown" }} alternative={alternative ? { label: alternative.label, onUse: () => onRetry(msg.id, alternative.key) } : undefined} onRetry={() => onRetry(msg.id)} />}
 
       {msg.status === "done" && r && (
         <>

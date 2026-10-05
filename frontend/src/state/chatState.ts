@@ -19,7 +19,7 @@ export type Action =
   | { type: "send"; text: string; userId: string; assistantId: string }
   | { type: "receive"; id: string; response: ChatResponse }
   | { type: "fail"; id: string; error: { status: number; code: string; hint?: string } }
-  | { type: "retry"; id: string }
+  | { type: "retry"; id: string; model?: string }
   | { type: "select"; id: string | null }
   | { type: "reset" };
 
@@ -80,7 +80,7 @@ export function reducer(state: ChatState, action: Action): ChatState {
     case "fail":
       return mapAssistant(state, action.id, "pending", (a) => ({ ...a, status: "error", error: action.error }));
     case "retry":
-      return mapAssistant(state, action.id, "error", (a) => ({ ...a, status: "pending", error: undefined, response: undefined }));
+      return mapAssistant(state, action.id, "error", (a) => ({ ...a, model: action.model ?? a.model, status: "pending", error: undefined, response: undefined }));
     case "select":
       return { ...state, selectedId: action.id };
     case "reset":
