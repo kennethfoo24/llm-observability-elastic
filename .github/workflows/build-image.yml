@@ -35,7 +35,8 @@ jobs:
         working-directory: backend
         run: |
           pip install -r requirements.lock
-          pip install --no-deps -e . "pytest>=8" "pytest-timeout>=2"
+          pip install --no-deps -e .
+          pip install "pytest>=8" "pytest-timeout>=2"
           pytest -q
 
       - uses: actions/setup-node@v4
