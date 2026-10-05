@@ -12,6 +12,7 @@ trap 'rm -f "$CFG"' EXIT
 cat > "$CFG" <<YAML
 steps:
   - name: gcr.io/cloud-builders/docker
+    env: ["DOCKER_BUILDKIT=1"]
     args: ["build", "--platform", "linux/amd64", "-f", "backend/Dockerfile", "-t", "$IMAGE_BASE:$TAG", "."]
 images: ["$IMAGE_BASE:$TAG"]
 YAML

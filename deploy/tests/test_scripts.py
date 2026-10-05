@@ -76,3 +76,8 @@ def test_dockerignore_and_gcloudignore_exclude_secrets():
         assert "elasticsearch.txt" in lines, name
         assert lines & {".env", "**/.env", "**/*.env", "*.env"}, name
         assert lines & {"backend/secrets", "**/secrets"}, name
+
+
+def test_cloud_build_enables_buildkit_for_copy_chmod():
+    text = (SCRIPTS[0].parent / "build_push.sh").read_text()
+    assert 'DOCKER_BUILDKIT=1' in text
