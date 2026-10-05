@@ -83,3 +83,10 @@ test("an error status with no error object still shows a generic recoverable err
   await userEvent.click(screen.getByRole("button", { name: /try again/i }));
   expect(onRetry).toHaveBeenCalledWith("a1");
 });
+
+test("skeleton pulse is switched off under prefers-reduced-motion", () => {
+  render(<AssistantMessage {...base} msg={msg({ status: "pending", response: undefined })} />);
+  const bars = screen.getByRole("status").querySelectorAll("div");
+  expect(bars.length).toBe(3);
+  bars.forEach((b) => expect(b.className).toContain("motion-reduce:animate-none"));
+});

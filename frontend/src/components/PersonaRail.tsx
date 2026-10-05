@@ -33,7 +33,7 @@ export function PersonaRail({ personas, selected, onSelect, disabled }: Props) {
 
       {personas.length === 0 ? (
         <div data-testid="persona-skeleton" className="mt-4 grid gap-2" aria-hidden>
-          {[0, 1, 2, 3].map((i) => <div key={i} className="h-[72px] animate-pulse rounded-control bg-canvas" />)}
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-[72px] animate-pulse motion-reduce:animate-none rounded-control bg-canvas" />)}
         </div>
       ) : (
         <div role="radiogroup" aria-labelledby="who-asks" className="mt-4 grid gap-2">

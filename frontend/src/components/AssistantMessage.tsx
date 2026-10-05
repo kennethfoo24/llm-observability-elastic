@@ -24,9 +24,9 @@ export function AssistantMessage({ msg, selected, personaName, onSelect, onCitat
 
       {msg.status === "pending" && (
         <div role="status" aria-busy="true" aria-label="Waiting for the answer" className="grid max-w-prose gap-2 py-1">
-          <div className="h-3.5 w-11/12 animate-pulse rounded-full bg-line" />
-          <div className="h-3.5 w-9/12 animate-pulse rounded-full bg-line" />
-          <div className="h-3.5 w-6/12 animate-pulse rounded-full bg-line" />
+          <div className="h-3.5 w-11/12 animate-pulse motion-reduce:animate-none rounded-full bg-line" />
+          <div className="h-3.5 w-9/12 animate-pulse motion-reduce:animate-none rounded-full bg-line" />
+          <div className="h-3.5 w-6/12 animate-pulse motion-reduce:animate-none rounded-full bg-line" />
         </div>
       )}
 

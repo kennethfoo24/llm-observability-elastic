@@ -45,7 +45,7 @@ export function ModelControls({ models, selectedModel, onModel, engine, onEngine
         <div data-testid="model-skeleton" role="status" className="mt-3">
           <span className="sr-only">Loading models</span>
           <div className="grid gap-2" aria-hidden>
-            {[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-control bg-canvas" />)}
+            {[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse motion-reduce:animate-none rounded-control bg-canvas" />)}
           </div>
         </div>
       ) : (

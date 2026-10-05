@@ -23,7 +23,7 @@ function Skeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Collecting the trace" className="grid gap-4 px-5 py-5">
       {["Guardrail check", "Hybrid search", "Prompt build", "LLM call"].map((s) => (
-        <div key={s}><div className="h-3 w-32 animate-pulse rounded-full bg-ink-3" /><div className="mt-2 h-2 w-full animate-pulse rounded-full bg-ink-2" /></div>
+        <div key={s}><div className="h-3 w-32 animate-pulse motion-reduce:animate-none rounded-full bg-ink-3" /><div className="mt-2 h-2 w-full animate-pulse motion-reduce:animate-none rounded-full bg-ink-2" /></div>
       ))}
     </div>
   );

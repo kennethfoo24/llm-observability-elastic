@@ -41,7 +41,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
         hasMessages ? (
           <ChatThread
             messages={state.messages} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
-            onSelect={(id) => { dispatch({ type: "select", id }); if (window.matchMedia("(max-width: 1023px)").matches) setXrayOpen(true); }} onCitation={selectCitation} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
+            onSelect={(id) => { dispatch({ type: "select", id }); if (window.matchMedia("(max-width: 1279px)").matches) setXrayOpen(true); }} onCitation={selectCitation} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
           />
         ) : (
           <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />

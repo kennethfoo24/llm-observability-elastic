@@ -20,7 +20,7 @@ function lockScroll() {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/* Below lg the X-ray is a bottom sheet (the grid shows it inline at lg, so the sheet is hidden there). It renders only while open. */
+/* Below xl the X-ray is a bottom sheet (the grid shows it inline at xl, so the sheet is hidden there). It renders only while open. */
 export function XRaySheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -57,7 +57,7 @@ export function XRaySheet({ open, onClose, children }: { open: boolean; onClose:
   return (
     <AnimatePresence>
       {open && (
-        <div className="lg:hidden">
+        <div className="xl:hidden">
           <motion.div data-testid="xray-scrim" className="fixed inset-0 z-40 bg-ink/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} aria-hidden />
           <motion.div
             ref={dialogRef} role="dialog" aria-modal="true" aria-label="X-ray"
