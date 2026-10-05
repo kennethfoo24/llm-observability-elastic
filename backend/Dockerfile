@@ -30,8 +30,9 @@ RUN edot-bootstrap --action=install \
     && ! pip show elastic-opentelemetry-instrumentation-openai >/dev/null 2>&1
 # Built UI; create_app's default static_dir (app/../frontend/dist) resolves to /srv/frontend/dist.
 COPY --from=ui /ui/dist /srv/frontend/dist
-RUN chown -R app:app /srv
-ENV OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY \
+# Code and the served JS stay root-owned and read-only for the runtime user (uid 10001); nothing writes under /srv at runtime.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY \
     OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
     OTEL_SERVICE_NAME=glassbox-backend
 USER 10001
