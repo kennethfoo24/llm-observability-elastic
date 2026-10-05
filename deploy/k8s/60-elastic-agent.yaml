@@ -1,0 +1,30 @@
+# One Fleet-managed Elastic Agent for the gcp_vertexai integration (policy glassbox-gcp).
+# GCP access: Application Default Credentials via Workload Identity (KSA glassbox-monitoring -> GSA glassbox-monitoring,
+# roles/monitoring.viewer). No key file. The image is pinned to the stack-compatible tag from docs/deploy-p0-results.md E.3.
+# Secret glassbox-fleet (fleet_url, enrollment_token) is created by deploy/scripts/create_secrets.sh WITH_AGENT=1.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: glassbox-elastic-agent, namespace: genai-demo, labels: {app: glassbox-elastic-agent}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: glassbox-elastic-agent}}
+  template:
+    metadata: {labels: {app: glassbox-elastic-agent}}
+    spec:
+      serviceAccountName: glassbox-monitoring
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: agent
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.5.0
+          env:
+            - {name: FLEET_ENROLL, value: "1"}
+            - {name: FLEET_URL, valueFrom: {secretKeyRef: {name: glassbox-fleet, key: fleet_url}}}
+            - {name: FLEET_ENROLLMENT_TOKEN, valueFrom: {secretKeyRef: {name: glassbox-fleet, key: enrollment_token}}}
+            - {name: STATE_PATH, value: /usr/share/elastic-agent/state}
+          resources: {requests: {cpu: 100m, memory: 300Mi}, limits: {cpu: 500m, memory: 700Mi}}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}, readOnlyRootFilesystem: false}
+          volumeMounts: [{name: state, mountPath: /usr/share/elastic-agent/state}]
+      volumes: [{name: state, emptyDir: {}}]

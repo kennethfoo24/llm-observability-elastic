@@ -22,6 +22,10 @@ else
   echo "cronjob glassbox-trafficgen not found, skipping"
 fi
 run kubectl -n "$NS" scale deployment/glassbox --replicas=0
+# The Vertex AI agent costs almost nothing but is stopped too (only if deployed).
+if [ "$DRY_RUN" = "1" ] || kubectl -n "$NS" get deployment glassbox-elastic-agent >/dev/null 2>&1; then
+  run kubectl -n "$NS" scale deployment/glassbox-elastic-agent --replicas=0
+fi
 run kubectl -n "$NS" wait --for=delete pod -l app=glassbox --timeout=180s
 
 if [ "$ALL" = "1" ]; then

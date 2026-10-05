@@ -2,6 +2,7 @@
 # Create/update the app Secrets in namespace genai-demo from gitignored local files ONLY:
 #   backend/secrets/persona_keys.json, backend/secrets/guardrail_log_keys.json (keys obs, sec),
 #   elasticsearch.txt, backend/secrets/app_password.txt (generated if missing).
+# WITH_AGENT=1 also installs the Vertex AI Fleet package and creates Secret glassbox-fleet (fleet_url, enrollment_token).
 # Env overrides: APP_PASSWORD, GEMMA_API_KEY, GLOG_OBS_KEY, GLOG_SEC_KEY.
 # Values are never printed, only key NAMES. DRY_RUN=1 prints key names and target only.
 # The guardrail log keys must be ingest-only keys (docs/dev-tools-mint-ingest-keys.md); the script
@@ -18,6 +19,7 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "[dry-run] target: context=$KUBE_CONTEXT namespace=$NS"
   echo "[dry-run] secret glassbox-persona-keys keys: $PERSONA_KEYS"
   echo "[dry-run] secret glassbox-app keys: $APP_KEYS"
+  [ "${WITH_AGENT:-0}" = "1" ] && echo "[dry-run] secret glassbox-fleet keys: fleet_url enrollment_token (WITH_AGENT=1)"
   exit 0
 fi
 
@@ -96,4 +98,14 @@ trap 'rm -f "$ENVF"' EXIT
 } > "$ENVF"
 kubectl -n "$NS" create secret generic glassbox-app --from-env-file="$ENVF" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+if [ "${WITH_AGENT:-0}" = "1" ]; then
+  # Installs the gcp_vertexai package + agent policy (idempotent) and stores the Fleet URL and enrollment token
+  # in Secret glassbox-fleet through a mode-600 env file; nothing is printed.
+  FENV="$(umask 077; mktemp "${TMPDIR:-/tmp}/glassbox-fleet.XXXXXX")"
+  trap 'rm -f "$ENVF" "$FENV"' EXIT
+  python3 -m elastic.fleet --env-file "$FENV" --gcp-project "$PROJECT_ID"
+  kubectl -n "$NS" create secret generic glassbox-fleet --from-env-file="$FENV" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  echo "secret glassbox-fleet applied in $NS (keys: fleet_url enrollment_token)"
+fi
 echo "secrets applied in $NS: glassbox-persona-keys ($PERSONA_KEYS); glassbox-app ($APP_KEYS)"
