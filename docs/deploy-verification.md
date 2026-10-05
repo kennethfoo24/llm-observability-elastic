@@ -148,3 +148,13 @@ Final suites: backend `pytest -q`: 189 passed (22 integration deselected). `pyte
 | Lockout fix live | pass | 3 wrong passwords: 401 each; correct password afterwards: 200 |
 | X-ray link config | pass | `/api/config` returns non-empty `kibana_url` and `security_kibana_url` |
 | X-ray links in a browser | not verified | Kibana URL state formats (Discover ES|QL, Security alerts query) need one click-through by a logged-in user |
+
+## Guardrail prompt capture and Dev Tools link (2026-10-05)
+
+| Item | Result | Evidence |
+|---|---|---|
+| Redeploy | pass | `docker.io/kennethfoo24/glassbox@sha256:cb0e4816de47bfec3f079bcb6d1f17043138344453928104de748b0d32e653a5` (CI run 37333234654); CronJob still suspended |
+| /api/config | pass | exposes guardrail model ids and pipeline `genai-guardrail` |
+| Blocked prompt trace | pass | injection prompt blocked (`prompt_injection`); its `guardrail.check` span carries `guardrail.prompt_text` equal to the prompt |
+| Dev Tools requests, run via API | pass | `_infer` on DeBERTa: INJECTION 0.9999998; `_infer` on NER: 200; `_ingest/pipeline/genai-guardrail/_simulate`: FLAGGED, reasons `prompt_injection`, injection_score 1.0 |
+| Dev Tools link in a browser | not verified | Console `load_from` URL needs one click by a logged in Kibana user |
