@@ -4,32 +4,42 @@
 
 **Goal:** Run the Glass Box app on GKE behind HTTPS, wire telemetry, guardrail verdicts and cost into Elastic (traces, OOTB Vertex AI dashboards, custom dashboards, a cost alert, a Security detection rule), keep it alive with a low-rate traffic generator, and leave a runbook and demo script so it can be started, shown and stopped cheaply.
 
-**Architecture:** One namespace `genai-demo` on `kenneth-gke`: the app (image built by Cloud Build, Workload Identity to Vertex), a small dedicated OTel collector that fans telemetry out to the Observability project and routes only the guardrail prompt logs to the Security project as well (so the Security detection rule never needs cross-project search), a CronJob traffic generator that calls the app's own API, and one Fleet-managed Elastic Agent for the Vertex AI integration. Kibana content (dashboards, alert rule, detection rule, pipelines) is applied from code by an idempotent script.
+**Architecture:** One namespace `genai-demo` on `kenneth-gke`: the app (image built by Cloud Build, Workload Identity to Vertex), which sends traces and metrics to the cluster's EXISTING OpenTelemetry daemon collector (no new collector is built, no Elastic key is needed in the app pod for that path, and the shared stack is not modified), and sends only the guardrail prompt log records straight to the Observability and Security projects through a dedicated in-app OTLP log exporter (the existing stack's log path writes to a fixed `logs.otel` index and cannot run the dataset-routed guardrail pipeline; this also lets the Security detection rule work without cross-project search); a CronJob traffic generator that calls the app's own API; and one NEW single-replica Fleet-managed Elastic Agent for the Vertex AI integration (the existing agents are per-node DaemonSets, so adding the integration to their policy would collect every metric three times). Kibana content (dashboards, alert rule, detection rule, pipelines) is applied from code by an idempotent script.
 
-**Tech Stack:** GKE (Ingress `gce`, ManagedCertificate, BackendConfig/FrontendConfig, Workload Identity), Artifact Registry + Cloud Build, OpenTelemetry Collector contrib, Elastic Fleet + `gcp_vertexai` integration, Kibana saved-objects / alerting / detection-engine APIs, Python 3.12 (httpx), bash.
+**Tech Stack:** GKE (Ingress `gce`, ManagedCertificate, BackendConfig/FrontendConfig, Workload Identity), Artifact Registry + Cloud Build, the existing EDOT OpenTelemetry daemon collector, Elastic Fleet + `gcp_vertexai` integration, Kibana saved-objects / alerting / detection-engine APIs, Python 3.12 (httpx), bash.
 
 **Specs and prior plans:** `docs/superpowers/specs/2026-10-04-genai-glassbox-design.md`; backend plan `docs/superpowers/plans/2026-10-04-backend-core-and-elastic-assets.md`; UI plan `docs/superpowers/plans/2026-10-05-ui-glass-box.md`. Evidence and field names: `docs/p0-results.md` (Sections A-J), `docs/ui-verification.md`, ledgers in `docs/superpowers/reports/`.
+
+## Existing collectors and agents considered (investigated 2026-10-05, read-only plus one probe log)
+
+| Candidate | Finding | Decision |
+|---|---|---|
+| `opentelemetry-kube-stack-daemon-collector` (DaemonSet, EDOT 9.4.2, OTLP on 4317/4318, Service in `opentelemetry-operator-system`) -> `...-gateway-collector` (EDOT 9.5.0) | Exports to OUR Observability project (`kenneth-sandbox-d54ee0`): traces/metrics through OTLP, logs through the Elasticsearch exporter with a FIXED `logs_index: logs.otel`. No NetworkPolicies. The Helm release status is `failed` but the daemon and gateway pods are Running; the `cluster-stats` collector is CrashLooping and the gateway logs `bulk indexer flush error`. | REUSE for the app's traces and metrics (the gateway already carries tens of millions of trace docs into this project). Do not modify it. |
+| Same stack, logs path | A probe log with `data_stream.dataset=genai_guardrail` sent through the daemon collector did NOT arrive within 30 minutes (fixed index + flush errors). Even when it works it lands in `logs.otel`, so `logs@custom` and the guardrail pipeline would never run. | Do NOT route guardrail logs through it. They use a dedicated in-app OTLP log exporter straight to the managed OTLP endpoints (the path verified in Phase 0 of the backend plan). |
+| Fleet agents in `kube-system` and `fleet-agents` (DaemonSets on policy `kubernetes-agent-policy`) | One pod per node (3). Adding `gcp_vertexai` to their policy would run it three times (3x Cloud Monitoring reads, 3x duplicate metric docs) and changes a shared policy. | Do not use. |
+| Single-instance agents (`ospf-lab-netflow`, `Synthetics 1` policies) | Belong to unrelated labs. | Do not use. |
+| New: one `glassbox-gcp` agent policy with ONE Elastic Agent pod | Needed only because Vertex AI metrics require exactly one Fleet-managed collector with GCP access. | Build (Task 7). |
 
 ## Authorized actions (binding; this list IS the authorization the user gives by approving the plan)
 
 Anything not listed here needs a fresh question to the user. Resources are named exactly:
 
 - **GCP project `elastic-sa`:** Artifact Registry Docker repo `glassbox` (asia-southeast1); Cloud Build builds of this repo; global static IP `glassbox-ip`; service accounts `glassbox-app` (role `roles/aiplatform.user`) and `glassbox-monitoring` (role `roles/monitoring.viewer`) plus Workload Identity bindings for exactly the Kubernetes service accounts below; starting and stopping the VM `kenneth-gemma-llm`.
-- **GKE `kenneth-gke` (asia-southeast1-a):** the namespace `genai-demo` and everything inside it (Deployments, Services, Ingress -> global HTTPS load balancer, ManagedCertificate, BackendConfig, FrontendConfig, ConfigMaps, Secrets, CronJob, ServiceAccounts).
+- **GKE `kenneth-gke` (asia-southeast1-a):** the namespace `genai-demo` and everything inside it (Deployments, Services, Ingress -> global HTTPS load balancer, ManagedCertificate, BackendConfig, FrontendConfig, Secrets, CronJob, ServiceAccounts).
 - **Elastic Observability project (`kenneth-sandbox-d54ee0`):** create/overwrite the objects this plan names (Fleet package policy for `gcp_vertexai` and agent policy `glassbox-gcp`, dashboards prefixed `Glass Box`, rule `Glass Box: LLM spend above threshold`, pipeline `genai-guardrail` and its hook, optional mapping template only after the user answers the Task 0 question).
 - **Elastic Security project (`kenneth-sandbox-sec-c9cf0d`):** import the two guardrail models, create pipeline `genai-guardrail` and its `logs@custom` hook, create detection rule `glassbox-flagged-prompts`.
-- **Secrets handling:** keys are read from local gitignored files (`elasticsearch.txt`, `backend/.env`, `backend/secrets/persona_keys.json`) and written to Kubernetes Secrets without printing. Never print, log, commit or paste a key.
+- **Secrets handling:** keys are read from local gitignored files (`elasticsearch.txt`, `backend/.env`, `backend/secrets/persona_keys.json`) and written to Kubernetes Secrets without printing. Two more inputs, both handled without printing: the demo password is generated randomly by `create_secrets.sh` the first time into `backend/secrets/app_password.txt` (mode 0600, gitignored; the user reads it there or replaces it), and the vLLM API key is read from the `vllm-api-key` metadata of `kenneth-gemma-llm` into memory only. Never print, log, commit or paste a key.
 
-**Explicitly NOT authorized without asking:** touching other namespaces or workloads (including `o11y-metrics/chatbot-rag-app` and the shared `opentelemetry-operator-system` stack, whose Helm release shows `failed`), other people's service accounts or clusters, deleting any pre-existing Elastic object, cross-project search linking, editing the Gemma VM's startup script or firewall, rotating any key you did not mint in this project, pushing git anywhere (there is no remote and none may be added).
+**Explicitly NOT authorized without asking:** touching other namespaces or workloads (including `o11y-metrics/chatbot-rag-app` and the shared `opentelemetry-operator-system` stack, whose Helm release shows `failed`), other people's service accounts or clusters, deleting any pre-existing Elastic object, cross-project search linking, editing the Gemma VM's startup script or firewall, rotating any key you did not mint in this project (the plaintext OTLP key on `o11y-metrics/chatbot-rag-app` stays exactly as is, by the user's decision), modifying the existing OpenTelemetry collectors, Elastic Agents or their Helm release (the app only sends OTLP to the existing daemon collector Service as a client), pushing git anywhere (there is no remote and none may be added).
 
 ## Global Constraints
 
 - Region/zone: `asia-southeast1` / `asia-southeast1-a`. GKE nodes are linux/amd64 (the Mac is arm64): images MUST be built with Cloud Build (or `--platform linux/amd64`), never pushed from a plain local arm64 build.
 - Namespace `genai-demo`; Kubernetes service accounts: `glassbox` (app, Vertex via Workload Identity), `glassbox-monitoring` (Elastic Agent). Workload Identity pool `elastic-sa.svc.id.goog`.
 - App listens on 8000; health `/healthz`; image runs as uid 10001, root-owned read-only code; persona keys mounted at `/srv/secrets/persona_keys.json`.
-- Env names are the backend Settings names uppercased: `OBS_ES_URL`, `OBS_ES_ADMIN_KEY` (required by Settings: set it to the guardrail-only key value so the admin key never enters the pod), `OBS_ES_GUARDRAIL_KEY`, `OBS_KIBANA_URL`, `APP_PASSWORD`, `GEMMA_BASE_URL`, `GEMMA_API_KEY`, `VERTEX_PROJECT`, `VERTEX_LOCATION`.
+- Env names are the backend Settings names uppercased: `OBS_ES_URL`, `OBS_ES_ADMIN_KEY` (required by Settings: set it to the guardrail-only key value so the admin key never enters the pod), `OBS_ES_GUARDRAIL_KEY`, `OBS_KIBANA_URL`, `GUARDRAIL_LOG_*` (above), `APP_PASSWORD`, `GEMMA_BASE_URL`, `GEMMA_API_KEY`, `VERTEX_PROJECT`, `VERTEX_LOCATION`.
 - Client timeout is 90 s (UI). Server worst case must stay below it: retrieval 20 s + LLM 60 s + guardrail 1.5 s. GCLB backend timeout is set to 100 s (default is 30 s and would cut slow answers).
-- OTel: app exports OTLP http/protobuf to the in-namespace collector `glassbox-collector:4318`; `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY`; the shared kube-stack is not used.
+- OTel: the app exports traces and metrics (OTLP http/protobuf) to the EXISTING daemon collector Service `http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318` (no new collector, no change to the shared stack). Guardrail prompt log records go through a dedicated in-app OTLP log exporter straight to the Observability and Security managed OTLP endpoints (settings `GUARDRAIL_LOG_OBS_ENDPOINT`, `GUARDRAIL_LOG_OBS_KEY`, `GUARDRAIL_LOG_SEC_ENDPOINT`, `GUARDRAIL_LOG_SEC_KEY`; ingest-only keys preferred, the project keys are the documented fallback). `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY`.
 - Hostname is `<dashed-static-ip>.sslip.io` (third-party DNS service; documented dependency).
 - Every commit message ends with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (second `-m`). No git remote; never push.
 - No em-dash or en-dash characters in any user-visible string, runbook or demo text.
@@ -41,7 +51,7 @@ Anything not listed here needs a fresh question to the user. Resources are named
 |---|---|
 | Global external HTTPS load balancer forwarding rule (fixed, while the Ingress exists) | about $18 |
 | Static IP while in use, managed certificate, sslip.io | $0 |
-| Pods (app + collector + agent + cronjob) on existing nodes (about 20% CPU used) | $0 extra |
+| Pods (app + agent + cronjob) on existing nodes (about 20% CPU used); no new collector | $0 extra |
 | Traffic generator, every 5 min 07:00-22:00 SGT (about 5,760 requests): 80% Flash-Lite ($0.00135 each), 20% Flash ($0.0081 each) | about $15 |
 | Vertex integration plumbing (Monitoring API reads) | under $1 |
 | Elastic Observability and Security ingest/retention of this traffic (under 1 GB) | well under $1 |
@@ -54,8 +64,8 @@ Anything not listed here needs a fresh question to the user. Resources are named
 2. Slow answers (Gemma cold, reranker cold) must not be cut by the load balancer: BackendConfig `timeoutSec: 100`, server upstream timeouts below 90 s with no hidden retries. (Task 1, Task 5)
 3. Secrets: no key may reach git, logs, `kubectl describe` output, manifests or command lines of scripts that print; the persona-keys Secret expires in 90 days and an expired key makes every chat 502. (Task 4, Task 10)
 4. The traffic generator must never run away on cost: `concurrencyPolicy: Forbid`, `activeDeadlineSeconds`, a hard per-run request cap, a `suspend` switch, and the cost alert as the safety net. (Task 2, Task 8)
-5. If the collector or Elastic is down the app must keep answering (telemetry is best effort and not part of readiness). (Task 5, Task 6)
-6. Guardrail prompt logs must reach BOTH projects and the Security pipeline must produce the same verdict as Observability, otherwise the detection rule silently never fires. (Task 3, Task 6)
+5. If the existing collector, the guardrail log export or Elastic is unavailable the app must keep answering (telemetry is best effort and not part of readiness). The shared collector must never be scaled down or edited to test this: the check points the app at a dead endpoint instead. (Task 1, Task 6)
+6. Guardrail prompt logs must reach BOTH projects (direct in-app export) and the Security pipeline must produce the same verdict as Observability, otherwise the detection rule silently never fires; and the same prompts must NOT also leak into the shared `logs.otel` stream (the dedicated logger does not propagate to the root handler). (Task 1, Task 3, Task 6)
 7. The Vertex AI integration metrics lag 3-6 minutes: "empty dashboard" immediately after traffic is expected, not a failure; the runbook says so. (Task 7, Task 10)
 
 ---
@@ -125,7 +135,7 @@ Note: the data comes from the earlier tracing proof (Task 12 of the backend plan
 
 - [ ] **Step 0D: Capture a Lens ES|QL dashboard template.** (read-only) List existing dashboards that contain an ES|QL (`textBased`) Lens panel: `GET /api/saved_objects/_find?type=dashboard&per_page=100&fields=title` then, for candidates, `GET /api/saved_objects/dashboard/<id>` and look at the referenced `lens` objects (`GET /api/saved_objects/lens/<id>`) for `state.datasourceStates.textBased`. Pick ONE small Lens object with an ES|QL datasource and a bar/line chart; save its JSON (with ids/updated_at removed) to `elastic/dashboards/template.lens-esql.json` and write `elastic/dashboards/template.meta.json` with the JSON pointers (RFC 6901) to: the panel title, the ES|QL string, the x column, the y column, the split column, and the visualization type. If no ES|QL Lens exists in the project, fall back to creating one in Kibana via the Playwright MCP tools (Observability > Dashboards > create > ES|QL), exporting it with `POST /api/saved_objects/_export`, and using that as the template. Record in the results doc which route was used.
 
-- [ ] **Step 0E: Image and load-balancer facts.** (read-only plus pulls) (1) Pin the collector image: `docker pull otel/opentelemetry-collector-contrib:0.154.0` (the shared operator uses collector 0.154.0; if the tag does not exist use the newest listed tag) and record the digest `docker inspect --format '{{index .RepoDigests 0}}'`. (2) Confirm the GKE Ingress class: `kubectl get ingressclass` returned nothing, which is normal for the built-in `gce` controller selected by annotation; confirm `gcloud container clusters describe kenneth-gke --zone asia-southeast1-a --format='value(addonsConfig.httpLoadBalancing.disabled)'` prints empty or False (HTTP load balancing enabled). (3) Pin the Elastic Agent image used by the cluster's existing Fleet agents: `kubectl -n fleet-agents get ds,deploy -o jsonpath='{..image}'` and record the version; the Vertex agent must use the same stack version line as the Observability project (`GET /api/status` version). (4) Check the Cloud Build default service account can push to Artifact Registry (`gcloud projects get-iam-policy elastic-sa` is read-only; do not change it): record roles of `1059491012611@cloudbuild.gserviceaccount.com` and the compute default SA; if neither has `roles/artifactregistry.writer`, Task 5 will pass `--service-account` explicitly or grant the repo-level writer role on the NEW repo only (that is allowed because it is part of the new `glassbox` repo).
+- [ ] **Step 0E: Existing-collector traces, image and load-balancer facts.** (read-only plus one probe trace) (1) Prove the existing daemon collector is a valid target for TRACES: `kubectl -n opentelemetry-operator-system port-forward svc/opentelemetry-kube-stack-daemon-collector 14318:4318` and POST one OTLP trace (`/v1/traces`, service name `deploy-p0-trace-probe`) from a script, then find it in `traces-*` of the Observability project within 2 minutes. Record the result. (Already established on 2026-10-05: the gateway secret points at `kenneth-sandbox-d54ee0`; a LOG probe through the same path did not arrive and logs use the fixed `logs.otel` index, which is why guardrail logs bypass it.) Stop the port-forward afterwards. (2) Confirm the GKE Ingress class: `kubectl get ingressclass` returned nothing, which is normal for the built-in `gce` controller selected by annotation; confirm `gcloud container clusters describe kenneth-gke --zone asia-southeast1-a --format='value(addonsConfig.httpLoadBalancing.disabled)'` prints empty or False (HTTP load balancing enabled). (3) Pin the Elastic Agent image used by the cluster's existing Fleet agents: `kubectl -n fleet-agents get ds,deploy -o jsonpath='{..image}'` and record the version; the Vertex agent must use the same stack version line as the Observability project (`GET /api/status` version). (4) Check the Cloud Build default service account can push to Artifact Registry (`gcloud projects get-iam-policy elastic-sa` is read-only; do not change it): record roles of `1059491012611@cloudbuild.gserviceaccount.com` and the compute default SA; if neither has `roles/artifactregistry.writer`, Task 5 will pass `--service-account` explicitly or grant the repo-level writer role on the NEW repo only (that is allowed because it is part of the new `glassbox` repo).
 
 - [ ] **Step 0F: Write `docs/deploy-p0-results.md`** with sections A (Security routing), B (Vertex integration inputs and the credentials decision), C (trace fields and types, working ES|QL), D (dashboard template route and pointers), E (image pins and LB facts, Cloud Build permissions). No secrets. Open questions for the user (if any): (i) typed guardrail fields need `logs-otel@custom` mapping + rollover in each project (Section E of `docs/p0-results.md`): ask whether to apply it (needed only for numeric guardrail panels; the plan works without it using keyword counts). Commit:
 ```bash
@@ -135,15 +145,15 @@ git commit -m "docs: record deployment phase 0 findings" -m "Co-Authored-By: Cla
 
 ---
 
-### Task 1: Backend hardening (security headers, rate limits, timeouts, image permissions)
+### Task 1: Backend hardening (security headers, rate limits, timeouts, direct guardrail log export, image permissions)
 
 **Files:**
-- Create: `backend/app/security.py`, `backend/tests/test_security.py`
-- Modify: `backend/app/config.py`, `backend/app/main.py`, `backend/app/llm_sdk.py`, `backend/app/llm_langchain.py`, `backend/Dockerfile`, `backend/tests/test_llm_sdk.py`, `backend/tests/test_llm_langchain.py`
+- Create: `backend/app/security.py`, `backend/tests/test_security.py`, `backend/tests/test_guardrail_log_export.py`
+- Modify: `backend/app/telemetry.py`, `backend/pyproject.toml`, `backend/requirements.lock`, `backend/app/config.py`, `backend/app/main.py`, `backend/app/llm_sdk.py`, `backend/app/llm_langchain.py`, `backend/Dockerfile`, `backend/tests/test_llm_sdk.py`, `backend/tests/test_llm_langchain.py`
 
 **Interfaces:**
 - Consumes: `create_app(deps, settings, gate, static_dir)`, `Settings`.
-- Produces: `class SlidingWindowLimiter(limit: int, window_s: float, now: Callable[[], float] = time.monotonic)` with `allow(key: str) -> bool` and `retry_after(key) -> int`; `client_ip(scope_client: str | None, forwarded_for: str | None, trusted_hops: int = 1) -> str`; `SECURITY_HEADERS: dict[str, str]`; `install_security(app, settings)` which adds (a) a middleware setting the headers on every response (HSTS only when `x-forwarded-proto` is `https`), (b) rate limiting on `/api/*` (general `rate_limit_per_min` default 120, and `chat_rate_limit_per_min` default 20 for `POST /api/chat`) returning 429 `{"error":"rate_limited"}` with `Retry-After`, (c) brute-force throttling: after `auth_fail_limit` (default 10) 401s from one client IP within `auth_fail_window_s` (default 300) every `/api/*` request from that IP returns 429 until the window passes. Settings gain `llm_timeout_s: float = 60.0`, `rate_limit_per_min: int = 120`, `chat_rate_limit_per_min: int = 20`, `auth_fail_limit: int = 10`, `auth_fail_window_s: int = 300`, `trusted_proxy_hops: int = 1`.
+- Produces: `class SlidingWindowLimiter(limit: int, window_s: float, now: Callable[[], float] = time.monotonic)` with `allow(key: str) -> bool` and `retry_after(key) -> int`; `client_ip(scope_client: str | None, forwarded_for: str | None, trusted_hops: int = 1) -> str`; `SECURITY_HEADERS: dict[str, str]`; `install_security(app, settings)` which adds (a) a middleware setting the headers on every response (HSTS only when `x-forwarded-proto` is `https`), (b) rate limiting on `/api/*` (general `rate_limit_per_min` default 120, and `chat_rate_limit_per_min` default 20 for `POST /api/chat`) returning 429 `{"error":"rate_limited"}` with `Retry-After`, (c) brute-force throttling: after `auth_fail_limit` (default 10) 401s from one client IP within `auth_fail_window_s` (default 300) every `/api/*` request from that IP returns 429 until the window passes. `telemetry.setup_guardrail_log_export(s: Settings, exporter_factory=None, simple: bool = False) -> list[logging.Handler]` (builds one dedicated `LoggerProvider` + OTLP http log exporter per configured destination and attaches a handler to the `genai.guardrail` logger with `propagate = False`; no-op returning `[]` and leaving `propagate = True` when no destination is configured; idempotent: calling it again replaces its own handlers); Settings also gain `guardrail_log_obs_endpoint`, `guardrail_log_obs_key`, `guardrail_log_sec_endpoint`, `guardrail_log_sec_key` (all default `""`); Settings gain `llm_timeout_s: float = 60.0`, `rate_limit_per_min: int = 120`, `chat_rate_limit_per_min: int = 20`, `auth_fail_limit: int = 10`, `auth_fail_window_s: int = 300`, `trusted_proxy_hops: int = 1`.
 
 - [ ] **Step 1: Write the failing tests** `backend/tests/test_security.py`
 
@@ -402,14 +412,133 @@ def test_langchain_default_factory_uses_the_configured_timeout(monkeypatch, s):
 ```
 Run: `pytest tests/test_llm_sdk.py tests/test_llm_langchain.py -q` -> FAIL. Implement: in `llm_sdk.py` `_openai_client` pass `timeout=self._s.llm_timeout_s, max_retries=0` (replacing the hard-coded 120); `_genai_client` passes `http_options=types.HttpOptions(timeout=int(self._s.llm_timeout_s * 1000))` (import `from google.genai import types` locally; verify the installed google-genai 2.x `HttpOptions` timeout unit is milliseconds by reading its docstring/source and adjust the test if it is seconds); in `llm_langchain.py` `_default_factory` passes `timeout=self._s.llm_timeout_s, max_retries=0` to both `ChatOpenAI` and `ChatGoogleGenerativeAI` (check the installed parameter names `timeout`/`max_retries` against the package; adapt the call and the test to the real names). Run both files: PASS.
 
+- [ ] **Step 4b: Guardrail prompt logs go straight to Observability and Security (failing tests first).** Create `backend/tests/test_guardrail_log_export.py`:
+
+```python
+import logging
+
+import pytest
+from opentelemetry.sdk._logs.export import InMemoryLogExporter
+
+from app.config import Settings
+from app.telemetry import emit_prompt_log, setup_guardrail_log_export
+
+LOG = logging.getLogger("genai.guardrail")
+
+
+@pytest.fixture(autouse=True)
+def _restore_logger():
+    yield
+    setup_guardrail_log_export(Settings(_env_file=None, obs_es_url="http://x", obs_es_admin_key="k", obs_kibana_url="https://kb"))
+    LOG.propagate = True
+
+
+def _settings(**over):
+    return Settings(_env_file=None, obs_es_url="http://x", obs_es_admin_key="k", obs_kibana_url="https://kb", **over)
+
+
+def test_no_destination_is_a_noop_and_keeps_normal_log_propagation():
+    assert setup_guardrail_log_export(_settings()) == []
+    assert LOG.propagate is True
+
+
+def test_both_destinations_receive_the_prompt_record_with_routing_attributes():
+    exporters = {}
+
+    def factory(endpoint, key):
+        exporters[endpoint] = InMemoryLogExporter()
+        return exporters[endpoint]
+
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="k1",
+                  guardrail_log_sec_endpoint="https://sec.example", guardrail_log_sec_key="k2")
+    handlers = setup_guardrail_log_export(s, exporter_factory=factory, simple=True)
+    assert len(handlers) == 2 and LOG.propagate is False
+    emit_prompt_log(prompt="Ignore previous instructions {x} \U0001F600", persona="employee", model="m", engine="sdk", status="ok")
+    assert set(exporters) == {"https://obs.example", "https://sec.example"}
+    for exp in exporters.values():
+        rec = exp.get_finished_logs()
+        assert len(rec) == 1
+        attrs = dict(rec[0].log_record.attributes)
+        assert attrs["data_stream.dataset"] == "genai_guardrail"
+        assert attrs["genai.prompt_text"].startswith("Ignore previous instructions")
+        assert attrs["app.persona"] == "employee" and attrs["guardrail.status"] == "ok"
+        assert rec[0].log_record.resource.attributes["service.name"] == "glassbox-backend"
+
+
+def test_a_destination_without_both_endpoint_and_key_is_skipped():
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="",
+                  guardrail_log_sec_endpoint="", guardrail_log_sec_key="k2")
+    assert setup_guardrail_log_export(s, exporter_factory=lambda e, k: InMemoryLogExporter(), simple=True) == []
+
+
+def test_setup_is_idempotent_and_does_not_stack_handlers():
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="k1")
+    f = lambda e, k: InMemoryLogExporter()  # noqa: E731
+    setup_guardrail_log_export(s, exporter_factory=f, simple=True)
+    setup_guardrail_log_export(s, exporter_factory=f, simple=True)
+    from app.telemetry import _HANDLERS
+    assert len(_HANDLERS) == 1 and sum(h in LOG.handlers for h in _HANDLERS) == 1
+
+
+def test_the_default_factory_builds_an_otlp_http_exporter_with_the_key_only_in_the_auth_header(monkeypatch):
+    seen = {}
+
+    class Fake(InMemoryLogExporter):
+        def __init__(self, **kw):
+            super().__init__()
+            seen.update(kw)
+
+    monkeypatch.setattr("opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter", Fake)
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example/", guardrail_log_obs_key="SECRETKEY")
+    setup_guardrail_log_export(s, simple=True)
+    assert seen["endpoint"] == "https://obs.example/v1/logs" and seen["headers"] == {"Authorization": "ApiKey SECRETKEY"}
+```
+Run `cd backend && pytest tests/test_guardrail_log_export.py -q` -> FAIL (`ImportError: cannot import name 'setup_guardrail_log_export'`). Implement in `backend/app/telemetry.py` (keep the existing `emit_prompt_log` and add):
+
+```python
+_HANDLERS: list[logging.Handler] = []
+
+
+def setup_guardrail_log_export(s, exporter_factory=None, simple: bool = False) -> list[logging.Handler]:
+    """Send guardrail prompt log records straight to the managed OTLP endpoints (Observability and Security).
+
+    The shared in-cluster log path writes to a fixed `logs.otel` index, so dataset routing and the guardrail
+    ingest pipeline would never run there; these records therefore bypass it (propagate=False)."""
+    from opentelemetry.exporter.otlp.proto.http import _log_exporter
+    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, SimpleLogRecordProcessor
+    from opentelemetry.sdk.resources import Resource
+
+    for h in _HANDLERS:
+        _log.removeHandler(h)
+    _HANDLERS.clear()
+    factory = exporter_factory or (lambda endpoint, key: _log_exporter.OTLPLogExporter(
+        endpoint=endpoint.rstrip("/") + "/v1/logs", headers={"Authorization": f"ApiKey {key}"}))
+    for endpoint, key in ((s.guardrail_log_obs_endpoint, s.guardrail_log_obs_key),
+                          (s.guardrail_log_sec_endpoint, s.guardrail_log_sec_key)):
+        if not endpoint or not key:
+            continue
+        provider = LoggerProvider(resource=Resource.create(
+            {"service.name": "glassbox-backend", "deployment.environment": "demo"}))
+        processor_cls = SimpleLogRecordProcessor if simple else BatchLogRecordProcessor
+        provider.add_log_record_processor(processor_cls(factory(endpoint, key)))
+        handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
+        _log.addHandler(handler)
+        _HANDLERS.append(handler)
+    _log.propagate = not _HANDLERS
+    return list(_HANDLERS)
+```
+Add the four settings to `backend/app/config.py`, call `setup_guardrail_log_export(s)` from `create_app` right after the settings are resolved (before the routes), and add `opentelemetry-exporter-otlp-proto-http` to `backend/pyproject.toml` dependencies and regenerate `backend/requirements.lock` with the same uv command used before (`<uv> pip compile backend/pyproject.toml -o backend/requirements.lock --python 3.12`, runtime deps only). Verify the installed `InMemoryLogExporter` name/location in the SDK (it lives in `opentelemetry.sdk._logs.export` in current releases; adapt the test import if the installed version differs) and that `get_finished_logs()` entries expose `.log_record.attributes`. Never log the key: add a test line asserting `caplog.text` contains no "SECRETKEY" after a failed export (use an exporter whose `export` raises).
+Run: `cd backend && pytest tests/test_guardrail_log_export.py -q` -> PASS; then the whole suite.
+
 - [ ] **Step 5: Dockerfile permissions.** In `backend/Dockerfile` use `COPY --chmod=a+rX` for `backend/app`, `backend/prices.yaml`, `backend/pyproject.toml`, `backend/requirements.lock` and `/srv/frontend/dist` (`COPY --from=ui --chmod=a+rX ...`), and add a build-time readability check as the last line before `USER`: `RUN find /srv -type f ! -perm -o=r -print -quit | grep -q . && (echo "unreadable file in /srv" && exit 1) || true`. Rebuild: `docker build -f backend/Dockerfile -t glassbox:dev .`, then prove the uid works: `docker run --rm --user 10001 glassbox:dev python -c "import app.main; print('ok')"` prints `ok`.
 
 - [ ] **Step 6: Full suite and commit**
 
 Run: `cd backend && pytest -q` (all green; baseline 156 passed + new).
 ```bash
-git add backend/app/security.py backend/app/config.py backend/app/main.py backend/app/llm_sdk.py backend/app/llm_langchain.py backend/Dockerfile backend/tests
-git commit -m "feat: security headers, rate limiting, auth lockout, aligned LLM timeouts and image permissions" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+git add backend/app/security.py backend/app/telemetry.py backend/app/config.py backend/app/main.py backend/app/llm_sdk.py backend/app/llm_langchain.py backend/pyproject.toml backend/requirements.lock backend/Dockerfile backend/tests
+git commit -m "feat: security headers, rate limiting, auth lockout, aligned LLM timeouts, direct guardrail log export and image permissions" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -1126,11 +1255,11 @@ git commit -m "feat: Elastic content as code: cost alert, detection rule, dashbo
 ### Task 4: GCP bootstrap, manifests, image build and secrets scripts (nothing applied yet)
 
 **Files:**
-- Create: `deploy/README.md`, `deploy/render.py`, `deploy/scripts/gcp_bootstrap.sh`, `deploy/scripts/build_push.sh`, `deploy/scripts/create_secrets.sh`, `deploy/scripts/deploy.sh`, `deploy/scripts/teardown.sh`, `deploy/k8s/00-namespace.yaml`, `deploy/k8s/10-serviceaccounts.yaml`, `deploy/k8s/20-collector.yaml`, `deploy/k8s/30-app.yaml`, `deploy/k8s/40-ingress.yaml`, `deploy/k8s/50-trafficgen.yaml`, `deploy/k8s/60-elastic-agent.yaml`, `deploy/tests/test_render.py`, `deploy/tests/test_manifests.py`
+- Create: `deploy/README.md`, `deploy/render.py`, `deploy/scripts/gcp_bootstrap.sh`, `deploy/scripts/build_push.sh`, `deploy/scripts/create_secrets.sh`, `deploy/scripts/deploy.sh`, `deploy/scripts/teardown.sh`, `docs/dev-tools-mint-ingest-keys.md`, `deploy/k8s/00-namespace.yaml`, `deploy/k8s/10-serviceaccounts.yaml`, `deploy/k8s/30-app.yaml`, `deploy/k8s/40-ingress.yaml`, `deploy/k8s/50-trafficgen.yaml`, `deploy/k8s/60-elastic-agent.yaml`, `deploy/tests/test_render.py`, `deploy/tests/test_manifests.py`
 - Consumes: Task 0E pins, the Settings env names.
 
 **Interfaces:**
-- Produces: `deploy/render.py FILE... --set KEY=VALUE...` printing the files with `${KEY}` replaced (error if any `${...}` remains unreplaced, never reads secrets); manifests whose placeholders are exactly `${IMAGE}`, `${HOST}`, `${COLLECTOR_IMAGE}`, `${AGENT_IMAGE}`, `${PROJECT}`; scripts that are idempotent and safe to re-run.
+- Produces: `deploy/render.py FILE... --set KEY=VALUE...` printing the files with `${KEY}` replaced (error if any `${...}` remains unreplaced, never reads secrets); manifests whose placeholders are exactly `${IMAGE}`, `${HOST}`, `${AGENT_IMAGE}`, `${PROJECT}`; scripts that are idempotent and safe to re-run.
 
 - [ ] **Step 1: Failing tests** `deploy/tests/test_render.py` and `deploy/tests/test_manifests.py` (add `deploy/tests/conftest.py` putting the repo root on `sys.path`)
 
@@ -1206,7 +1335,7 @@ def test_app_pod_is_locked_down_and_wired_to_workload_identity():
     env = {e["name"]: e for e in c["env"]}
     for name in ("OBS_ES_URL", "OBS_ES_ADMIN_KEY", "OBS_ES_GUARDRAIL_KEY", "APP_PASSWORD", "GEMMA_API_KEY"):
         assert "secretKeyRef" in env[name]["valueFrom"], name
-    assert env["OTEL_EXPORTER_OTLP_ENDPOINT"]["value"] == "http://glassbox-collector:4318"
+    assert env["OTEL_EXPORTER_OTLP_ENDPOINT"]["value"] == "http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318"
     assert env["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"]["value"] == "SPAN_ONLY"
     assert any(v["name"] == "persona-keys" for v in spec["volumes"])
 
@@ -1231,13 +1360,14 @@ def test_trafficgen_cannot_run_away():
     assert int(env["MAX_REQUESTS"]["value"]) <= 2 and "secretKeyRef" in env["APP_PASSWORD"]["valueFrom"]
 
 
-def test_collector_routes_guardrail_logs_to_both_projects_and_keeps_keys_in_env():
-    cm = _find("ConfigMap", "glassbox-collector")["data"]["config.yaml"]
-    cfg = yaml.safe_load(cm)
-    assert "otlphttp/obs" in cfg["exporters"] and "otlphttp/sec" in cfg["exporters"]
-    route = cfg["connectors"]["routing/logs"]["table"][0]
-    assert "genai_guardrail" in route["condition"] and set(route["pipelines"]) == {"logs/obs", "logs/sec"}
-    assert "${env:OBS_OTLP_KEY}" in cm and "${env:SEC_OTLP_KEY}" in cm
+def test_app_reuses_the_existing_collector_and_exports_guardrail_logs_directly_with_keys_from_secrets():
+    names = {d["metadata"]["name"] for d in DOCS if d["kind"] in ("Deployment", "DaemonSet", "ConfigMap")}
+    assert "glassbox-collector" not in names  # no new collector is built
+    c = _find("Deployment", "glassbox")["spec"]["template"]["spec"]["containers"][0]
+    env = {e["name"]: e for e in c["env"]}
+    for name in ("GUARDRAIL_LOG_OBS_ENDPOINT", "GUARDRAIL_LOG_OBS_KEY", "GUARDRAIL_LOG_SEC_ENDPOINT", "GUARDRAIL_LOG_SEC_KEY"):
+        assert "secretKeyRef" in env[name]["valueFrom"], name
+    assert "glassbox-otlp" not in str([d for d in DOCS])  # the collector-only secret no longer exists
 ```
 Run: `pytest deploy/tests -q`
 Expected: FAIL (files do not exist).
@@ -1304,79 +1434,7 @@ metadata:
   annotations:
     iam.gke.io/gcp-service-account: glassbox-monitoring@${PROJECT}.iam.gserviceaccount.com
 ```
-`deploy/k8s/20-collector.yaml`:
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: glassbox-collector
-  namespace: genai-demo
-data:
-  config.yaml: |
-    receivers:
-      otlp:
-        protocols:
-          http: {endpoint: 0.0.0.0:4318}
-          grpc: {endpoint: 0.0.0.0:4317}
-    processors:
-      memory_limiter: {check_interval: 2s, limit_mib: 200, spike_limit_mib: 50}
-      batch: {timeout: 5s, send_batch_size: 512}
-    exporters:
-      otlphttp/obs:
-        endpoint: ${env:OBS_OTLP_ENDPOINT}
-        headers: {Authorization: "ApiKey ${env:OBS_OTLP_KEY}"}
-        retry_on_failure: {enabled: true, max_elapsed_time: 120s}
-      otlphttp/sec:
-        endpoint: ${env:SEC_OTLP_ENDPOINT}
-        headers: {Authorization: "ApiKey ${env:SEC_OTLP_KEY}"}
-        retry_on_failure: {enabled: true, max_elapsed_time: 120s}
-    connectors:
-      routing/logs:
-        default_pipelines: [logs/obs]
-        table:
-          - context: log
-            condition: attributes["data_stream.dataset"] == "genai_guardrail"
-            pipelines: [logs/obs, logs/sec]
-    service:
-      pipelines:
-        traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [otlphttp/obs]}
-        metrics: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [otlphttp/obs]}
-        logs/in: {receivers: [otlp], processors: [memory_limiter], exporters: [routing/logs]}
-        logs/obs: {receivers: [routing/logs], processors: [batch], exporters: [otlphttp/obs]}
-        logs/sec: {receivers: [routing/logs], processors: [batch], exporters: [otlphttp/sec]}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: {name: glassbox-collector, namespace: genai-demo}
-spec:
-  replicas: 1
-  selector: {matchLabels: {app: glassbox-collector}}
-  template:
-    metadata: {labels: {app: glassbox-collector}}
-    spec:
-      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
-      containers:
-        - name: collector
-          image: ${COLLECTOR_IMAGE}
-          args: ["--config=/etc/otelcol/config.yaml"]
-          ports: [{containerPort: 4317}, {containerPort: 4318}]
-          env:
-            - {name: OBS_OTLP_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-otlp, key: obs_endpoint}}}
-            - {name: OBS_OTLP_KEY, valueFrom: {secretKeyRef: {name: glassbox-otlp, key: obs_key}}}
-            - {name: SEC_OTLP_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-otlp, key: sec_endpoint}}}
-            - {name: SEC_OTLP_KEY, valueFrom: {secretKeyRef: {name: glassbox-otlp, key: sec_key}}}
-          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 300m, memory: 256Mi}}
-          securityContext: {readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
-          volumeMounts: [{name: cfg, mountPath: /etc/otelcol}]
-      volumes: [{name: cfg, configMap: {name: glassbox-collector}}]
----
-apiVersion: v1
-kind: Service
-metadata: {name: glassbox-collector, namespace: genai-demo}
-spec:
-  selector: {app: glassbox-collector}
-  ports: [{name: otlp-http, port: 4318, targetPort: 4318}, {name: otlp-grpc, port: 4317, targetPort: 4317}]
-```
+There is no collector manifest: the app sends traces and metrics to the EXISTING daemon collector Service (nothing in `opentelemetry-operator-system` is created, edited or deleted) and exports only the guardrail prompt logs itself (Task 1).
 `deploy/k8s/30-app.yaml`:
 ```yaml
 apiVersion: apps/v1
@@ -1410,7 +1468,11 @@ spec:
             - {name: VERTEX_PROJECT, value: "${PROJECT}"}
             - {name: VERTEX_LOCATION, value: "global"}
             - {name: OTEL_SERVICE_NAME, value: "glassbox-backend"}
-            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://glassbox-collector:4318"}
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318"}
+            - {name: GUARDRAIL_LOG_OBS_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_endpoint}}}
+            - {name: GUARDRAIL_LOG_OBS_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_key}}}
+            - {name: GUARDRAIL_LOG_SEC_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_sec_endpoint}}}
+            - {name: GUARDRAIL_LOG_SEC_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_sec_key}}}
             - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf"}
             - {name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT, value: "SPAN_ONLY"}
             - {name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true"}
@@ -1579,24 +1641,34 @@ out = {
 for k, v in out.items(): print(f"export {k}={shlex.quote(v)}")
 EOF
 )
-: "${APP_PASSWORD:?set APP_PASSWORD in the environment (not on the command line history: use read -s)}"
-: "${GEMMA_API_KEY:?set GEMMA_API_KEY (the vLLM api key from the VM metadata, see runbook)}"
+PW_FILE=backend/secrets/app_password.txt
+if [ -z "${APP_PASSWORD:-}" ]; then
+  if [ ! -s "$PW_FILE" ]; then
+    python3 -c "import secrets; print(secrets.token_urlsafe(18))" > "$PW_FILE"; chmod 600 "$PW_FILE"
+    echo "generated a demo password in $PW_FILE (read it there; it is never printed here)"
+  fi
+  APP_PASSWORD="$(cat "$PW_FILE")"
+fi
+if [ -z "${GEMMA_API_KEY:-}" ]; then
+  GEMMA_API_KEY="$(gcloud compute instances describe kenneth-gemma-llm --zone asia-southeast1-c --project elastic-sa --format=json \
+    | python3 -c "import json,sys; print(next(i['value'] for i in json.load(sys.stdin)['metadata']['items'] if i['key']=='vllm-api-key'))")"
+fi
+export APP_PASSWORD GEMMA_API_KEY
 NS=genai-demo
 kubectl -n $NS create secret generic glassbox-persona-keys --from-file=persona_keys.json=backend/secrets/persona_keys.json \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n $NS create secret generic glassbox-app \
   --from-literal=obs_es_url="$OBS_ES_URL" --from-literal=kibana_url="$OBS_KIBANA_URL" \
   --from-literal=guardrail_key="$GUARDRAIL_KEY" --from-literal=app_password="$APP_PASSWORD" \
-  --from-literal=gemma_api_key="$GEMMA_API_KEY" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl -n $NS create secret generic glassbox-otlp \
-  --from-literal=obs_endpoint="$OBS_OTLP" --from-literal=obs_key="$OBS_OTLP_KEY" \
-  --from-literal=sec_endpoint="$SEC_OTLP" --from-literal=sec_key="$SEC_OTLP_KEY" \
+  --from-literal=gemma_api_key="$GEMMA_API_KEY" \
+  --from-literal=glog_obs_endpoint="$OBS_OTLP" --from-literal=glog_obs_key="${GLOG_OBS_KEY:-$OBS_OTLP_KEY}" \
+  --from-literal=glog_sec_endpoint="$SEC_OTLP" --from-literal=glog_sec_key="${GLOG_SEC_KEY:-$SEC_OTLP_KEY}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-echo "secrets applied: glassbox-persona-keys glassbox-app glassbox-otlp"
+echo "secrets applied: glassbox-persona-keys glassbox-app"
 ```
-Security note recorded in `deploy/README.md`: the OTLP intake keys currently are the projects' admin API keys (the only keys that exist); the app pod NEVER receives them (only the collector does). Replace with ingest-only keys when the user creates them (open item in the runbook).
+Security note recorded in `deploy/README.md`: the guardrail log export needs an OTLP intake key per project. The only keys that exist today are the projects' admin API keys, so by default `create_secrets.sh` uses them (`OBS_OTLP_KEY`, `SEC_OTLP_KEY`): this puts an admin-level key in the internet-facing app pod's environment, which is a real risk (an RCE in the app would leak it). To avoid it, the user can mint INGEST-ONLY keys in Kibana Dev Tools of each project and export them as `GLOG_OBS_KEY` / `GLOG_SEC_KEY` before running the script; `docs/dev-tools-mint-ingest-keys.md` (written in this task from the same pattern as `docs/dev-tools-mint-keys.md`, role: `cluster: ["monitor"]`, `indices: [{names: ["logs-genai_guardrail*", "logs-*.otel-*"], privileges: ["auto_configure", "create_doc", "create_index"]}]`) gives the exact requests. Task 5 asks the user once whether to use ingest-only keys (recommended) or the fallback, records the answer in the runbook, and verifies an ingest-only key can actually deliver an OTLP log before relying on it (probe with `scripts/spikes/log_routing.py`).
 `deploy/scripts/deploy.sh`: reads the image from `$IMAGE` (the output of `build_push.sh`), computes `HOST` from the reserved IP, then
-`python3 deploy/render.py deploy/k8s/*.yaml --set IMAGE=$IMAGE --set HOST=$HOST --set PROJECT=elastic-sa --set COLLECTOR_IMAGE=$COLLECTOR_IMAGE --set AGENT_IMAGE=$AGENT_IMAGE | kubectl apply -f -` with `50-trafficgen.yaml` and `60-elastic-agent.yaml` EXCLUDED unless `WITH_TRAFFICGEN=1` / `WITH_AGENT=1` (the script selects files explicitly); then `kubectl -n genai-demo rollout status deployment/glassbox --timeout=300s` and a loop polling `kubectl -n genai-demo get managedcertificate glassbox-cert -o jsonpath='{.status.certificateStatus}'` every 30 s for up to 90 minutes printing `status`; finally `curl -fsS https://$HOST/healthz`. It exits non-zero if the certificate is not `Active` or healthz fails at the end.
+`python3 deploy/render.py deploy/k8s/*.yaml --set IMAGE=$IMAGE --set HOST=$HOST --set PROJECT=elastic-sa --set AGENT_IMAGE=$AGENT_IMAGE | kubectl apply -f -` with `50-trafficgen.yaml` and `60-elastic-agent.yaml` EXCLUDED unless `WITH_TRAFFICGEN=1` / `WITH_AGENT=1` (the script selects files explicitly); then `kubectl -n genai-demo rollout status deployment/glassbox --timeout=300s` and a loop polling `kubectl -n genai-demo get managedcertificate glassbox-cert -o jsonpath='{.status.certificateStatus}'` every 30 s for up to 90 minutes printing `status`; finally `curl -fsS https://$HOST/healthz`. It exits non-zero if the certificate is not `Active` or healthz fails at the end.
 `deploy/scripts/teardown.sh`: deletes the Ingress, ManagedCertificate, BackendConfig, FrontendConfig (stops the load balancer cost), scales the app/collector to 0 unless `--all`, in which case it deletes the namespace after printing what will be deleted and asking for the literal confirmation `delete genai-demo`; never touches anything outside `genai-demo`.
 `deploy/README.md`: one page listing the scripts in order, the authorized-actions boundary, the cost table, and the hostname dependency on sslip.io.
 
@@ -1604,23 +1676,16 @@ Security note recorded in `deploy/README.md`: the OTLP intake keys currently are
 
 Run: `pytest deploy/tests -q` -> all pass. Then
 ```bash
-python3 deploy/render.py deploy/k8s/00-namespace.yaml deploy/k8s/10-serviceaccounts.yaml deploy/k8s/20-collector.yaml deploy/k8s/30-app.yaml deploy/k8s/40-ingress.yaml deploy/k8s/50-trafficgen.yaml --set IMAGE=example/app@sha256:0 --set HOST=1-2-3-4.sslip.io --set PROJECT=elastic-sa --set COLLECTOR_IMAGE=example/otelcol@sha256:0 > /tmp/glassbox-render.yaml
+python3 deploy/render.py deploy/k8s/00-namespace.yaml deploy/k8s/10-serviceaccounts.yaml deploy/k8s/30-app.yaml deploy/k8s/40-ingress.yaml deploy/k8s/50-trafficgen.yaml --set IMAGE=example/app@sha256:0 --set HOST=1-2-3-4.sslip.io --set PROJECT=elastic-sa > /tmp/glassbox-render.yaml
 kubectl apply --dry-run=client -f /tmp/glassbox-render.yaml
 bash -n deploy/scripts/*.sh
-python3 - <<'PY' > /tmp/glassbox-collector.yaml
-import yaml
-docs = [d for d in yaml.safe_load_all(open('/tmp/glassbox-render.yaml')) if d]
-print(next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'] == 'glassbox-collector')['data']['config.yaml'])
-PY
-docker run --rm -e OBS_OTLP_ENDPOINT=https://x -e OBS_OTLP_KEY=k -e SEC_OTLP_ENDPOINT=https://y -e SEC_OTLP_KEY=k \
-  -v /tmp/glassbox-collector.yaml:/etc/otelcol/config.yaml:ro "$COLLECTOR_IMAGE_PIN" validate --config=/etc/otelcol/config.yaml
 ```
-Expected: every object `created (dry run)`, shell syntax OK, and the collector binary accepts the config (`validate` exits 0; `COLLECTOR_IMAGE_PIN` is the digest recorded in Task 0E; the dummy env values contain no real keys). If `validate` rejects the `routing` connector syntax for the pinned version, fix `20-collector.yaml` (and its test) to the version's documented routing-connector fields before going further. `docker inspect glassbox:dev --format '{{json .Config.Cmd}}'` confirms the CMD so the Deployment `command` matches (adjust `30-app.yaml` if the image already runs `opentelemetry-instrument`). `gcloud meta list-files-for-upload .` (run from the repo root with the new `.gcloudignore`) lists no `elasticsearch.txt`, `.env` or `secrets`.
+Expected: every object `created (dry run)` and shell syntax OK. `docker inspect glassbox:dev --format '{{json .Config.Cmd}}'` confirms the CMD so the Deployment `command` matches (adjust `30-app.yaml` if the image already runs `opentelemetry-instrument`). `gcloud meta list-files-for-upload .` (run from the repo root with the new `.gcloudignore`) lists no `elasticsearch.txt`, `.env` or `secrets`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add deploy .gcloudignore
+git add deploy docs/dev-tools-mint-ingest-keys.md .gcloudignore
 git commit -m "feat: GKE manifests, collector fan-out, bootstrap/build/secrets/deploy/teardown scripts" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1635,11 +1700,11 @@ git commit -m "feat: GKE manifests, collector fan-out, bootstrap/build/secrets/d
 
 - [ ] **Step 2: Build and push the amd64 image.** Run `IMAGE=$(bash deploy/scripts/build_push.sh)`; expected: a reference `asia-southeast1-docker.pkg.dev/elastic-sa/glassbox/app@sha256:...`. Verify the architecture: `gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)'` is non-empty and `docker manifest inspect "$IMAGE"` (or a throwaway `kubectl run ... --image` job) shows `linux/amd64`. If the build cannot push, apply the Task 0E remedy (repo-scoped writer role on the NEW repo only).
 
-- [ ] **Step 3: Namespace, service accounts, secrets.** `kubectl apply -f deploy/k8s/00-namespace.yaml`, render + apply `10-serviceaccounts.yaml`; then `read -s APP_PASSWORD && export APP_PASSWORD` and `read -s GEMMA_API_KEY && export GEMMA_API_KEY` (the vLLM key lives in the VM metadata `vllm-api-key`; fetch it with `gcloud compute instances describe kenneth-gemma-llm --zone asia-southeast1-c --format=json | python3 -c ...` into the variable WITHOUT printing it, or ask the user to type it), run `bash deploy/scripts/create_secrets.sh`. Expected output: `secrets applied: ...`. Verify keys exist without printing values: `kubectl -n genai-demo get secret glassbox-app -o json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['data']))"` prints the key NAMES only.
+- [ ] **Step 3: Namespace, service accounts, secrets.** `kubectl apply -f deploy/k8s/00-namespace.yaml`, render + apply `10-serviceaccounts.yaml`; then run `bash deploy/scripts/create_secrets.sh` (it generates the demo password into `backend/secrets/app_password.txt` on first run and reads the vLLM key from the VM metadata without printing either; if the user chose ingest-only guardrail log keys, export `GLOG_OBS_KEY` and `GLOG_SEC_KEY` first; the controller asks the user about this before Task 5 starts). Expected output: `secrets applied: ...`. Verify keys exist without printing values: `kubectl -n genai-demo get secret glassbox-app -o json | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['data']))"` prints the key NAMES only.
 
-- [ ] **Step 4: Deploy.** `IMAGE=... COLLECTOR_IMAGE=<digest from Task 0E> bash deploy/scripts/deploy.sh`. It waits for the rollout and for the certificate. Expected within 90 minutes: certificate `Active`, `curl -fsS https://<host>/healthz` -> `{"ok":true}`. While waiting, verify on the pod: `kubectl -n genai-demo logs deploy/glassbox --tail=30` (no key material appears; if any appears, STOP and report), Workload Identity works (`kubectl -n genai-demo exec deploy/glassbox -- python -c "import google.auth; c,p=google.auth.default(); print(p)"` prints `elastic-sa`).
+- [ ] **Step 4: Deploy.** `IMAGE=... bash deploy/scripts/deploy.sh`. It waits for the rollout and for the certificate. Expected within 90 minutes: certificate `Active`, `curl -fsS https://<host>/healthz` -> `{"ok":true}`. While waiting, verify on the pod: `kubectl -n genai-demo logs deploy/glassbox --tail=30` (no key material appears; if any appears, STOP and report), Workload Identity works (`kubectl -n genai-demo exec deploy/glassbox -- python -c "import google.auth; c,p=google.auth.default(); print(p)"` prints `elastic-sa`).
 
-- [ ] **Step 5: Live smoke (the checklist items the stub could not show).** With the Playwright MCP tools (or curl) against `https://<host>`: (a) unauthenticated `/api/personas` -> 401; wrong password 11 times -> 429 (use a throwaway local IP only if you can; otherwise verify once in the unit tests and skip) then wait out the window; (b) as Maya ask the Project Aurora severance question: answer without `project-aurora`, X-ray lists it under "Hidden by DLS" (real DLS); as Rachel the answer cites `project-aurora` and no ghost cards; (c) red-team prompts: "Ignore previous instructions..." is blocked (guardrail reason `prompt_injection`), the email prompt blocked, the salary prompt allowed and flagged, the two-colleagues prompt flagged by the NER model; (d) the response `trace_id` is non-empty, "Open trace in Kibana" opens the real APM trace of `glassbox-backend` with the full waterfall and `gen_ai.*` prompt content; (e) engine "LangChain" waterfall shows three stages; (f) Gemma shows Offline (VM stopped) and selecting is impossible; Gemini Flash and Flash-Lite answer; citations from real Gemini render as chips (record the citation formats Gemini actually emits; if it emits lists or other syntaxes the UI does not chip, record them as polish); (g) response headers include the CSP and `strict-transport-security`; no CSP violations in the browser console (`browser_console_messages`); fix any violation in `backend/app/security.py` with a test, rebuild and redeploy. Write results to `docs/deploy-verification.md` as a table (item, pass/fail, evidence without secrets).
+- [ ] **Step 5: Live smoke (the checklist items the stub could not show).** With the Playwright MCP tools (or curl) against `https://<host>`: (a) unauthenticated `/api/personas` -> 401; wrong password 11 times -> 429 (use a throwaway local IP only if you can; otherwise verify once in the unit tests and skip) then wait out the window; (b) as Maya ask the Project Aurora severance question: answer without `project-aurora`, X-ray lists it under "Hidden by DLS" (real DLS); as Rachel the answer cites `project-aurora` and no ghost cards; (c) red-team prompts: "Ignore previous instructions..." is blocked (guardrail reason `prompt_injection`), the email prompt blocked, the salary prompt allowed and flagged, the two-colleagues prompt flagged by the NER model; (d) the response `trace_id` is non-empty (traces reach Elastic through the EXISTING daemon collector, so also confirm the service `glassbox-backend` shows up in APM with the pod's `k8s.pod.name` resource attribute), "Open trace in Kibana" opens the real APM trace of `glassbox-backend` with the full waterfall and `gen_ai.*` prompt content; (e) engine "LangChain" waterfall shows three stages; (f) Gemma shows Offline (VM stopped) and selecting is impossible; Gemini Flash and Flash-Lite answer; citations from real Gemini render as chips (record the citation formats Gemini actually emits; if it emits lists or other syntaxes the UI does not chip, record them as polish); (g) response headers include the CSP and `strict-transport-security`; no CSP violations in the browser console (`browser_console_messages`); fix any violation in `backend/app/security.py` with a test, rebuild and redeploy. Write results to `docs/deploy-verification.md` as a table (item, pass/fail, evidence without secrets).
 
 - [ ] **Step 6: Commit evidence**
 
@@ -1652,13 +1717,13 @@ git commit -m "docs: record the first GKE deployment and live smoke results" -m 
 
 ### Task 6: Telemetry and guardrail paths end to end (LIVE)
 
-- [ ] **Step 1: Prove the collector fan-out.** Generate three guardrail prompts through the deployed app (one benign, one injection, one email). Within 2 minutes query BOTH projects (`logs-genai_guardrail*`, newest first): the benign and flagged prompts must exist in Observability (all three) and in Security (all three, since the routing rule matches on the dataset attribute). Record counts in `docs/deploy-verification.md`. If Security shows none, check the collector logs (`kubectl -n genai-demo logs deploy/glassbox-collector --tail=50`), the Task 0A result and the routing condition; fix `20-collector.yaml` (and its test) and redeploy.
+- [ ] **Step 1: Prove the two telemetry paths.** (a) Traces and metrics through the EXISTING collector: generate five chats; within 2 minutes the `glassbox-backend` service has traces in Observability with `k8s.pod.name` set and the full span tree (guardrail.check, retrieval.hybrid, prompt.build, the Gemini call with `gen_ai.input.messages`). (b) Guardrail logs through the direct in-app export: generate three prompts (benign, injection, email); within 2 minutes query BOTH projects (`logs-genai_guardrail*`, newest first): all three exist in Observability and in Security. Also assert the same three prompts are NOT present in `logs.otel` of Observability (the dedicated logger must not leak to the shared path): search `logs.otel*` for the injection prompt text and expect zero hits. Record counts in `docs/deploy-verification.md`. If Security shows none, check the app pod logs for export errors (never print keys), the Secret key names, and whether an ingest-only key lacks a privilege (the Task 4 probe step); fix and redeploy.
 
 - [ ] **Step 2: Install the guardrail models and pipeline into the Security project.** `PROJECT=security bash scripts/import_models.sh` (runs eland in Docker; ML compute is not billed in Security projects) then `source backend/.venv/bin/activate && python scripts/install_pipeline.py --project security`. Verify `_infer` works there for both models and the verdict for a stored probe is computed: after the next guardrail logs arrive, `attributes.security.threat_verdict` is present on the Security docs (`FLAGGED` for the injection and email prompts, `CLEAN` for the benign one). If Security's `logs@custom` already has other processors, the install script merges and never drops them (unit-tested in Task 3).
 
 - [ ] **Step 3: Apply the Elastic content.** `python -m elastic.apply --project all --dry-run` then without `--dry-run`. Then verify: (a) Observability: the dashboard `Glass Box: LLM observability` exists and each panel renders data after traffic (open it with the Playwright MCP tools, screenshot to the scratchpad shots dir, confirm no panel shows an error; panels with no data yet are acceptable only for Vertex-sourced ones); (b) the rule `glassbox-llm-spend` exists and is enabled: to PROVE it fires, run `python -m elastic.apply --project observability --cost-threshold 0.0001`, generate two chats, wait up to 3 minutes and confirm an active alert in `Rules > Glass Box: LLM spend above threshold > Alerts` via `GET /api/alerting/rules/_find?search=Glass%20Box` (`last_run.outcome` ok, `execution_status`) and the alerts index; then restore the real threshold with `--cost-threshold 0.25`; (c) Security: the detection rule `glassbox-flagged-prompts` is enabled and, after one injection prompt, an alert appears (`POST /api/detection_engine/signals/search` with a `match_all` over the last 15 minutes returns a signal whose `kibana.alert.rule.rule_id` is `glassbox-flagged-prompts`). Record each proof (rule status text, alert counts; no keys).
 
-- [ ] **Step 4: Resilience check.** Scale the collector to 0 (`kubectl -n genai-demo scale deploy/glassbox-collector --replicas=0`), ask a chat question: it must still answer (HTTP 200) and the pod must stay Ready; scale the collector back to 1 and confirm telemetry resumes. Record in the verification doc.
+- [ ] **Step 4: Resilience check (without touching the shared collector).** Point the app at a dead telemetry endpoint: `kubectl -n genai-demo set env deploy/glassbox OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:9 GUARDRAIL_LOG_OBS_ENDPOINT=http://127.0.0.1:9 GUARDRAIL_LOG_SEC_ENDPOINT=http://127.0.0.1:9`, wait for the rollout, ask three chat questions: each must return HTTP 200 within the normal time and the pod must stay Ready (telemetry is best effort). Then restore the real values by re-applying the rendered `30-app.yaml` (`python3 deploy/render.py deploy/k8s/30-app.yaml --set IMAGE=$IMAGE --set PROJECT=elastic-sa | kubectl apply -f -`), wait for the rollout and confirm traces and guardrail logs resume. Record in the verification doc.
 
 - [ ] **Step 5: Commit evidence** (`docs/deploy-verification.md`).
 
@@ -1706,7 +1771,7 @@ Implement `elastic/fleet.py` with those two builders (the `inputs` structure com
 - [ ] **Step 1: `deploy/scripts/gemma.sh`** with subcommands `start`, `stop`, `status`, `wait` operating on `kenneth-gemma-llm` in `asia-southeast1-c` (`gcloud compute instances start|stop|describe`) and `wait` polling `https://llm-34-126-172-79.nip.io/v1/models` (Bearer key from the VM metadata read into memory, never printed) every 15 s up to 15 minutes printing elapsed time. `start` prints the cost warning and the auto-shutdown time (180 minutes after boot). Add `bash -n` and a dry `status` run (read-only) to the checks.
 - [ ] **Step 2: Cold start and token throughput measurement.** `gemma.sh start && gemma.sh wait`; record the time from `start` to the first `200` (first boot after a long stop may install drivers/containers: record both). Through the deployed app send 5 chats on Gemma (flip the persona and engine between them) and record: Gemma availability flipping to selectable in the UI within one 15 s poll; answers returned; the waterfall `llm.generate` times; vLLM tokens per hour estimate = (tokens processed / elapsed hours) is NOT meaningful at demo load, so instead record vLLM's own throughput by calling `GET https://llm-34-126-172-79.nip.io/metrics` (open on this VM; note this in the findings as an exposure) and reading `vllm:generation_tokens_total` and `vllm:prompt_tokens_total` over a 10-minute window. Update `backend/prices.yaml` `assumed_tokens_per_hour` ONLY if the user wants amortisation based on a measured steady throughput; otherwise leave it and document the assumption in `docs/deploy-verification.md` (ask the user in the report).
 - [ ] **Step 3: Offline behaviours live.** With the VM running, `gemma.sh stop` and confirm: within one poll (about 15 s) the Gemma control returns to Offline, a send on Gemma returns the inline offline error and "Try with Gemini Flash-Lite" works (UI plan M15). Confirm the traffic generator never selects Gemma (`GEMMA_TRAFFIC=0`).
-- [ ] **Step 4 (OPTIONAL, GATED, do not start without the user's approval): vLLM metrics into Elastic.** The VM exposes `/metrics` publicly through Caddy. Proposal for the user to approve: edit the VM's startup-script Caddyfile heredoc to `basic_auth` the `/metrics` path, and add a scraper (`prometheus` receiver in `glassbox-collector`, targeting `https://llm-34-126-172-79.nip.io/metrics` with the basic-auth secret) plus a "Gemma (vLLM)" dashboard. This edits a user-owned VM startup script and changes who can read metrics, so it needs an explicit yes. If the user declines, record the open `/metrics` exposure as an accepted risk in the runbook.
+- [ ] **Step 4 (OPTIONAL, GATED, do not start without the user's approval): vLLM metrics into Elastic.** The VM exposes `/metrics` publicly through Caddy. Proposal for the user to approve: edit the VM's startup-script Caddyfile heredoc to `basic_auth` the `/metrics` path, and add a scraper: the new `glassbox-gcp` Elastic Agent gets a Prometheus-metrics integration targeting `https://llm-34-126-172-79.nip.io/metrics` with the basic-auth secret (no new collector, the shared stack is not touched), plus a "Gemma (vLLM)" dashboard. This edits a user-owned VM startup script and changes who can read metrics, so it needs an explicit yes. If the user declines, record the open `/metrics` exposure as an accepted risk in the runbook.
 - [ ] **Step 5: Commit** `gemma.sh` and the appended evidence.
 
 ---
@@ -1715,7 +1780,7 @@ Implement `elastic/fleet.py` with those two builders (the `inputs` structure com
 
 **Files:** `docs/RUNBOOK.md`, `docs/DEMO.md`, `deploy/scripts/demo_up.sh`, `deploy/scripts/demo_down.sh`
 
-- [ ] **Step 1: `docs/RUNBOOK.md`** (plain language, no dashes) with: (1) one-time setup order (the scripts and their checks); (2) before a demo: `demo_up.sh` (un-suspends the generator, optionally starts Gemma, waits, prints the URL and password reminder); (3) during: where to look (Kibana APM service `glassbox-backend`, the Glass Box dashboard, the Vertex AI dashboards, Security alerts); (4) after: `demo_down.sh` (suspend generator, stop Gemma, optionally `teardown.sh` to remove the load balancer); (5) key lifecycle: persona keys expire 90 days after minting (record the expiry date in the doc: minted 2026-10-05, expires 2027-01-03), how to re-mint with `docs/dev-tools-mint-keys.md`, update the Secret (`create_secrets.sh`) and `kubectl rollout restart`; the OTLP intake keys are currently project admin keys and should be replaced by ingest-only keys (open item); the old plaintext OTLP key in `o11y-metrics/chatbot-rag-app` was exposed in this project's working notes: rotation is Task 11; (6) known behaviours: Vertex metrics lag 3-6 minutes; managed certificate delay on first deploy; first chat after a long idle is slower (ML models scale to zero after 24 hours idle); Gemma boot 5-10 minutes; the 90 second client timeout; rate limits (20 chats per minute per IP) and the lockout after 10 wrong passwords; (7) troubleshooting table (symptom, check, fix) covering: 502 `upstream_error`, 503 `gemma_offline`, empty dashboards, no Security alerts, certificate stuck, pods CrashLoop (persona keys missing or expired); (8) cost table and the off switches.
+- [ ] **Step 1: `docs/RUNBOOK.md`** (plain language, no dashes) with: (1) one-time setup order (the scripts and their checks); (2) before a demo: `demo_up.sh` (un-suspends the generator, optionally starts Gemma, waits, prints the URL and password reminder); (3) during: where to look (Kibana APM service `glassbox-backend`, the Glass Box dashboard, the Vertex AI dashboards, Security alerts); (4) after: `demo_down.sh` (suspend generator, stop Gemma, optionally `teardown.sh` to remove the load balancer); (5) key lifecycle: persona keys expire 90 days after minting (record the expiry date in the doc: minted 2026-10-05, expires 2027-01-03), how to re-mint with `docs/dev-tools-mint-keys.md`, update the Secret (`create_secrets.sh`) and `kubectl rollout restart`; the OTLP intake keys are currently project admin keys and should be replaced by ingest-only keys (open item); the plaintext OTLP key on `o11y-metrics/chatbot-rag-app` is intentionally left untouched (user decision); note only that its value appeared in this project's working notes; (6) known behaviours: Vertex metrics lag 3-6 minutes; managed certificate delay on first deploy; first chat after a long idle is slower (ML models scale to zero after 24 hours idle); Gemma boot 5-10 minutes; the 90 second client timeout; rate limits (20 chats per minute per IP) and the lockout after 10 wrong passwords; (7) troubleshooting table (symptom, check, fix) covering: 502 `upstream_error`, 503 `gemma_offline`, empty dashboards, no Security alerts, certificate stuck, pods CrashLoop (persona keys missing or expired); (8) cost table and the off switches.
 - [ ] **Step 2: `docs/DEMO.md`**: a 10-minute script with exact clicks and prompts mapped to the four pillars: (1) 2 min DLS: Maya vs Rachel on the Aurora question with "Ask again" and the ghost cards; (2) 3 min tracing: open the trace from the X-ray, walk the waterfall (guardrail, ES hybrid search, prompt build, Gemini call with prompt and response), show LangChain mode nesting; (3) 2 min guardrails: red-team injection (blocked), email (blocked), salary (flagged only), then Security alerts and the detection rule; (4) 2 min cost: session cost in the header, the Glass Box cost panels, the Vertex OOTB dashboards, and the cost alert firing via the temporary low threshold command; (5) 1 min Gemma: start, show Offline to selectable, switch, stop. Include "what to say" one-liners per step and the expected on-screen result; no dash characters.
 - [ ] **Step 3: Up/down scripts.** `demo_up.sh [--gemma]` and `demo_down.sh [--teardown]` using only the commands already proven in Tasks 5-9; `bash -n` both; run `demo_down.sh` then `demo_up.sh` once live and record that the URL answers after.
 - [ ] **Step 4: Final verification record.** Complete `docs/deploy-verification.md` with the full checklist (every item from the Review Focus list and the carried live-smoke list), each with evidence and pass/fail; list anything not done and why. Run the full test suites one last time: `cd backend && pytest -q`, `pytest elastic/tests deploy/tests -q -m "not integration"`, `cd ../frontend && npm test`.
@@ -1727,15 +1792,11 @@ git commit -m "docs: runbook, demo script, demo up/down scripts and the final de
 
 ---
 
-### Task 11 (OPTIONAL, needs the user's decision): the old plaintext OTLP key
-
-An earlier survey of the cluster showed `o11y-metrics/chatbot-rag-app` carrying an Elastic OTLP API key as a plain environment variable, and that key value appeared in this project's tool output. It belongs to a workload this plan does not own. Do NOT act without asking. Present the user these options and wait: (a) leave as is (accept the exposure), (b) invalidate that API key in the Elastic project (it stops any telemetry from that old app; identify the key id via `GET /_security/api_key` by name and only with the user's confirmation of the exact key), (c) additionally move the value into a Secret in that namespace. Record the choice in the runbook. No code is written for this task.
-
 ---
 
 ## Self-review notes
 
 - **Spec coverage:** GKE deployment, HTTPS and password gate (Tasks 4-5); OOTB Vertex AI dashboards (Task 7); APM tracing live with content capture (Tasks 5-6); guardrail pipeline and the Security detection rule without cross-project search (Tasks 3, 6); cost tracking, dashboards and threshold alert (Tasks 3, 6, 8); traffic generator (Tasks 2, 8); Gemma on demand with measurements (Task 9); runbook and demo (Task 10); hardening carried from the reviews: headers, rate limiting, lockout, timeouts, image modes, UI/server timeout alignment (Task 1).
-- **Decisions made in the plan and why:** a dedicated collector (the shared kube-stack Helm release is failed and not ours); fan-out to Security instead of cross-project search (CPS is billed on the linked project's retained volume and needs a Cloud API key; the Security OTLP intake was verified to accept its key); Workload Identity over service-account keys (pending the Task 0B manifest check); direct images built by Cloud Build for amd64 (the Mac is arm64); the app pod never receives the admin key.
-- **Soft spots settled by Task 0 or by the first live step rather than guessed:** the ES|QL field names and numeric types for the dashboards and alert (0C); the Lens ES|QL template shape (0D); whether the Vertex integration accepts ADC (0B); the Security project's dataset routing (0A); the collector image tag (0E); whether `.es-query` ES|QL rule parameters match this Kibana version (Task 6 proves the rule fires).
+- **Decisions made in the plan and why:** reuse of the existing daemon collector for traces and metrics (verified to export to this project; not modified), direct in-app export for guardrail logs because the shared log path writes to a fixed `logs.otel` index and cannot run the dataset-routed pipeline; direct export to Security instead of cross-project search (CPS is billed on the linked project's retained volume and needs a Cloud API key; the Security OTLP intake was verified to accept its key); one new single-replica Elastic Agent only for Vertex because the existing agents are per-node DaemonSets; Workload Identity over service-account keys (pending the Task 0B manifest check); direct images built by Cloud Build for amd64 (the Mac is arm64); the app pod never receives the admin key.
+- **Soft spots settled by Task 0 or by the first live step rather than guessed:** the ES|QL field names and numeric types for the dashboards and alert (0C); the Lens ES|QL template shape (0D); whether the Vertex integration accepts ADC (0B); the Security project's dataset routing (0A); whether `.es-query` ES|QL rule parameters match this Kibana version (Task 6 proves the rule fires).
 - **Cost of mistakes:** each live task has a recorded proof step and a teardown; `deploy/scripts/teardown.sh` removes the only meaningful fixed cost (the load balancer) and the generator has an off switch and a cost alert.
