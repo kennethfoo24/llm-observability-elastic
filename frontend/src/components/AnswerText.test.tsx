@@ -91,3 +91,36 @@ test("citations inside inline code, fenced code and link text are left alone", (
   expect(container.querySelectorAll("code")).toHaveLength(2);
   expect(container.textContent).toContain("[pto-policy]");
 });
+
+test("a bracketed list of known ids becomes one chip per id with comma separators and no brackets", async () => {
+  const onCitation = vi.fn();
+  const { container } = render(<AnswerText knownIds={KNOWN} text="Both apply [pto-policy, remote-work]." onCitation={onCitation} />);
+  expect(screen.getAllByRole("button")).toHaveLength(2);
+  await userEvent.click(screen.getByRole("button", { name: "remote-work" }));
+  expect(onCitation).toHaveBeenCalledWith("remote-work");
+  expect(container.textContent).toBe("Both apply pto-policy, remote-work.");
+});
+
+test("semicolon lists work too", () => {
+  render(<AnswerText knownIds={KNOWN} text="See [pto-policy; remote-work]" onCitation={vi.fn()} />);
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["pto-policy", "remote-work"]);
+});
+
+test("in a mixed list the unknown id stays plain text", () => {
+  const { container } = render(<AnswerText knownIds={KNOWN} text="See [pto-policy, made-up-doc]" onCitation={vi.fn()} />);
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["pto-policy"]);
+  expect(container.textContent).toBe("See pto-policy, made-up-doc");
+});
+
+test("a list of only unknown ids is left exactly as written", () => {
+  const { container } = render(<AnswerText knownIds={KNOWN} text="See [foo-bar, baz-qux]" onCitation={vi.fn()} />);
+  expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(container.textContent).toBe("See [foo-bar, baz-qux]");
+});
+
+test("lists inside code spans and fences are untouched", () => {
+  const { container } = render(<AnswerText knownIds={KNOWN} text={"`[pto-policy, remote-work]`\n\n```\n[pto-policy; remote-work]\n```"} onCitation={vi.fn()} />);
+  expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(container.textContent).toContain("[pto-policy, remote-work]");
+  expect(container.textContent).toContain("[pto-policy; remote-work]");
+});

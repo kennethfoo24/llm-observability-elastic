@@ -1,6 +1,9 @@
 import Markdown from "react-markdown";
 
-const CITATION = /\[([a-z0-9][a-z0-9-]{1,60})\]/g;
+const ID = "[a-z0-9][a-z0-9-]{1,60}";
+// one id, or a list of ids separated by commas or semicolons: [a], [a, b], [a; b]
+const CITATION = new RegExp(`\\[(${ID}(?:\\s*[,;]\\s*${ID})*)\\]`, "g");
+const SEPARATOR = /\s*[,;]\s*/;
 
 type MdNode = { type: string; value?: string; url?: string; children?: MdNode[] };
 
@@ -14,9 +17,14 @@ function citationPlugin(knownIds: ReadonlySet<string>) {
       if (child.type !== "text" || !child.value) { walk(child); out.push(child); continue; }
       let last = 0;
       for (const m of child.value.matchAll(CITATION)) {
-        if (!knownIds.has(m[1])) continue;
+        const ids = m[1].split(SEPARATOR);
+        if (!ids.some((id) => knownIds.has(id))) continue;
         if (m.index > last) out.push({ type: "text", value: child.value.slice(last, m.index) });
-        out.push({ type: "link", url: `cite:${m[1]}`, children: [{ type: "text", value: m[1] }] });
+        // a list renders as chips with comma separators and no brackets; an unknown id in it stays plain text
+        ids.forEach((id, n) => {
+          if (n > 0) out.push({ type: "text", value: ", " });
+          out.push(knownIds.has(id) ? { type: "link", url: `cite:${id}`, children: [{ type: "text", value: id }] } : { type: "text", value: id });
+        });
         last = m.index + m[0].length;
       }
       if (last === 0) out.push(child);

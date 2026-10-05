@@ -90,3 +90,8 @@ test("skeleton pulse is switched off under prefers-reduced-motion", () => {
   expect(bars.length).toBe(3);
   bars.forEach((b) => expect(b.className).toContain("motion-reduce:animate-none"));
 });
+
+test("a timed out request shows the timeout copy", () => {
+  render(<AssistantMessage {...base} msg={msg({ status: "error", error: { status: 0, code: "timeout" } })} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("The request took too long. Try again.");
+});

@@ -34,6 +34,7 @@ const ERROR_COPY: Record<string, string> = {
   gemma_offline: "The self-hosted Gemma model is offline.",
   upstream_error: "The model service had a problem. Try again.",
   network_error: "Could not reach the server.",
+  timeout: "The request took too long. Try again.",
   pricing_unavailable: "This model is not priced yet.",
   invalid_request: "That question could not be sent.",
 };

@@ -130,3 +130,14 @@ test("arrows do nothing when disabled", async () => {
   await userEvent.keyboard("{ArrowDown}");
   expect(onModel).not.toHaveBeenCalled();
 });
+
+test("the selected engine segment is marked by fill and border, not text colour alone", () => {
+  render(<ModelControls models={[]} selectedModel="" onModel={vi.fn()} engine="langchain" onEngine={vi.fn()} />);
+  const on = screen.getByRole("radio", { name: "LangChain" });
+  const off = screen.getByRole("radio", { name: "Direct SDK" });
+  expect(on).toHaveAttribute("data-state", "on");
+  expect(on.className).toContain("data-[state=on]:bg-blue-soft");
+  expect(on.className).toContain("data-[state=on]:border-blue");
+  expect(on.className).toContain("data-[state=on]:text-blue-strong");
+  expect(off).toHaveAttribute("data-state", "off");
+});

@@ -92,7 +92,7 @@ export function ModelControls({ models, selectedModel, onModel, engine, onEngine
         {([["sdk", "Direct SDK"], ["langchain", "LangChain"]] as const).map(([value, label]) => (
           <ToggleGroup.Item
             key={value} value={value}
-            className="min-h-10 rounded-[8px] px-3 py-2 text-sm font-medium text-muted transition disabled:opacity-60 data-[state=on]:bg-surface data-[state=on]:text-ink data-[state=on]:shadow-sm"
+            className="min-h-10 rounded-[8px] border border-transparent px-3 py-2 text-sm font-medium text-muted transition disabled:opacity-60 data-[state=on]:border-blue data-[state=on]:bg-blue-soft data-[state=on]:text-blue-strong"
           >
             {label}
           </ToggleGroup.Item>

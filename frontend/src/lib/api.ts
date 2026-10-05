@@ -21,11 +21,28 @@ export function onUnauthorized(cb: () => void): () => void {
   return () => unauthorizedListeners.delete(cb);
 }
 
+export const REQUEST_TIMEOUT_MS = 90_000;
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await send<T>(path, init, controller.signal);
+  } catch (e) {
+    // a hung upstream must not leave a message pending forever
+    if (controller.signal.aborted) throw new ApiError(0, "timeout");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function send<T>(path: string, init: RequestInit, signal: AbortSignal): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       ...init,
+      signal,
       headers: { "Content-Type": "application/json", "X-Demo-Password": auth.get(), ...(init.headers ?? {}) },
     });
   } catch {
