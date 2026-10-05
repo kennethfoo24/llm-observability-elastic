@@ -78,3 +78,55 @@ All checks via Elasticsearch and Kibana REST (Kibana is SSO only, no logged-in b
 | Traffic generator | CronJob `glassbox-trafficgen` has `GEMMA_TRAFFIC=0` (unset would also mean off) and is currently suspended. |
 
 Accepted risk (Step 4 NOT done, needs the user's yes): the VM's Caddy exposes vLLM `/metrics` without authentication on `https://llm-34-126-172-79.nip.io/metrics` (counters, queue sizes, model name; no prompts). Proposal for the user: `basic_auth` on `/metrics` in the VM startup-script Caddyfile plus a Prometheus integration on the `glassbox-gcp` agent and a "Gemma (vLLM)" dashboard. Until approved it stays open and is recorded here as an accepted risk. The VM's `/v1/*` paths remain behind the Bearer key.
+
+## Task 10: demo scripts, runbook and final record (2026-10-05)
+
+`deploy/scripts/demo_up.sh [--gemma]` and `demo_down.sh [--teardown]` use only commands proven in Tasks 5-9 (scale, CronJob patch, `gemma.sh`, `teardown.sh`). Dry-run tests are in `deploy/tests/test_scripts.py`.
+Live run (not `--gemma`, not `--teardown`): `demo_down.sh` confirmed "cronjob suspended" and Gemma TERMINATED; `demo_up.sh` scaled the app to 1 (rollout ok), un-suspended the CronJob and `https://107-178-251-254.sslip.io/healthz` answered 200. `demo_down.sh` was then run again so the CronJob is left suspended (cost control); final state is recorded in the task report. `demo_up.sh --gemma` was dry-run only (Gemma was not started in this task).
+
+Final suites: backend `pytest -q`: 189 passed (22 integration deselected). `pytest elastic/tests deploy/tests -m "not integration"`: 55 passed (10 deselected); this run includes the uncommitted work-in-progress `elastic/tests/test_fleet.py`. Frontend `npm test`: 229 passed (25 files).
+
+## Final checklist
+
+### Review Focus (plan)
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| 1 | Certificate wait, no success before healthz 200 | PASS | `deploy.sh` waits up to 90 minutes and then curls healthz; live: certificate Active about 25 minutes after apply, healthz 200 (Task 5, Task 10 live up) |
+| 2 | Slow answers not cut by the LB | PASS (config) | BackendConfig `timeoutSec: 100`, server upstream timeouts below 90 s; Gemma chats up to 4.3 s live. No deliberately slow 60 s request was run |
+| 3 | Secrets never in git, logs, describe, argv | PASS | No key in pod logs (Task 5); scripts read local files and print names only; scan tests in `deploy/tests`; persona key expiry 2027-01-03 documented in the runbook. One password exposure happened and was rotated (see Notes above) |
+| 4 | Traffic generator cost guard | PASS | `concurrencyPolicy: Forbid`, deadline, cap of 5 per run, suspend switch verified at 21:35, 13 scheduled jobs never overlapped, cost rule `ok` (Task 8) |
+| 5 | App keeps answering when telemetry endpoints are dead | PASS | 3 chats HTTP 200 with dead endpoints, pod Ready 0 restarts (Task 6) |
+| 6 | Guardrail logs reach both projects, same verdict, no `logs.otel` leak | PASS | 5 and 5 docs, verdicts match, 0 leaked docs in `logs.otel` (Task 6) |
+| 7 | Vertex metrics lag documented | PASS (docs) | Runbook section 6. The lag itself could not be measured because Vertex collection is blocked (open item 1) |
+
+### Carried live-smoke list
+
+| Item | Result | Evidence |
+|---|---|---|
+| a Auth (401, lockout) | PASS, lockout not run live | Unit tests cover lockout |
+| b Real DLS Maya vs Rachel | PASS | Task 5 section b |
+| c Red team (injection, email, salary, two names) | PASS | Task 5 section c |
+| d Traces with content capture | PASS via REST; Kibana trace link not opened | No SSO browser session |
+| e LangChain stages | PASS | Task 5 section e |
+| f Models and Gemma Offline | PASS | Task 5 section f, Task 9 |
+| g Headers, CSP, redirect | PASS | Task 5 section g |
+| Dashboard `glassbox-overview` | PASS via ES|QL per panel; Lens rendering NOT VERIFIED | Task 6 3a |
+| Cost alert fires, threshold restored | PASS | Task 6 3b |
+| Security detection rule fires | PASS | Task 6 3c |
+| Traffic generator schedule and off switch | PASS | Task 8 |
+| Gemma start, chats, stop | PASS | Task 9 (cold start 511 s) |
+| Vertex AI integration data | NOT VERIFIED (blocked) | Task 7: agent online, `gcp/metrics` failed, no data |
+| Post-login browser visuals | NOT VERIFIED visually | API and frontend tests only |
+| demo_up and demo_down live | PASS | Task 10 live run above |
+
+## Open items
+
+1. Vertex AI integration incomplete: `gcp_vertexai` needs `credentials_json`. The project owner chose a service-account key for `glassbox-monitoring`; key creation was denied by the permission system and not done. `elastic/fleet.py` and `elastic/tests/test_fleet.py` hold uncommitted `credentials_json` support. Finishing commands are in `docs/RUNBOOK.md` section 9.
+2. Please eyeball once: the Glass Box dashboard (Lens rendering) and the Kibana trace link (verified through REST only).
+3. Post-login UI visuals verified by API and frontend tests only.
+4. Guardrail log export uses project admin keys (owner decision), not ingest-only keys. `docs/dev-tools-mint-ingest-keys.md` exists for later hardening.
+5. Gemma vLLM `/metrics` is open (accepted risk); the gated proposal (basic_auth, Prometheus integration, Gemma dashboard) awaits approval. Gemma warm restart time and whether to base `assumed_tokens_per_hour` on measured throughput are undecided.
+6. The plaintext OTLP key on `o11y-metrics/chatbot-rag-app` is untouched by decision; its value appeared in this project's working notes.
+7. Persona keys expire 2027-01-03 (minted 2026-10-05).
+8. Parked minors: IPv6 /64 limiter weakness, per-replica limiter state, `/favicon.ico` 404, Task 7 and Task 3 minors in the ledger.

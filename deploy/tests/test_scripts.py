@@ -105,3 +105,27 @@ def test_gemma_script_safe_and_dry_runnable():
         assert r.returncode == 0 and needle in r.stdout, (sub, r.stdout, r.stderr)
     r = subprocess.run(["bash", str(p), "bogus"], env=env, capture_output=True, text=True)
     assert r.returncode != 0
+
+
+def test_demo_scripts_safe_and_dry_runnable():
+    for name in ("demo_up.sh", "demo_down.sh"):
+        p = ROOT / "deploy/scripts" / name
+        t = p.read_text()
+        assert subprocess.run(["bash", "-n", str(p)]).returncode == 0, name
+        for pat in FORBIDDEN + [r"\bset -x\b", r"app_password\.txt\)"]:
+            assert not re.search(pat, t), (name, pat)
+        assert "guard_gcloud" in t and "guard_kube" in t and "set -euo pipefail" in t
+        assert not re.search(r"cat\s+\S*app_password", t), name  # password is never read or printed
+    assert "backend/secrets/app_password.txt" in (ROOT / "deploy/scripts/demo_up.sh").read_text()
+    if shutil.which("gcloud") is None or shutil.which("kubectl") is None:
+        pytest.skip("gcloud/kubectl not installed")
+    env = {**os.environ, "DRY_RUN": "1"}
+    r = subprocess.run(["bash", str(ROOT / "deploy/scripts/demo_up.sh"), "--gemma"], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert '"suspend":false' in r.stdout.replace("\\", "") and "instances start" in r.stdout and "would poll" in r.stdout
+    assert "see backend/secrets/app_password.txt" in r.stdout
+    r = subprocess.run(["bash", str(ROOT / "deploy/scripts/demo_down.sh"), "--teardown"], env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert '"suspend":true' in r.stdout.replace("\\", "") and "instances stop" in r.stdout and "delete ingress" in r.stdout
+    for name in ("demo_up.sh", "demo_down.sh"):
+        assert subprocess.run(["bash", str(ROOT / "deploy/scripts" / name), "--bogus"], env=env, capture_output=True).returncode != 0
