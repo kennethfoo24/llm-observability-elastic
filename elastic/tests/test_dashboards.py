@@ -40,7 +40,7 @@ def test_every_panel_query_targets_this_service_and_has_a_bounded_limit():
 
 def test_latency_panel_converts_nanoseconds_to_milliseconds_and_lists_real_span_names():
     lat = next(p for p in PANELS if "latency" in p.title.lower())
-    for name in ("guardrail.check", "retrieval.hybrid", "prompt.build", "generate_content"):
+    for name in ("guardrail.check", "retrieval.hybrid", "prompt.build", "chat "):
         assert name in lat.esql
     assert "1000000" in lat.esql and "p95_ms" in lat.esql
 

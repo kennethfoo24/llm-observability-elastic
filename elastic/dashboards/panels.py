@@ -49,8 +49,8 @@ PANELS = [
     # ES|QL duration on traces is nanoseconds.
     Panel("Request latency by stage (p95, ms)",
           'FROM traces-generic.otel-default | WHERE service.name == "glassbox-backend" AND '
-          '(name IN ("guardrail.check", "retrieval.hybrid", "prompt.build") OR STARTS_WITH(name, "generate_content")) | '
-          'EVAL stage = CASE(STARTS_WITH(name, "generate_content"), "generate_content", name), '
+          '(name IN ("guardrail.check", "retrieval.hybrid", "prompt.build") OR STARTS_WITH(name, "chat ")) | '
+          'EVAL stage = CASE(STARTS_WITH(name, "chat "), "chat (LLM call)", name), '
           "ms = duration / 1000000.0 | "
           "STATS p95_ms = PERCENTILE(ms, 95) BY stage | LIMIT 10",
           "bar", "stage", "p95_ms"),
