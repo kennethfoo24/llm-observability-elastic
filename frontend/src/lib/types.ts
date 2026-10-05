@@ -10,7 +10,8 @@ export type Guardrail = {
   reasons: string[];
   status: "ok" | "degraded";
   latency_ms: number;
-  injection_score: number;
+  /** null when the injection model did not answer (timeout, error, malformed): not scored, not zero */
+  injection_score: number | null;
 };
 export type DocHit = { id: string; title: string; classification: string; score: number };
 export type Ghost = { id: string; title: string; classification: string };

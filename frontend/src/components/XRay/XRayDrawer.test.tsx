@@ -71,19 +71,20 @@ test("model and cost show tokens, thinking tokens and cost in monospace numbers"
   expect(within(cost).getByText("gemini-3.1-flash-lite")).toBeInTheDocument();
 });
 
-test("a flagged blocked prompt shows the verdict in words and its reasons, and no retrieval section content", () => {
+test("a blocked prompt says Blocked in the guardrail panel, with its reasons and its reasons, and no retrieval section content", () => {
   const blocked = response({ blocked: true, answer: "", docs: [], hidden: [], cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 },
     block_reason: ["prompt_injection"], guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 30, injection_score: 0.99 }, stages: [{ name: "guardrail.check", ms: 30 }] });
   render(<XRayDrawer {...props} msg={msg(blocked)} />);
   const g = screen.getByRole("region", { name: "Guardrail" });
-  expect(within(g).getByText("Flagged")).toBeInTheDocument();
+  expect(within(g).getByText("Blocked")).toBeInTheDocument();
+  expect(within(g).queryByText("Flagged")).toBeNull();
   expect(within(g).getByText("Prompt injection attempt")).toBeInTheDocument();
   expect(within(g).getByText("0.99")).toBeInTheDocument();
   expect(screen.getByText(/stopped before any search or model call/i)).toBeInTheDocument();
 });
 
 test("degraded guardrail shows a Degraded badge", () => {
-  render(<XRayDrawer {...props} msg={msg(response({ guardrail: { verdict: "CLEAN", reasons: [], status: "degraded", latency_ms: 1500, injection_score: 0 } }))} />);
+  render(<XRayDrawer {...props} msg={msg(response({ guardrail: { verdict: "CLEAN", reasons: [], status: "degraded", latency_ms: 1500, injection_score: null } }))} />);
   expect(screen.getByText("Degraded")).toBeInTheDocument();
 });
 
@@ -184,4 +185,51 @@ test("the Kibana link encodes the trace id and says it opens in a new tab", () =
   const link = screen.getByRole("link", { name: /open trace in kibana/i });
   expect(link).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/a%2Fb%20c");
   expect(link).toHaveTextContent("(opens in a new tab)");
+});
+
+const patternsOnly = (over: Partial<ChatResponse["guardrail"]> = {}) =>
+  response({ guardrail: { verdict: "CLEAN", reasons: [], status: "degraded", latency_ms: 1500, injection_score: null, ...over } });
+
+test("when the injection model did not answer the verdict is Patterns only, never Clean, with n/a and an explanation", () => {
+  render(<XRayDrawer {...props} msg={msg(patternsOnly())} />);
+  const g = screen.getByRole("region", { name: "Guardrail" });
+  expect(within(g).getByText("Patterns only")).toBeInTheDocument();
+  expect(within(g).queryByText("Clean")).toBeNull();
+  expect(within(g).getByText("Degraded")).toBeInTheDocument();
+  expect(within(g).getByText("n/a")).toBeInTheDocument();
+  expect(within(g).queryByText("0.00")).toBeNull();
+  expect(within(g).getByText("The injection model did not answer, so only pattern checks ran.")).toBeInTheDocument();
+  const word = within(g).getByText("Patterns only").closest("span")!;
+  expect(word.className).toContain("text-on-ink-muted");
+  expect(word.className).not.toContain("text-clean");
+});
+
+test("a flagged verdict without an injection score stays Flagged and shows n/a", () => {
+  render(<XRayDrawer {...props} msg={msg(patternsOnly({ verdict: "FLAGGED", reasons: ["pii_email"] }))} />);
+  const g = screen.getByRole("region", { name: "Guardrail" });
+  expect(within(g).getByText("Flagged")).toBeInTheDocument();
+  expect(within(g).getByText("n/a")).toBeInTheDocument();
+  expect(within(g).queryByText(/did not answer/)).toBeNull();
+});
+
+test("a scored clean answer still reads Clean with its probability", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  const g = screen.getByRole("region", { name: "Guardrail" });
+  expect(within(g).getByText("Clean")).toBeInTheDocument();
+  expect(within(g).getByText("0.02")).toBeInTheDocument();
+});
+
+test("the LLM bar is blue (yellow is for cost only) and the guardrail bar follows the verdict", () => {
+  const { container } = render(<XRayDrawer {...props} msg={msg(response())} />);
+  const bars = Array.from(container.querySelectorAll("ol span.absolute"));
+  expect(bars.some((b) => b.className.includes("bg-cost"))).toBe(false);
+  expect(bars[0].className).toContain("bg-clean");
+  expect(bars[3].className).toContain("bg-blue-bright");
+});
+
+test("the guardrail bar is neutral when only patterns ran", () => {
+  const { container } = render(<XRayDrawer {...props} msg={msg(patternsOnly())} />);
+  const bars = Array.from(container.querySelectorAll("ol span.absolute"));
+  expect(bars[0].className).toContain("bg-on-ink-muted");
+  expect(bars[0].className).not.toContain("bg-clean");
 });

@@ -48,7 +48,7 @@ test("a flagged but allowed answer shows the answer and a flag note", () => {
 });
 
 test("a degraded guardrail is called out in words", () => {
-  const degraded = response({ guardrail: { verdict: "CLEAN", reasons: [], status: "degraded", latency_ms: 1500, injection_score: 0 } });
+  const degraded = response({ guardrail: { verdict: "CLEAN", reasons: [], status: "degraded", latency_ms: 1500, injection_score: null } });
   render(<AssistantMessage {...base} msg={msg({ response: degraded })} />);
   expect(screen.getByText(/guardrail models were slow or unavailable/i)).toBeInTheDocument();
 });

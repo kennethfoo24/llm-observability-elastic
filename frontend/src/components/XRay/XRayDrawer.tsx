@@ -57,7 +57,7 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, highlightDocId }
         <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 140, damping: 20 }}>
           <Section title="Guardrail"><GuardrailStrip r={r} /></Section>
           <Section title="Trace">
-            <Waterfall stages={r.stages} verdict={r.guardrail.verdict} />
+            <Waterfall stages={r.stages} verdict={r.guardrail.verdict} scored={r.guardrail.injection_score !== null} />
             {kibanaUrl && r.trace_id ? (
               <a
                 href={`${kibanaUrl}/app/apm/link-to/trace/${encodeURIComponent(r.trace_id)}`} target="_blank" rel="noreferrer noopener"

@@ -6,10 +6,12 @@ import type { ChatResponse } from "../../lib/types";
 export function GuardrailStrip({ r }: { r: ChatResponse }) {
   const g = r.guardrail;
   const flagged = g.verdict === "FLAGGED";
-  const Icon = flagged ? ShieldWarning : g.verdict === "UNKNOWN" ? ShieldSlash : ShieldCheck;
-  const word = flagged ? "Flagged" : g.verdict === "UNKNOWN" ? "Unscored" : "Clean";
-  const tone = flagged ? "text-flag" : g.verdict === "UNKNOWN" ? "text-on-ink-muted" : "text-clean";
-  const score = Number.isFinite(g.injection_score) ? g.injection_score : 0;
+  const scored = typeof g.injection_score === "number" && Number.isFinite(g.injection_score);
+  // an unscored non-flagged verdict is not "Clean": only the regex checks ran
+  const patternsOnly = !flagged && !scored;
+  const Icon = r.blocked || flagged ? ShieldWarning : patternsOnly || g.verdict === "UNKNOWN" ? ShieldSlash : ShieldCheck;
+  const word = r.blocked ? "Blocked" : flagged ? "Flagged" : patternsOnly ? "Patterns only" : g.verdict === "UNKNOWN" ? "Unscored" : "Clean";
+  const tone = r.blocked || flagged ? "text-flag" : patternsOnly || g.verdict === "UNKNOWN" ? "text-on-ink-muted" : "text-clean";
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
@@ -24,8 +26,9 @@ export function GuardrailStrip({ r }: { r: ChatResponse }) {
       )}
       <dl className="mt-3 flex items-baseline justify-between gap-3 text-sm">
         <dt className="text-on-ink-muted">Injection probability</dt>
-        <dd className="num font-bold">{score.toFixed(2)}</dd>
+        <dd className="num font-bold">{scored ? g.injection_score!.toFixed(2) : "n/a"}</dd>
       </dl>
+      {patternsOnly && <p className="mt-3 text-sm text-on-ink-muted">The injection model did not answer, so only pattern checks ran.</p>}
       {r.blocked && <p className="mt-3 text-sm text-on-ink-muted">Stopped before any search or model call, so nothing was retrieved or billed.</p>}
     </div>
   );

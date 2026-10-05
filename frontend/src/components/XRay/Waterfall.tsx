@@ -4,13 +4,13 @@ import { formatMs } from "../../lib/format";
 import { layoutStages } from "../../lib/stages";
 import type { Stage, Verdict } from "../../lib/types";
 
-export function Waterfall({ stages, verdict }: { stages: Stage[]; verdict: Verdict }) {
+export function Waterfall({ stages, verdict, scored = true }: { stages: Stage[]; verdict: Verdict; scored?: boolean }) {
   const rows = layoutStages(stages);
   if (rows.length === 0) return <p className="text-sm text-on-ink-muted">No timing data</p>;
   return (
     <ol className="grid gap-3">
       {rows.map((row, i) => {
-        const color = row.name === "guardrail.check" ? (verdict === "FLAGGED" ? "bg-flag" : "bg-clean") : row.name === "llm.generate" ? "bg-cost" : "bg-blue-bright";
+        const color = row.name === "guardrail.check" ? (verdict === "FLAGGED" ? "bg-flag" : scored ? "bg-clean" : "bg-on-ink-muted") : "bg-blue-bright";
         return (
           <li key={`${row.name}-${i}`} title={STAGE_HINTS[row.name]} className="min-w-0">
             <div className="flex items-baseline justify-between gap-3 text-sm">
