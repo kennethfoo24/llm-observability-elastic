@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { Composer, MAX_CHARS } from "./Composer";
@@ -123,12 +123,35 @@ test("disabled Send explains why (empty and pending)", () => {
   expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Waiting for the current answer");
 });
 
-test("over-limit Send is described as too long and counter is live", () => {
+test("over-limit shows the too-long alert and describes Send as too long", () => {
   render(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
   expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Question is too long");
+  expect(screen.getByRole("alert")).toHaveTextContent(/too long/i);
 });
 
 test("near-limit counter is a polite live region", () => {
   render(<Composer value={"x".repeat(3600)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
   expect(screen.getByText("3600 / 4000")).toHaveAttribute("aria-live", "polite");
+});
+
+test("same-task: two Enter keydowns inside one act send exactly once", () => {
+  const onSend = vi.fn();
+  render(<Harness onSend={onSend} initial="hello" />);
+  const box = screen.getByRole("textbox", { name: /your question/i });
+  act(() => {
+    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.keyDown(box, { key: "Enter" });
+  });
+  expect(onSend).toHaveBeenCalledTimes(1);
+});
+
+test("same-task: two Send clicks inside one act send exactly once", () => {
+  const onSend = vi.fn();
+  render(<Harness onSend={onSend} initial="hello" />);
+  const btn = screen.getByRole("button", { name: /send/i });
+  act(() => {
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+  });
+  expect(onSend).toHaveBeenCalledTimes(1);
 });
