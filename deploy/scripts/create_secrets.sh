@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ "${NAMESPACE:-$NS}" = "$NS" ] || die "namespace must be $NS"
 
-APP_KEYS="obs_es_url kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key"
+APP_KEYS="obs_es_url kibana_url sec_kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key"
 PERSONA_KEYS="persona_keys.json"
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -47,6 +47,7 @@ keys = json.loads(Path("backend/secrets/persona_keys.json").read_text())
 out = {
     "S_OBS_ES_URL": raw["OBSERVABILITY_ELASTICSEARCH"],
     "S_KIBANA_URL": raw["OBSERVABILITY_KIBANA"],
+    "S_SEC_KIBANA_URL": raw.get("SECURITY_KIBANA", ""),
     "S_OBS_OTLP": raw["OBSERVABILITY_OPENTELEMETRY"],
     "S_SEC_OTLP": raw["SECURITY_OPENTELEMETRY"],
     "S_ADMIN_OBS": raw.get("OBSERVABILITY_API_KEY", ""),
@@ -94,6 +95,7 @@ trap 'rm -f "$ENVF"' EXIT
 {
   printf 'obs_es_url=%s\n' "$S_OBS_ES_URL"
   printf 'kibana_url=%s\n' "$S_KIBANA_URL"
+  printf 'sec_kibana_url=%s\n' "$S_SEC_KIBANA_URL"
   printf 'guardrail_key=%s\n' "$S_GUARDRAIL_KEY"
   printf 'app_password=%s\n' "$APP_PASSWORD"
   printf 'gemma_api_key=%s\n' "$GEMMA_API_KEY"

@@ -49,6 +49,12 @@ def test_create_secrets_has_guards_and_reads_only_local_sources():
     assert "guard_kube" in t and "guard_gcloud" in t and 'die "namespace must be' in t
     assert "guardrail_log_keys.json" in t and "GLOG_OBS_KEY" in t and "GLOG_SEC_KEY" in t
     assert "--dry-run=client -o yaml | kubectl apply" in t
+    assert "sec_kibana_url" in t and "SECURITY_KIBANA" in t
+
+
+def test_app_manifest_wires_optional_security_kibana_url():
+    m = (ROOT / "deploy" / "k8s" / "30-app.yaml").read_text()
+    assert "SEC_KIBANA_URL" in m and "key: sec_kibana_url, optional: true" in m
 
 
 def test_bash_syntax_ok():

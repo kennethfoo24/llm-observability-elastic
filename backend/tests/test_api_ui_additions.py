@@ -50,7 +50,7 @@ def test_config_returns_kibana_url_without_trailing_slash_and_requires_password(
     c = _client()
     assert c.get("/api/config").status_code == 401
     body = c.get("/api/config", headers=H).json()
-    assert body == {"kibana_url": "https://kb.example", "company": "Nimbus Corp"}
+    assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Nimbus Corp"}
 
 
 def test_personas_include_clearance_counts_from_the_corpus_manifest():
@@ -86,3 +86,11 @@ def test_default_dist_resolves_for_checkout_and_image_layouts(tmp_path):
     (tmp_path / "img/frontend/dist").mkdir(parents=True)
     (tmp_path / "img/frontend/dist/index.html").write_text("x")
     assert default_dist(tmp_path / "img/app/main.py") == tmp_path / "img/frontend/dist"
+
+
+def test_config_exposes_security_kibana_url_when_set():
+    s = Settings(_env_file=None, obs_es_url="http://x", obs_es_admin_key="k", obs_kibana_url="https://kb.example/",
+                 sec_kibana_url="https://sec.example/", app_password="")
+    deps = Deps(_Ret(), _Guard(), _Sdk(), None, SPECS, PRICES, emit_log=lambda **kw: None, gate=_Gate())
+    body = TestClient(create_app(deps, s, gate=_Gate(), static_dir=None)).get("/api/config").json()
+    assert body["security_kibana_url"] == "https://sec.example"
