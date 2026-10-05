@@ -22,6 +22,7 @@ from .llm_sdk import GemmaGate, GemmaOffline, SdkEngine
 from .models import get_models
 from .personas import PERSONAS
 from .retrieval import Retriever
+from .security import install_security
 
 logger = logging.getLogger("app.main")
 
@@ -91,6 +92,9 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
             if not hmac.compare_digest(supplied.encode(), s.app_password.encode()):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
         return await call_next(request)
+
+    # Registered after the password gate so it is the outer middleware and sees the gate's 401s.
+    install_security(app, s)
 
     @app.get("/healthz")
     def healthz():

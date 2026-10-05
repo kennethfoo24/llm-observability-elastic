@@ -32,6 +32,19 @@ class Settings(BaseSettings):
     max_message_chars: int = 4000
     app_password: str = ""
 
+    llm_timeout_s: float = 60.0
+    rate_limit_per_min: int = 120
+    chat_rate_limit_per_min: int = 20
+    auth_fail_limit: int = 10
+    auth_fail_window_s: int = 300
+    trusted_proxy_hops: int = 1
+
+    # Direct OTLP/HTTP export of guardrail prompt logs to Observability and Security (empty = disabled)
+    guardrail_log_obs_endpoint: str = ""
+    guardrail_log_obs_key: str = ""
+    guardrail_log_sec_endpoint: str = ""
+    guardrail_log_sec_key: str = ""
+
     @property
     def guardrail_es_key(self) -> str:
         return self.obs_es_guardrail_key or self.obs_es_admin_key
