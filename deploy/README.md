@@ -40,3 +40,18 @@ Guardrail prompt logs are exported by the app itself. The hostname depends on th
 
 The external HTTPS load balancer is about $18 per month; the static IP is small; pods fit on existing nodes; the Gemma
 VM costs money only while running. `teardown.sh` stops the load balancer cost; suspending the CronJob stops traffic.
+
+### Measured traffic generator cost (2026-10-05, one hour live, 13 requests)
+
+| Item | Measured |
+|---|---|
+| Gemini Flash-Lite, answered requests (11) | about $0.000185 each |
+| Gemini Flash, answered requests (1) | $0.00539 each |
+| Blocked by guardrail (1 of 13) | $0 (no model call) |
+| Average per request (13, all included) | $0.00057 |
+| Spend for the hour | $0.0074 |
+
+Projection at 1 request per 5 minutes, 07:00 to 22:00 SGT (180 requests per day, about 5,400 per month): about $3 per month at the
+observed mix (1 Flash in 13). If Flash is 20 percent of traffic as the design assumes, the blended cost is about $0.0012 per
+request, or about $6.6 per month. This is well below the earlier $15 estimate, and the $0.25 per hour alert threshold is never
+approached (the rule stayed `ok` with no active alerts).

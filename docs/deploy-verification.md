@@ -52,3 +52,11 @@ All checks via Elasticsearch and Kibana REST (Kibana is SSO only, no logged-in b
 - Agent: Deployment `glassbox-elastic-agent` (`elastic-agent:9.5.0`, non-root uid 1000, caps dropped, no privileged/hostPath/hostNetwork, writable emptyDir only for `/usr/share/elastic-agent/state`, KSA `glassbox-monitoring`). Enrolled and Fleet status `online` within about 90 s (a 9.5.0 agent is accepted by the 9.6.0 stack).
 - ADC via Workload Identity does NOT work for this input: component `gcp/metrics-default` goes STARTING -> FAILED with `Permanent: no credentials_file_path or credentials_json specified`. No metrics data stream (`metrics-gcp*`) was created (0 docs) after 15+ minutes and 11 successful chats on Flash-Lite and Flash. No key was created.
 - Workload Identity itself is bound (`roles/iam.workloadIdentityUser` for `genai-demo/glassbox-monitoring`).
+
+## Task 8: traffic generator rollout and cost watch (2026-10-05)
+
+- Applied `50-trafficgen.yaml` rendered with the running image; it stayed `suspend: true`. Manual job `manual-1`: Complete in 20 s, one JSON line, `status 200`, verdict CLEAN, no prompt text; job deleted.
+- Un-suspended at 20:29 SGT (inside the `*/5 7-21` window) and observed until 21:31 SGT: 13 scheduled jobs (20:30 to 21:30), all Complete, never more than one at a time (`concurrencyPolicy: Forbid`); history kept to the last 2 successful jobs (`successfulJobsHistoryLimit: 2`).
+- ES|QL (`traces-generic.otel-default`, `service.name == "glassbox-backend"`, since 20:29 SGT): 13 requests, 12 CLEAN and 1 FLAGGED/blocked ($0). Flash-Lite 11 billed, avg $0.000185; Flash 1 at $0.00539; total $0.0074; avg $0.00057 per request. Guardrail logs (`logs-genai_guardrail*`) for the window: 13 docs, `attributes.security.threat_verdict` CLEAN 12, FLAGGED 1 (the 15% attack mix gave 1 flagged of 13, expected about 2).
+- Cost rule `glassbox-llm-spend`: `execution_status` ok, threshold still `spend > 0.25`, 0 active alerts (the Task 6 proof alert is not active).
+- Off switch: `suspend` patched true at 21:31:47 SGT; no job started at the 21:35 boundary (lastScheduleTime stayed 13:30Z). Leftover jobs deleted. Final state: CronJob SUSPENDED (un-suspend for demos).
