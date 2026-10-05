@@ -35,8 +35,6 @@ spec:
             - {name: PERSONA_KEYS_PATH, value: /srv/secrets/persona_keys.json}
             - {name: TRUSTED_PROXY_HOPS, value: "1"}
             - {name: GEMMA_BASE_URL, value: "https://llm-34-126-172-79.nip.io/v1"}
-            - {name: VERTEX_PROJECT, value: "${PROJECT}"}
-            - {name: VERTEX_LOCATION, value: "global"}
             - {name: OTEL_SERVICE_NAME, value: "glassbox-backend"}
             - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318"}
             - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf"}

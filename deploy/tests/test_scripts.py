@@ -153,8 +153,8 @@ def test_gemma_stop_ssd_flag_follows_env():
     assert r.returncode != 0
 
 
-def test_create_secrets_checks_fleet_interpreter_before_secrets_and_teardown_offers_ip_release():
-    t = (ROOT / "deploy/scripts/create_secrets.sh").read_text()
-    assert t.index('import httpx') < t.index("kubectl apply -f deploy/k8s/00-namespace.yaml")
-    assert '"$FLEET_PY" -m elastic.fleet' in t
+def test_teardown_offers_ip_release_and_no_script_mentions_the_removed_agent():
+    for n in ("create_secrets.sh", "deploy.sh", "teardown.sh", "gcp_bootstrap.sh"):
+        t = (ROOT / "deploy/scripts" / n).read_text()
+        assert "WITH_AGENT" not in t and "elastic.fleet" not in t and "elastic-agent" not in t, n
     assert "addresses delete" in (ROOT / "deploy/scripts/teardown.sh").read_text()

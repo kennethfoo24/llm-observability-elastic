@@ -76,7 +76,9 @@ def test_app_pod_is_hardened_and_wired():
                  "GUARDRAIL_LOG_OBS_ENDPOINT", "GUARDRAIL_LOG_OBS_KEY", "GUARDRAIL_LOG_SEC_ENDPOINT", "GUARDRAIL_LOG_SEC_KEY"):
         assert "secretKeyRef" in env[name]["valueFrom"], name
     ksa = _find("ServiceAccount", "glassbox")
-    assert ksa["metadata"]["annotations"]["iam.gke.io/gcp-service-account"] == "glassbox-app@elastic-sa.iam.gserviceaccount.com"
+    assert "annotations" not in ksa["metadata"]  # no GCP identity: the LLM is EIS, reached with the guardrail API key
+    assert [d["metadata"]["name"] for d in DOCS if d["kind"] == "ServiceAccount"] == ["glassbox"]
+    assert not [n for n in env if n.startswith("VERTEX")]
     svc = _find("Service", "glassbox")
     assert svc["metadata"]["annotations"]["cloud.google.com/neg"] == '{"ingress": true}'
 
@@ -118,22 +120,3 @@ def test_trafficgen_is_suspended_capped_and_hardened():
     assert pod["securityContext"]["runAsNonRoot"] is True and pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     csc = c["securityContext"]
     assert csc["readOnlyRootFilesystem"] is True and csc["allowPrivilegeEscalation"] is False and csc["capabilities"]["drop"] == ["ALL"]
-
-
-def test_elastic_agent_is_single_hardened_and_uses_secret_refs_only():
-    dep = _find("Deployment", "glassbox-elastic-agent")
-    assert dep["metadata"]["namespace"] == "genai-demo" and dep["spec"]["replicas"] == 1
-    spec = dep["spec"]["template"]["spec"]
-    assert spec["serviceAccountName"] == "glassbox-monitoring"
-    assert not spec.get("hostNetwork") and not spec.get("hostPID") and not spec.get("hostIPC")
-    assert not [v for v in spec.get("volumes", []) if "hostPath" in v]
-    c = spec["containers"][0]
-    assert c["image"] == "docker.elastic.co/elastic-agent/elastic-agent:9.5.0"
-    sc = c["securityContext"]
-    assert not sc.get("privileged") and sc["allowPrivilegeEscalation"] is False and sc["capabilities"]["drop"] == ["ALL"]
-    assert "limits" in c["resources"] and "requests" in c["resources"]
-    env = {e["name"]: e for e in c["env"]}
-    assert env["FLEET_ENROLL"]["value"] == "1"
-    for name in ("FLEET_URL", "FLEET_ENROLLMENT_TOKEN"):
-        assert "secretKeyRef" in env[name]["valueFrom"] and env[name]["valueFrom"]["secretKeyRef"]["name"] == "glassbox-fleet"
-        assert "value" not in env[name]

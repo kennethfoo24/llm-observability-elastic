@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Render and apply the manifests, wait for the rollout and the managed certificate, then check healthz.
-# Usage: IMAGE=<image@digest> deploy/scripts/deploy.sh   (WITH_TRAFFICGEN=1 also applies the suspended CronJob; WITH_AGENT=1 the Vertex AI Elastic Agent, needs Secret glassbox-fleet)
+# Usage: IMAGE=<image@digest> deploy/scripts/deploy.sh   (WITH_TRAFFICGEN=1 also applies the suspended CronJob)
 # DRY_RUN=1 renders and echoes the apply instead of running it.
 set -euo pipefail
 . "$(dirname "$0")/_common.sh"
@@ -13,7 +13,6 @@ if [ "$DRY_RUN" = "1" ]; then IP="${STATIC_IP:-$(static_ip 2>/dev/null || echo 0
 HOST="$(host_for_ip "$IP")"
 FILES=(deploy/k8s/00-namespace.yaml deploy/k8s/10-serviceaccounts.yaml deploy/k8s/30-app.yaml deploy/k8s/40-ingress.yaml)
 [ "${WITH_TRAFFICGEN:-0}" = "1" ] && FILES+=(deploy/k8s/50-trafficgen.yaml)
-[ "${WITH_AGENT:-0}" = "1" ] && FILES+=(deploy/k8s/60-elastic-agent.yaml)
 
 RENDERED="$(python3 deploy/render.py "${FILES[@]}" --set IMAGE="$IMAGE" --set HOST="$HOST" \
   --set PROJECT="$PROJECT_ID" --set STATIC_IP_NAME="$STATIC_IP_NAME")"
