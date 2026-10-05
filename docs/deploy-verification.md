@@ -130,3 +130,10 @@ Final suites: backend `pytest -q`: 189 passed (22 integration deselected). `pyte
 6. The plaintext OTLP key on `o11y-metrics/chatbot-rag-app` is untouched by decision; its value appeared in this project's working notes.
 7. Persona keys expire 2027-01-03 (minted 2026-10-05).
 8. Parked minors: IPv6 /64 limiter weakness, per-replica limiter state, `/favicon.ico` 404, Task 7 and Task 3 minors in the ledger.
+
+## Final fix wave (2026-10-05)
+
+- Lockout: `backend/app/security.py` now checks the password first; the correct password bypasses the lockout, wrong or missing credentials still get 429 after 10 failures in 300 s. `useBootstrap.ts` sends `/api/personas` first and the other two requests only after it succeeds, so a wrong unlock attempt counts once at the server. Tests: `test_repeated_wrong_passwords_lock_wrong_credentials_but_never_the_right_one`, `a wrong password sends exactly one authenticated request`.
+- Image built by Cloud Build: `app@sha256:533a1df797ba00b67592093db572f6ad89238780739f800862231424d347c037` (tag f56378d).
+- Redeploy NOT done: running `deploy.sh` with this image was denied by the permission system ("Production Deploy"), so the live site still runs the previous image and the live lockout checks (wrong password 3 times then correct password 200) have NOT been run. To finish: `IMAGE=asia-southeast1-docker.pkg.dev/elastic-sa/glassbox/app@sha256:533a1df797ba00b67592093db572f6ad89238780739f800862231424d347c037 WITH_TRAFFICGEN=1 deploy/scripts/deploy.sh` (the CronJob stays suspended), then verify with at most 6 wrong tries.
+- Other items: `GEMMA_DISCARD_SSD` (tested), fleet interpreter check before Secret rewrite (tested), ignore files extended (tested), teardown prints the IP release command, runbook updated (IP cost, current state, SSD charges, image lookup, lockout wording).
