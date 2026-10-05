@@ -127,6 +127,8 @@ def dashboard_object(panels_json: list[dict]) -> dict:
                                        "syncTooltips": False, "hidePanelTitles": False}),
         },
         "references": [],
+        # Without these versions the import runs every migration on the by-value panels and returns HTTP 500.
+        "coreMigrationVersion": "8.8.0", "typeMigrationVersion": "10.3.0",
     }
 
 

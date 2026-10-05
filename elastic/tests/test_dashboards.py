@@ -104,3 +104,8 @@ def test_template_is_not_mutated_and_output_is_deterministic():
 def test_dashboard_object_has_no_em_dash_and_is_default_time_range_aware():
     d = dashboard_object([])
     assert "—" not in json.dumps(d) and d["attributes"]["timeRestore"] is False
+
+
+def test_dashboard_carries_migration_versions_or_kibana_import_returns_500():
+    obj, _ = _dash()
+    assert obj["coreMigrationVersion"] == "8.8.0" and obj["typeMigrationVersion"] == "10.3.0"
