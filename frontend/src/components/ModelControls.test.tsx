@@ -46,8 +46,7 @@ test("clicking the offline model does nothing", async () => {
 test("the engine toggle is operable by keyboard", async () => {
   const onEngine = vi.fn();
   render(<ModelControls models={models} selectedModel="flash-lite" onModel={vi.fn()} engine="sdk" onEngine={onEngine} />);
-  await userEvent.tab(); // flash-lite radio
-  await userEvent.tab(); // flash radio (gemma is disabled)
+  await userEvent.tab(); // selected model radio
   await userEvent.tab(); // engine group
   expect(screen.getByRole("radio", { name: "Direct SDK" })).toHaveFocus();
   await userEvent.keyboard("{ArrowRight}");
@@ -64,9 +63,70 @@ test("disabled disables every control", () => {
 test("shows a skeleton while models have not loaded", () => {
   render(<ModelControls models={[]} selectedModel="" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
   expect(screen.getByTestId("model-skeleton")).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Loading models");
 });
 
 test("has no obvious accessibility violations", async () => {
   const { container } = render(<ModelControls models={models} selectedModel="flash-lite" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
   expect(await axe(container)).toHaveNoViolations();
+});
+
+const four: ModelInfo[] = [
+  models[0],
+  { ...models[2], key: "gemma", available: false },
+  models[1],
+];
+
+test("model radios use a roving tabindex: Tab enters on the selected radio only", async () => {
+  render(<ModelControls models={models} selectedModel="flash" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
+  expect(screen.getByRole("radio", { name: /^gemini flash higher/i })).toHaveAttribute("tabindex", "0");
+  expect(screen.getByRole("radio", { name: /^gemini flash-lite/i })).toHaveAttribute("tabindex", "-1");
+  await userEvent.tab();
+  expect(screen.getByRole("radio", { name: /^gemini flash higher/i })).toHaveFocus();
+});
+
+test("a selected but offline model leaves the first available radio tabbable", () => {
+  render(<ModelControls models={models} selectedModel="gemma" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
+  expect(screen.getByRole("radio", { name: /^gemini flash-lite/i })).toHaveAttribute("tabindex", "0");
+  expect(screen.getByRole("radio", { name: /^gemini flash higher/i })).toHaveAttribute("tabindex", "-1");
+});
+
+test("arrows move focus and select the next available model, wrapping", async () => {
+  const onModel = vi.fn();
+  render(<ModelControls models={models} selectedModel="flash-lite" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
+  await userEvent.tab();
+  await userEvent.keyboard("{ArrowDown}");
+  expect(onModel).toHaveBeenLastCalledWith("flash");
+  expect(screen.getByRole("radio", { name: /^gemini flash higher/i })).toHaveFocus();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(onModel).toHaveBeenLastCalledWith("flash-lite");
+  await userEvent.keyboard("{ArrowUp}");
+  expect(onModel).toHaveBeenLastCalledWith("flash");
+});
+
+test("arrows skip the offline model", async () => {
+  const onModel = vi.fn();
+  render(<ModelControls models={four} selectedModel="flash-lite" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
+  await userEvent.tab();
+  await userEvent.keyboard("{ArrowDown}");
+  expect(onModel).toHaveBeenLastCalledWith("flash");
+  expect(onModel).not.toHaveBeenCalledWith("gemma");
+});
+
+test("Home and End jump to the first and last available models", async () => {
+  const onModel = vi.fn();
+  render(<ModelControls models={models} selectedModel="flash-lite" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
+  await userEvent.tab();
+  await userEvent.keyboard("{End}");
+  expect(onModel).toHaveBeenLastCalledWith("flash");
+  await userEvent.keyboard("{Home}");
+  expect(onModel).toHaveBeenLastCalledWith("flash-lite");
+});
+
+test("arrows do nothing when disabled", async () => {
+  const onModel = vi.fn();
+  render(<ModelControls models={models} selectedModel="flash-lite" onModel={onModel} engine="sdk" onEngine={vi.fn()} disabled />);
+  screen.getByRole("radio", { name: /^gemini flash-lite/i }).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  expect(onModel).not.toHaveBeenCalled();
 });
