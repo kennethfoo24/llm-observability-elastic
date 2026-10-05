@@ -158,3 +158,16 @@ Final suites: backend `pytest -q`: 189 passed (22 integration deselected). `pyte
 | Blocked prompt trace | pass | injection prompt blocked (`prompt_injection`); its `guardrail.check` span carries `guardrail.prompt_text` equal to the prompt |
 | Dev Tools requests, run via API | pass | `_infer` on DeBERTa: INJECTION 0.9999998; `_infer` on NER: 200; `_ingest/pipeline/genai-guardrail/_simulate`: FLAGGED, reasons `prompt_injection`, injection_score 1.0 |
 | Dev Tools link in a browser | not verified | Console `load_from` URL needs one click by a logged in Kibana user |
+
+## Switch to Elastic Inference Service (2026-10-05)
+
+Image `docker.io/kennethfoo24/glassbox@sha256:ba065ded4d347ecc2368ff02e31cd36539628d89a1b71220967d13109dc28209` (CI run 37336515579), deployed; `elastic.apply --project observability` updated the pipeline, rule and dashboard (latency panel now uses `chat ...` spans). CronJob still suspended.
+
+| Model (engine) | HTTP | Latency | Tokens in/out (gen_ai span) | Cost on root span | Trace |
+|---|---|---|---|---|---|
+| GPT-5.4 mini (sdk) | 200 | 2.0 s | 404 / 56 | $0.000555 | guardrail.check, retrieval.hybrid, prompt.build, `chat gpt-5.4-mini` with prompt and response content |
+| Claude 4.5 Haiku (sdk) | 200 | 2.0 s | 463 / 91 | $0.000918 | same shape, `chat claude-4.5-haiku` |
+| Gemini 3.5 Flash (sdk) | 200 | 4.4 s | 432 / 528 (includes thinking) | $0.0054 | same shape, `chat gemini-3.5-flash` |
+| GPT-5.4 mini (langchain) | 200 | 1.7 s | 404 / 53 | $0.0005415 | adds `invoke_workflow RunnableSequence`; one chat span, no double counting |
+
+Cost check: 404 x $0.75/M + 56 x $4.50/M = $0.000555 (matches). Prices are provider list prices marked "confirm EIS rate" in backend/prices.yaml.
