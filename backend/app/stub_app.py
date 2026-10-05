@@ -80,7 +80,7 @@ class StubSdk:
             self.gate.require()
         time.sleep(0.45 * self.delay)
         text = _answer(user)
-        thinking = 60 if spec.key == "flash" else 0
+        thinking = 60 if spec.key == "eis-gemini-flash" else 0
         return LLMResult(text, spec.model_id, max(1, len(system + user) // 4), max(1, len(text) // 4), thinking, "sdk")
 
 

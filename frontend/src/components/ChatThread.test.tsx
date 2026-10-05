@@ -7,7 +7,7 @@ const base = { models: [], pending: false, selectedId: null, onSelect: vi.fn(), 
 
 const thread: Message[] = [
   { id: "m1", kind: "user", text: "What is the Project Aurora severance budget?", persona: "employee" },
-  { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "pending" },
+  { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "pending" },
   { id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" },
 ];
 
@@ -34,7 +34,7 @@ test("no ask-again offer without a previous question", () => {
 test("an answer keeps the persona it was asked as, even after a switch", () => {
   render(<ChatThread {...base} messages={[
     { id: "m1", kind: "user", text: "q", persona: "employee" },
-    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
+    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
   ]} askAgainAs="Rachel Tan" />);
   expect(screen.getByText(/maya lim/i)).toBeInTheDocument();
 });
@@ -42,10 +42,10 @@ test("an answer keeps the persona it was asked as, even after a switch", () => {
 test("each answer shows the persona it was asked as, in a mixed-persona thread", () => {
   render(<ChatThread {...base} askAgainAs="Rachel Tan" messages={[
     { id: "m1", kind: "user", text: "q1", persona: "employee" },
-    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "pending" },
+    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "pending" },
     { id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" },
     { id: "m4", kind: "user", text: "q1", persona: "exec" },
-    { id: "m5", kind: "assistant", replyTo: "m4", persona: "exec", model: "flash-lite", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
+    { id: "m5", kind: "assistant", replyTo: "m4", persona: "exec", model: "eis-gpt-mini", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
   ]} />);
   expect(screen.getByText("Asked as Maya Lim")).toBeInTheDocument();
   expect(screen.getByText("Asked as Rachel Tan")).toBeInTheDocument();
@@ -56,7 +56,7 @@ test("scrolls to the end again when the pending answer lands", () => {
   Element.prototype.scrollIntoView = spy;
   const pending: Message[] = [
     { id: "m1", kind: "user", text: "q", persona: "employee" },
-    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "pending" },
+    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "pending" },
   ];
   const { rerender } = render(<ChatThread {...base} messages={pending} askAgainAs="x" />);
   const before = spy.mock.calls.length;

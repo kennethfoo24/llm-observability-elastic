@@ -49,19 +49,15 @@ class GemmaGate:
 
 
 class SdkEngine:
-    def __init__(self, s: Settings, gate: GemmaGate, genai_client=None, openai_client=None):
+    def __init__(self, s: Settings, gate: GemmaGate, eis_client=None, openai_client=None):
         self._s, self._gate = s, gate
-        self._genai, self._openai = genai_client, openai_client
+        self._eis, self._openai = eis_client, openai_client
 
-    def _genai_client(self):
-        if self._genai is None:
-            from google import genai
-            from google.genai import types
-            # HttpOptions.timeout is in milliseconds.
-            self._genai = genai.Client(vertexai=True, project=self._s.vertex_project,
-                                       location=self._s.vertex_location,
-                                       http_options=types.HttpOptions(timeout=int(self._s.llm_timeout_s * 1000)))
-        return self._genai
+    def _eis_client(self):
+        if self._eis is None:
+            from .llm_eis import EisClient
+            self._eis = EisClient(self._s)
+        return self._eis
 
     def _openai_client(self):
         if self._openai is None:
@@ -80,12 +76,5 @@ class SdkEngine:
             u = r.usage
             return LLMResult(text or "", spec.model_id, (u.prompt_tokens if u else 0) or 0,
                              (u.completion_tokens if u else 0) or 0, 0, "sdk")
-        from google.genai import types
-        r = self._genai_client().models.generate_content(
-            model=spec.model_id, contents=user,
-            config=types.GenerateContentConfig(system_instruction=system))
-        u = r.usage_metadata
-        if u is None:
-            return LLMResult(r.text or "", spec.model_id, 0, 0, 0, "sdk")
-        return LLMResult(r.text or "", spec.model_id, u.prompt_token_count or 0,
-                         u.candidates_token_count or 0, getattr(u, "thoughts_token_count", 0) or 0, "sdk")
+        r = self._eis_client().chat(spec, system, user)
+        return LLMResult(r.text, spec.model_id, r.input_tokens, r.output_tokens, 0, "sdk")

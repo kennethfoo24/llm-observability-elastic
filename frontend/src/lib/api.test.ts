@@ -18,11 +18,11 @@ test("sends the stored password header on every request", async () => {
 
 test("chat posts the JSON body", async () => {
   const f = mockFetch(200, { answer: "ok" });
-  await api.chat({ message: "hi", persona: "employee", model: "flash-lite", engine: "sdk" });
+  await api.chat({ message: "hi", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
   const [url, init] = f.mock.calls[0] as [string, RequestInit];
   expect(url).toBe("/api/chat");
   expect(init.method).toBe("POST");
-  expect(JSON.parse(init.body as string)).toEqual({ message: "hi", persona: "employee", model: "flash-lite", engine: "sdk" });
+  expect(JSON.parse(init.body as string)).toEqual({ message: "hi", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
 });
 
 test("maps error bodies to ApiError with code and hint", async () => {
@@ -62,7 +62,7 @@ test("a hung request is aborted after 90 seconds and maps to ApiError timeout", 
     vi.stubGlobal("fetch", vi.fn((_url: string, init: RequestInit) => new Promise((_res, rej) => {
       init.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError")));
     })));
-    const p = api.chat({ message: "x", persona: "employee", model: "flash-lite", engine: "sdk" }).catch((e) => e);
+    const p = api.chat({ message: "x", persona: "employee", model: "eis-gpt-mini", engine: "sdk" }).catch((e) => e);
     await vi.advanceTimersByTimeAsync(89_999);
     let settled = false;
     void p.then(() => { settled = true; });

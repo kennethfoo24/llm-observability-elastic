@@ -6,7 +6,9 @@ def test_defaults_and_overrides(monkeypatch):
     monkeypatch.setenv("OBS_ES_ADMIN_KEY", "k")
     monkeypatch.setenv("OBS_KIBANA_URL", "https://obs.kb.example")
     s = Settings(_env_file=None)
-    assert s.vertex_project == "elastic-sa"
+    assert s.eis_gpt_mini_endpoint == ".openai-gpt-5.4-mini-chat_completion"
+    assert s.eis_claude_haiku_endpoint == ".anthropic-claude-4.5-haiku-chat_completion"
+    assert s.eis_gemini_flash_endpoint == ".google-gemini-3.5-flash-chat_completion"
     assert s.index_name == "hr-kb"
     assert s.gemma_model_id == "google/gemma-4-31B-it"
     assert s.max_message_chars == 4000

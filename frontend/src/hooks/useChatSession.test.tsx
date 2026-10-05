@@ -9,7 +9,7 @@ const personas: Persona[] = [
   { id: "exec", name: "Rachel Tan", title: "Chief People Officer", can_read_docs: 20, total_docs: 20 },
 ];
 const models: ModelInfo[] = [
-  { key: "flash-lite", label: "Flash-Lite", provider: "vertex", model_id: "g1", available: true },
+  { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis", model_id: "g1", available: true },
   { key: "gemma", label: "Gemma", provider: "gemma", model_id: "gm", available: true },
 ];
 const ok = (over: Partial<ChatResponse> = {}): ChatResponse => ({
@@ -28,7 +28,7 @@ test("send posts with the persona, model and engine at send time, then stores th
   const { result } = setup();
   act(() => result.current.setDraft("How many PTO days?"));
   await act(async () => { await result.current.send("How many PTO days?"); });
-  expect(chat).toHaveBeenCalledWith({ message: "How many PTO days?", persona: "employee", model: "flash-lite", engine: "sdk" });
+  expect(chat).toHaveBeenCalledWith({ message: "How many PTO days?", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
   expect(result.current.draft).toBe("");
   expect(result.current.state.spendUsd).toBeCloseTo(0.001);
   expect(result.current.current?.status).toBe("done");
@@ -80,7 +80,7 @@ test("retry re-sends the original question with the original persona", async () 
   act(() => result.current.dispatch({ type: "setPersona", persona: "exec", label: "x" }));
   const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
   await act(async () => { await result.current.retry(id); });
-  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "flash-lite", engine: "sdk" });
+  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
   expect((result.current.state.messages.find((m) => m.kind === "assistant") as any).status).toBe("done");
 });
 
@@ -90,10 +90,10 @@ test("retry with a model override sends that model and rebinds the message", asy
   act(() => result.current.dispatch({ type: "setModel", model: "gemma" }));
   await act(async () => { await result.current.send("hello"); });
   const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
-  await act(async () => { await result.current.retry(id, "flash-lite"); });
-  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "flash-lite", engine: "sdk" });
+  await act(async () => { await result.current.retry(id, "eis-gpt-mini"); });
+  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
   const a = result.current.state.messages.find((m) => m.kind === "assistant") as any;
-  expect(a).toMatchObject({ status: "done", model: "flash-lite" });
+  expect(a).toMatchObject({ status: "done", model: "eis-gpt-mini" });
 });
 
 test("selecting a citation selects that message and highlights the doc briefly", async () => {
@@ -117,7 +117,7 @@ test("when the selected model becomes unavailable the hook falls back to an avai
   const { result, rerender } = renderHook(({ m }) => useChatSession(personas, m, refresh), { initialProps: { m: models } });
   act(() => result.current.dispatch({ type: "setModel", model: "gemma" }));
   rerender({ m: [models[0], { ...models[1], available: false }] });
-  expect(result.current.state.model).toBe("flash-lite");
+  expect(result.current.state.model).toBe("eis-gpt-mini");
 });
 
 test("refreshModels is polled every 15 s while Gemma is unavailable", () => {

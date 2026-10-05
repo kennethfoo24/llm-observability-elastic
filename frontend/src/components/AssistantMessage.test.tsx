@@ -5,17 +5,17 @@ import type { AssistantMsg } from "../state/chatState";
 import type { ChatResponse } from "../lib/types";
 
 const response = (over: Partial<ChatResponse> = {}): ChatResponse => ({
-  answer: "You get 18 days [pto-policy].", blocked: false, block_reason: [], trace_id: "t1", persona: "employee", model: "gemini-3.1-flash-lite", engine: "sdk",
+  answer: "You get 18 days [pto-policy].", blocked: false, block_reason: [], trace_id: "t1", persona: "employee", model: "gpt-5.4-mini", engine: "sdk",
   docs: [{ id: "pto-policy", title: "Paid Time Off Policy", classification: "public", score: 3.1 }], hidden: [],
   usage: { input_tokens: 1200, output_tokens: 80, thinking_tokens: 0 }, cost_usd: 0.00042,
   guardrail: { verdict: "CLEAN", reasons: [], status: "ok", latency_ms: 40, injection_score: 0.01 },
   stages: [{ name: "guardrail.check", ms: 40 }, { name: "llm.generate", ms: 800 }], ...over,
 });
 const msg = (over: Partial<AssistantMsg> = {}): AssistantMsg => ({
-  id: "a1", kind: "assistant", replyTo: "u1", persona: "employee", model: "flash-lite", engine: "sdk", status: "done", response: response(), ...over,
+  id: "a1", kind: "assistant", replyTo: "u1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "done", response: response(), ...over,
 });
 const models = [
-  { key: "flash-lite", label: "Gemini Flash-Lite", provider: "vertex" as const, model_id: "g1", available: true },
+  { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis" as const, model_id: "g1", available: true },
   { key: "gemma", label: "Gemma 4 31B (self-hosted)", provider: "gemma" as const, model_id: "gm", available: false },
 ];
 const base = { models, selected: false, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), personaName: "Maya Lim" };
@@ -104,13 +104,13 @@ test("when the failed message's model is offline the card offers the first avail
   const onRetry = vi.fn();
   render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ model: "gemma", status: "error", response: undefined, error: { status: 503, code: "gemma_offline" } })} />);
   expect(screen.queryByRole("button", { name: /^try again$/i })).toBeNull();
-  await userEvent.click(screen.getByRole("button", { name: "Try with Gemini Flash-Lite" }));
-  expect(onRetry).toHaveBeenCalledWith("a1", "flash-lite");
+  await userEvent.click(screen.getByRole("button", { name: "Try with GPT-5.4 mini" }));
+  expect(onRetry).toHaveBeenCalledWith("a1", "eis-gpt-mini");
 });
 
 test("when the failed message's model is available the plain Try again is shown", async () => {
   const onRetry = vi.fn();
-  render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ model: "flash-lite", status: "error", response: undefined, error: { status: 502, code: "upstream_error" } })} />);
+  render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ model: "eis-gpt-mini", status: "error", response: undefined, error: { status: 502, code: "upstream_error" } })} />);
   expect(screen.queryByRole("button", { name: /try with/i })).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: /^try again$/i }));
   expect(onRetry).toHaveBeenCalledWith("a1");

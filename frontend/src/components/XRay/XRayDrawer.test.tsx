@@ -6,7 +6,7 @@ import type { ChatResponse, Persona } from "../../lib/types";
 
 const maya: Persona = { id: "employee", name: "Maya Lim", title: "Software Engineer", can_read_docs: 6, total_docs: 20 };
 const response = (over: Partial<ChatResponse> = {}): ChatResponse => ({
-  answer: "a", blocked: false, block_reason: [], trace_id: "4bf92f3577b34da6a3ce929d0e0e4736", persona: "employee", model: "gemini-3.1-flash-lite", engine: "sdk",
+  answer: "a", blocked: false, block_reason: [], trace_id: "4bf92f3577b34da6a3ce929d0e0e4736", persona: "employee", model: "gpt-5.4-mini", engine: "sdk",
   docs: [{ id: "pto-policy", title: "Paid Time Off Policy", classification: "public", score: 3.2 }],
   hidden: [{ id: "project-aurora", title: "Project Aurora: Platform and Data Reorganisation", classification: "restricted" }],
   usage: { input_tokens: 3120, output_tokens: 410, thinking_tokens: 75 }, cost_usd: 0.00135,
@@ -14,7 +14,7 @@ const response = (over: Partial<ChatResponse> = {}): ChatResponse => ({
   stages: [{ name: "guardrail.check", ms: 41 }, { name: "retrieval.hybrid", ms: 120 }, { name: "prompt.build", ms: 2 }, { name: "llm.generate", ms: 780 }], ...over,
 });
 const msg = (r: ChatResponse | undefined, over: Partial<AssistantMsg> = {}): AssistantMsg => ({
-  id: "a1", kind: "assistant", replyTo: "u1", persona: "employee", model: "flash-lite", engine: "sdk", status: r ? "done" : "pending", response: r, ...over,
+  id: "a1", kind: "assistant", replyTo: "u1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: r ? "done" : "pending", response: r, ...over,
 });
 const props = { persona: maya, question: "How many PTO days?", kibanaUrl: "https://kb.example", highlightDocId: null };
 
@@ -68,7 +68,7 @@ test("model and cost show tokens, thinking tokens and cost in monospace numbers"
   expect(within(cost).getByText("3,120")).toBeInTheDocument();
   expect(within(cost).getByText("410")).toBeInTheDocument();
   expect(within(cost).getByText("75")).toBeInTheDocument();
-  expect(within(cost).getByText("gemini-3.1-flash-lite")).toBeInTheDocument();
+  expect(within(cost).getByText("gpt-5.4-mini")).toBeInTheDocument();
 });
 
 test("a blocked prompt says Blocked in the guardrail panel, with its reasons and its reasons, and no retrieval section content", () => {

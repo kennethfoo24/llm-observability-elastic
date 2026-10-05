@@ -10,7 +10,7 @@ from .prompts import BENIGN, INJECTION, PII
 
 MAX_REQUESTS_HARD_CAP = 5
 WEIGHTS = {"benign": 0.85, "injection": 0.10, "pii": 0.05}
-MODEL_WEIGHTS = {"flash-lite": 0.80, "flash": 0.20}
+MODEL_WEIGHTS = {"eis-gpt-mini": 0.70, "eis-claude-haiku": 0.15, "eis-gemini-flash": 0.15}  # weighted toward the cheapest
 PERSONAS = ["employee", "manager", "hr", "exec"]
 
 
@@ -33,7 +33,7 @@ def build_plan(rng: random.Random, models: list[dict], gemma_ok: bool) -> Reques
     pool = {k: w for k, w in MODEL_WEIGHTS.items() if k in available}
     if gemma_ok and "gemma" in available:
         pool["gemma"] = 0.10
-    model = rng.choices(list(pool), weights=list(pool.values()))[0] if pool else "flash-lite"
+    model = rng.choices(list(pool), weights=list(pool.values()))[0] if pool else "eis-gpt-mini"
     engine = "langchain" if rng.random() < 0.30 else "sdk"
     return Request(kind, persona, model, engine, bank[idx], f"{kind}-{persona if kind == 'benign' else 'any'}-{idx}")
 

@@ -4,8 +4,9 @@ import { Cpu, Lightning, Plugs } from "@phosphor-icons/react";
 import type { Engine, ModelInfo } from "../lib/types";
 
 const BLURB: Record<string, string> = {
-  "flash-lite": "Fastest and lowest cost",
-  flash: "Higher quality, more reasoning",
+  "eis-gpt-mini": "Lowest cost",
+  "eis-claude-haiku": "Fast, strong at following instructions",
+  "eis-gemini-flash": "Higher quality, more reasoning",
   gemma: "Self-hosted on a GPU VM",
 };
 
@@ -68,6 +69,7 @@ export function ModelControls({ models, selectedModel, onModel, engine, onEngine
                 <span className="min-w-0">
                   <span className={`block font-medium text-ink ${off ? "opacity-70" : ""}`}>{m.label}</span>{" "}
                   <span className="block text-sm text-muted">{BLURB[m.key] ?? m.model_id}</span>
+                  {m.provider === "eis" && <>{" "}<span className="mt-1 block text-xs text-muted">via Elastic Inference Service</span></>}
                   {off && (
                     <>
                       {" "}

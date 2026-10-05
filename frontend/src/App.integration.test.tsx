@@ -10,7 +10,7 @@ const personas = [
   { id: "exec", name: "Rachel Tan", title: "Chief People Officer", can_read_docs: 20, total_docs: 20 },
 ];
 const models = [
-  { key: "flash-lite", label: "Gemini Flash-Lite", provider: "vertex" as const, model_id: "g1", available: true },
+  { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis" as const, model_id: "g1", available: true },
   { key: "gemma", label: "Gemma 4 31B (self-hosted)", provider: "gemma" as const, model_id: "gm", available: false },
 ];
 const answer = (over: Partial<ChatResponse>): ChatResponse => ({
@@ -50,7 +50,7 @@ test("switching persona offers to ask the same question again and the new answer
   await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
   await userEvent.click(await screen.findByRole("button", { name: /ask again as rachel tan/i }));
   expect(await screen.findByText(/2\.1 million/i)).toBeInTheDocument();
-  expect(chat).toHaveBeenLastCalledWith({ message: "What is the Project Aurora severance budget?", persona: "exec", model: "flash-lite", engine: "sdk" });
+  expect(chat).toHaveBeenLastCalledWith({ message: "What is the Project Aurora severance budget?", persona: "exec", model: "eis-gpt-mini", engine: "sdk" });
 });
 
 test("a blocked red-team prompt shows the block card and the x-ray says nothing was billed", async () => {
@@ -166,13 +166,13 @@ test("the rail disclosure is collapsed by default, toggles aria-expanded and kee
   render(<App />);
   const toggle = await screen.findByRole("button", { name: /change person or model/i });
   expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Maya Lim, Gemini Flash-Lite");
+  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Maya Lim, GPT-5.4 mini");
   await userEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toContainElement(screen.getByRole("radio", { name: /rachel tan/i }));
   await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Rachel Tan, Gemini Flash-Lite");
+  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Rachel Tan, GPT-5.4 mini");
   await userEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
@@ -183,7 +183,7 @@ test("picking a model by click closes the open disclosure and returns focus to i
   await userEvent.click(toggle);
   await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await userEvent.click(screen.getByRole("radio", { name: /gemini flash-lite/i }));
+  await userEvent.click(screen.getByRole("radio", { name: /gpt-5\.4 mini/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "false");
   expect(toggle).toHaveFocus();
 });
@@ -192,7 +192,7 @@ test("arrowing through the models with the keyboard does not close the disclosur
   render(<App />);
   const toggle = await screen.findByRole("button", { name: /change person or model/i });
   await userEvent.click(toggle);
-  screen.getByRole("radio", { name: /gemini flash-lite/i }).focus();
+  screen.getByRole("radio", { name: /gpt-5\.4 mini/i }).focus();
   await userEvent.keyboard("{ArrowDown}");
   expect(toggle).toHaveAttribute("aria-expanded", "true");
 });

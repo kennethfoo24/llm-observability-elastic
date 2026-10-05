@@ -6,7 +6,7 @@ from app.stub_app import build_stub_app
 H = {"X-Demo-Password": "demo"}
 
 
-def _chat(c, persona, message, model="flash-lite", engine="sdk"):
+def _chat(c, persona, message, model="eis-gemini-flash", engine="sdk"):
     return c.post("/api/chat", headers=H, json={"message": message, "persona": persona, "model": model, "engine": engine})
 
 
@@ -46,7 +46,7 @@ def test_no_visible_docs_gives_the_canned_answer(client):
 def test_gemma_offline_is_503_and_models_endpoint_reflects_it(client):
     assert _chat(client, "employee", "hello", model="gemma").status_code == 503
     models = {m["key"]: m for m in client.get("/api/models", headers=H).json()}
-    assert models["gemma"]["available"] is False and models["flash-lite"]["available"] is True
+    assert models["gemma"]["available"] is False and models["eis-gemini-flash"]["available"] is True
 
 
 def test_langchain_engine_omits_prompt_build_stage(client):

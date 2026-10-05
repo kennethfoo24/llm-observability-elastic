@@ -10,8 +10,8 @@ from app.models import ModelSpec
 from app.retrieval import RetrievalResult
 from app.security import SECURITY_HEADERS, SlidingWindowLimiter, client_ip
 
-SPECS = {"flash-lite": ModelSpec("flash-lite", "Flash-Lite", "vertex", "gemini-3.1-flash-lite")}
-PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
+SPECS = {"eis-gemini-flash": ModelSpec("eis-gemini-flash", "Gemini 3.5 Flash", "eis", "gemini-3.5-flash")}
+PRICES = {"models": {"gemini-3.5-flash": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
 
 
 class _Ret:
@@ -45,7 +45,7 @@ def _client(**over):
 
 
 H = {"X-Demo-Password": "pw"}
-BODY = {"message": "pto?", "persona": "employee", "model": "flash-lite", "engine": "sdk"}
+BODY = {"message": "pto?", "persona": "employee", "model": "eis-gemini-flash", "engine": "sdk"}
 
 
 def test_limiter_blocks_after_limit_and_recovers_after_window():

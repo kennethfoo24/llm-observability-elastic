@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from app.config import Settings
+from app.llm_eis import EisCompletion
 from app.llm_sdk import GemmaGate, GemmaOffline, SdkEngine
 from app.models import get_models
 
@@ -16,15 +17,14 @@ def s(monkeypatch):
     return Settings(_env_file=None)
 
 
-class FakeGenai:
-    def __init__(self):
-        self.models = self
+class FakeEis:
+    def __init__(self, completion=None):
         self.last = None
+        self.completion = completion or EisCompletion("18 days [pto-policy]", "openai-gpt-5.4-mini", 120, 30, "stop")
 
-    def generate_content(self, model, contents, config):
-        self.last = (model, contents, config)
-        usage = NS(prompt_token_count=120, candidates_token_count=30, thoughts_token_count=50)
-        return NS(text="18 days [pto-policy]", usage_metadata=usage)
+    def chat(self, spec, system, user, **kw):
+        self.last = (spec, system, user, kw)
+        return self.completion
 
 
 class FakeOpenAI:
@@ -42,12 +42,18 @@ def _gate(up=True):
     return GemmaGate("https://gemma/v1", "k", ttl_s=0.0, http=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
-def test_gemini_result_includes_thinking_tokens(s):
-    eng = SdkEngine(s, _gate(), genai_client=FakeGenai())
-    r = eng.generate(get_models(s)["flash-lite"], "sys", "user")
+def test_eis_result_maps_usage_and_uses_the_app_model_id(s):
+    eis = FakeEis()
+    r = SdkEngine(s, _gate(), eis_client=eis).generate(get_models(s)["eis-gpt-mini"], "sys", "user")
     assert (r.text, r.input_tokens, r.output_tokens, r.thinking_tokens, r.engine) == \
-        ("18 days [pto-policy]", 120, 30, 50, "sdk")
-    assert r.model_id == s.gemini_flash_lite_id
+        ("18 days [pto-policy]", 120, 30, 0, "sdk")
+    assert r.model_id == "gpt-5.4-mini"
+    assert eis.last[1:3] == ("sys", "user") and eis.last[3] == {}  # the SDK path keeps the EIS chat span
+
+
+def test_eis_models_do_not_consult_the_gemma_gate(s):
+    r = SdkEngine(s, _gate(False), eis_client=FakeEis()).generate(get_models(s)["eis-claude-haiku"], "s", "u")
+    assert r.text
 
 
 def test_gemma_via_openai_client(s):
@@ -98,15 +104,6 @@ def test_gemma_tolerates_missing_usage_and_empty_choices(s):
     assert (r.text, r.input_tokens, r.output_tokens) == ("", 7, 0)
 
 
-def test_gemini_tolerates_missing_usage_metadata(s):
-    class NoUsage(FakeGenai):
-        def generate_content(self, model, contents, config):
-            return NS(text=None, usage_metadata=None)
-
-    r = SdkEngine(s, _gate(), genai_client=NoUsage()).generate(get_models(s)["flash-lite"], "sys", "user")
-    assert (r.text, r.input_tokens, r.output_tokens, r.thinking_tokens) == ("", 0, 0, 0)
-
-
 @pytest.mark.parametrize("exc", [httpx.InvalidURL("bad url"), OSError("ssl: weird")])
 def test_gate_treats_any_exception_as_offline(exc):
     def boom(request):
@@ -124,14 +121,7 @@ def test_sdk_clients_are_built_with_the_configured_timeout_and_no_hidden_retries
         def __init__(self, **kw):
             seen["openai"] = kw
 
-    class FakeClient:
-        def __init__(self, **kw):
-            seen["genai"] = kw
-
     monkeypatch.setattr("openai.OpenAI", FakeOpenAIClient)
-    monkeypatch.setattr("google.genai.Client", FakeClient)
     eng = SdkEngine(s.model_copy(update={"llm_timeout_s": 42.0}), GemmaGate("https://g/v1", "k"))
     eng._openai_client()
-    eng._genai_client()
     assert seen["openai"]["timeout"] == 42.0 and seen["openai"]["max_retries"] == 0
-    assert seen["genai"]["http_options"].timeout == 42_000  # google-genai HttpOptions.timeout is milliseconds

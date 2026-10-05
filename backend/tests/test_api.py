@@ -9,10 +9,10 @@ from app.main import create_app
 from app.models import ModelSpec
 from app.retrieval import Doc, RetrievalResult
 
-SPECS = {"flash-lite": ModelSpec("flash-lite", "Flash-Lite", "vertex", "gemini-3.1-flash-lite"),
+SPECS = {"eis-gemini-flash": ModelSpec("eis-gemini-flash", "Gemini 3.5 Flash", "eis", "gemini-3.5-flash"),
          "gemma": ModelSpec("gemma", "Gemma", "gemma", "google/gemma-4-31B-it"),
-         "boom": ModelSpec("boom", "Boom", "vertex", "gemini-3.1-flash-lite")}
-PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5},
+         "boom": ModelSpec("boom", "Boom", "eis", "gemini-3.5-flash")}
+PRICES = {"models": {"gemini-3.5-flash": {"input_per_mtok": 0.25, "output_per_mtok": 1.5},
                      "google/gemma-4-31B-it": {"gpu_hourly_usd": 6.0, "assumed_tokens_per_hour": 1_200_000}}}
 
 
@@ -57,7 +57,7 @@ def client(monkeypatch):
 
 
 H = {"X-Demo-Password": "demo-pw"}
-BODY = {"message": "pto days?", "persona": "employee", "model": "flash-lite", "engine": "sdk"}
+BODY = {"message": "pto days?", "persona": "employee", "model": "eis-gemini-flash", "engine": "sdk"}
 
 
 def test_healthz_is_open_but_api_needs_password(client):
@@ -122,7 +122,7 @@ def test_gemma_offline_never_reaches_retriever_or_llm(client):
 
 def test_model_missing_from_prices_is_500_pricing_unavailable(client):
     # Boot refuses unpriced models, so register one after startup to exercise the runtime fallback.
-    client.deps.models["noprice"] = ModelSpec("noprice", "NoPrice", "vertex", "not-in-prices")
+    client.deps.models["noprice"] = ModelSpec("noprice", "NoPrice", "eis", "not-in-prices")
     r = client.post("/api/chat", json={**BODY, "model": "noprice"}, headers=H)
     assert r.status_code == 500 and r.json() == {"error": "pricing_unavailable"}
 
@@ -136,7 +136,7 @@ def test_unexpected_llm_error_is_502_without_message(client):
 
 def test_models_endpoint_marks_gemma_unavailable(client):
     models = {m["key"]: m for m in client.get("/api/models", headers=H).json()}
-    assert models["flash-lite"]["available"] is True and models["gemma"]["available"] is False
+    assert models["eis-gemini-flash"]["available"] is True and models["gemma"]["available"] is False
 
 
 def test_unicode_message_ok(client):
@@ -175,7 +175,7 @@ def test_interactive_docs_and_schema_are_disabled(client, path):
 def test_boot_fails_clearly_when_a_registered_model_has_no_price(monkeypatch):
     for k, v in {"OBS_ES_URL": "https://e", "OBS_ES_ADMIN_KEY": "k", "OBS_KIBANA_URL": "https://k"}.items():
         monkeypatch.setenv(k, v)
-    specs = {**SPECS, "noprice": ModelSpec("noprice", "NoPrice", "vertex", "not-in-prices")}
+    specs = {**SPECS, "noprice": ModelSpec("noprice", "NoPrice", "eis", "not-in-prices")}
     deps = Deps(Ret(), Guard(), Sdk(), None, specs, PRICES, emit_log=lambda **kw: None)
     with pytest.raises(RuntimeError, match="not-in-prices"):
         create_app(deps, Settings(_env_file=None), gate=FakeGate())

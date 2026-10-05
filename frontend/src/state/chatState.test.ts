@@ -2,12 +2,12 @@ import { initialState, lastUserQuestion, newId, pendingCount, reducer, userMessa
 import type { ChatResponse } from "../lib/types";
 
 const resp = (over: Partial<ChatResponse> = {}): ChatResponse => ({
-  answer: "18 days [pto-policy]", blocked: false, block_reason: [], trace_id: "abc", persona: "employee", model: "gemini-3.1-flash-lite",
+  answer: "18 days [pto-policy]", blocked: false, block_reason: [], trace_id: "abc", persona: "employee", model: "gpt-5.4-mini",
   engine: "sdk", docs: [], hidden: [], usage: { input_tokens: 10, output_tokens: 5, thinking_tokens: 0 }, cost_usd: 0.001,
   guardrail: { verdict: "CLEAN", reasons: [], status: "ok", latency_ms: 4, injection_score: 0 }, stages: [], ...over,
 });
 
-const start = () => initialState("employee", "flash-lite");
+const start = () => initialState("employee", "eis-gpt-mini");
 const sendAction = (text: string) => ({ type: "send" as const, text, userId: newId(), assistantId: newId() });
 
 test("send adds the user message and a pending assistant bound to the current persona, model and engine", () => {
@@ -15,7 +15,7 @@ test("send adds the user message and a pending assistant bound to the current pe
   s = reducer(s, sendAction("How many PTO days?"));
   const [u, a] = s.messages as [any, AssistantMsg];
   expect(u).toMatchObject({ kind: "user", text: "How many PTO days?", persona: "employee" });
-  expect(a).toMatchObject({ kind: "assistant", status: "pending", replyTo: u.id, persona: "employee", model: "flash-lite", engine: "langchain" });
+  expect(a).toMatchObject({ kind: "assistant", status: "pending", replyTo: u.id, persona: "employee", model: "eis-gpt-mini", engine: "langchain" });
   expect(s.selectedId).toBe(a.id);
   expect(pendingCount(s)).toBe(1);
 });
@@ -75,7 +75,7 @@ test("select, reset and unknown ids are safe", () => {
   s = reducer(s, { type: "select", id: null });
   expect(s.selectedId).toBeNull();
   s = reducer(s, { type: "reset" });
-  expect(s).toMatchObject({ messages: [], spendUsd: 0, selectedId: null, persona: "employee", model: "flash-lite" });
+  expect(s).toMatchObject({ messages: [], spendUsd: 0, selectedId: null, persona: "employee", model: "eis-gpt-mini" });
 });
 
 test("receive/fail/retry for unknown ids return the same state, add no spend and never throw", () => {
@@ -173,8 +173,8 @@ test("retry can rebind the message to another model while keeping persona and en
   s = reducer(s, sendAction("q"));
   const id = s.messages[1].id;
   s = reducer(s, { type: "fail", id, error: { status: 503, code: "gemma_offline" } });
-  s = reducer(s, { type: "retry", id, model: "flash-lite" });
-  expect(s.messages[1]).toMatchObject({ status: "pending", model: "flash-lite", persona: "employee", engine: "langchain" });
+  s = reducer(s, { type: "retry", id, model: "eis-gpt-mini" });
+  expect(s.messages[1]).toMatchObject({ status: "pending", model: "eis-gpt-mini", persona: "employee", engine: "langchain" });
 });
 
 test("retry with a model override still only works from the error state", () => {

@@ -4,7 +4,7 @@ import { ApiError, auth } from "../lib/api";
 import * as apiMod from "../lib/api";
 
 const personas = [{ id: "employee", name: "Maya Lim", title: "Software Engineer", can_read_docs: 6, total_docs: 20 }];
-const models = [{ key: "flash-lite", label: "Gemini Flash-Lite", provider: "vertex" as const, model_id: "g", available: true }];
+const models = [{ key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis" as const, model_id: "g", available: true }];
 const config = { kibana_url: "https://kb", company: "Nimbus Corp" };
 
 function mockApi() {

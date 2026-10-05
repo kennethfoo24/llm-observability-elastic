@@ -7,8 +7,8 @@ from app.models import ModelSpec
 from app.prompt import NO_CONTEXT_ANSWER
 from app.retrieval import Doc, Ghost, RetrievalResult
 
-PRICES = {"models": {"gemini-3.1-flash-lite": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
-SPEC = ModelSpec("flash-lite", "Flash-Lite", "vertex", "gemini-3.1-flash-lite")
+PRICES = {"models": {"gemini-3.5-flash": {"input_per_mtok": 0.25, "output_per_mtok": 1.5}}}
+SPEC = ModelSpec("eis-gemini-flash", "Gemini 3.5 Flash", "eis", "gemini-3.5-flash")
 GEMMA = ModelSpec("gemma", "Gemma", "gemma", "google/gemma-4-31B-it")
 CONTRACT_KEYS = {"answer", "blocked", "block_reason", "trace_id", "persona", "model", "engine", "docs",
                  "hidden", "usage", "cost_usd", "guardrail", "stages"}
@@ -66,11 +66,11 @@ def _deps(result=None, guard=None, sdk=None, gate=None):
     docs = [Doc("pto", "PTO", "public", "18 days", 2.0)]
     d = Deps(retriever=FakeRetriever(result or RetrievalResult(docs, [Ghost("aurora", "Aurora", "restricted")], 5)),
              guardrail=guard or FakeGuardrail(), sdk=sdk or FakeSdk(), langchain=FakeLc(),
-             models={"flash-lite": SPEC, "gemma": GEMMA}, prices=PRICES, emit_log=LogSink(), gate=gate)
+             models={"eis-gemini-flash": SPEC, "gemma": GEMMA}, prices=PRICES, emit_log=LogSink(), gate=gate)
     return d
 
 
-REQ = ChatRequest("how many pto days?", "employee", "flash-lite", "sdk")
+REQ = ChatRequest("how many pto days?", "employee", "eis-gemini-flash", "sdk")
 
 
 def test_happy_path_returns_xray_payload_and_cost():
@@ -110,18 +110,18 @@ def test_no_visible_docs_returns_canned_answer_without_llm_or_cost():
 
 def test_gemma_offline_propagates_for_the_api_layer():
     with pytest.raises(GemmaOffline):
-        run_chat(ChatRequest("q", "employee", "flash-lite", "sdk"), _deps(sdk=FakeSdk(boom=GemmaOffline("off"))))
+        run_chat(ChatRequest("q", "employee", "eis-gemini-flash", "sdk"), _deps(sdk=FakeSdk(boom=GemmaOffline("off"))))
 
 
 def test_langchain_engine_path_reports_engine_and_cost_once():
-    out = run_chat(ChatRequest("pto?", "employee", "flash-lite", "langchain"), _deps())
+    out = run_chat(ChatRequest("pto?", "employee", "eis-gemini-flash", "langchain"), _deps())
     assert out["engine"] == "langchain" and out["answer"] == "lc answer"
     assert out["cost_usd"] == pytest.approx(100 * 0.25 / 1e6 + 10 * 1.5 / 1e6)
 
 
 def test_langchain_no_docs_skips_chain_and_cost():
     d = _deps(result=RetrievalResult([], [], 1))
-    out = run_chat(ChatRequest("reorg?", "employee", "flash-lite", "langchain"), d)
+    out = run_chat(ChatRequest("reorg?", "employee", "eis-gemini-flash", "langchain"), d)
     assert out["answer"] == NO_CONTEXT_ANSWER and out["cost_usd"] == 0
 
 
@@ -138,7 +138,7 @@ def test_guardrail_exception_fails_open_for_benign_prompt(caplog):
 
 def test_guardrail_exception_still_blocks_regex_pii():
     d = _deps(guard=RaisingGuardrail())
-    out = run_chat(ChatRequest("email alex.tan@nimbus-corp.example the file", "employee", "flash-lite", "sdk"), d)
+    out = run_chat(ChatRequest("email alex.tan@nimbus-corp.example the file", "employee", "eis-gemini-flash", "sdk"), d)
     assert out["blocked"] and out["block_reason"] == ["pii_email"]
     assert out["guardrail"]["status"] == "degraded"
     assert d.retriever.calls == 0 and d.sdk.calls == 0
@@ -154,7 +154,7 @@ def test_response_has_exact_contract_keys(engine, kind):
         d = _deps(result=RetrievalResult([], [Ghost("aurora", "Aurora", "restricted")], 5))
     else:
         d = _deps()
-    out = run_chat(ChatRequest("pto?", "employee", "flash-lite", engine), d)
+    out = run_chat(ChatRequest("pto?", "employee", "eis-gemini-flash", engine), d)
     assert set(out) == CONTRACT_KEYS
     assert set(out["usage"]) == {"input_tokens", "output_tokens", "thinking_tokens"}
     assert set(out["guardrail"]) == {"verdict", "reasons", "status", "latency_ms", "injection_score"}
@@ -228,7 +228,7 @@ class ThinkingSdk(FakeSdk):
 def test_root_span_carries_pillar4_attributes_on_success():
     attrs = _root_attrs(lambda: run_chat(REQ, _deps(sdk=ThinkingSdk())))
     assert attrs["app.persona"] == "employee"
-    assert attrs["app.genai.engine"] == "sdk" and attrs["app.genai.model"] == "gemini-3.1-flash-lite"
+    assert attrs["app.genai.engine"] == "sdk" and attrs["app.genai.model"] == "gemini-3.5-flash"
     assert attrs["app.genai.cost_usd"] == pytest.approx(1000 * 0.25 / 1e6 + 150 * 1.5 / 1e6)
     assert attrs["app.genai.input_tokens"] == 1000
     # output_tokens is the billed total: visible output + thinking tokens
@@ -236,7 +236,7 @@ def test_root_span_carries_pillar4_attributes_on_success():
 
 
 def test_root_span_thinking_tokens_zero_in_langchain_mode():
-    attrs = _root_attrs(lambda: run_chat(ChatRequest("pto?", "employee", "flash-lite", "langchain"), _deps()))
+    attrs = _root_attrs(lambda: run_chat(ChatRequest("pto?", "employee", "eis-gemini-flash", "langchain"), _deps()))
     assert attrs["app.genai.thinking_tokens"] == 0 and attrs["app.genai.engine"] == "langchain"
     assert attrs["app.genai.output_tokens"] == 10
 

@@ -1,8 +1,12 @@
-version: 2026-10-04
+version: 2026-10-05
 notes: >
-  USD per 1M tokens. Thinking tokens bill as output. Gemma is amortised GPU time:
+  USD per 1M tokens. Thinking tokens bill as output. The three EIS chat models below are billed by Elastic
+  per million tokens; Elastic's per-model rates are published only in the JavaScript pricing table at
+  cloud.elastic.co/cloud-pricing-table?productType=serverless, so these lines carry provider list prices
+  (web search, 2026-10-05) and must be confirmed against the EIS rate. Gemma is amortised GPU time:
   A100-80GB ~ $6/hr over an assumed 1.2M tokens/hr (re-measure in the Task 9 smoke test).
 models:
-  gemini-3.1-flash-lite: {input_per_mtok: 0.25, output_per_mtok: 1.50}
-  gemini-3.5-flash: {input_per_mtok: 1.50, output_per_mtok: 9.00}   # verified 2026-10-04, see docs/p0-results.md
+  gpt-5.4-mini: {input_per_mtok: 0.75, output_per_mtok: 4.50}      # assumption: provider list price, confirm EIS rate
+  claude-4.5-haiku: {input_per_mtok: 1.00, output_per_mtok: 5.00}  # assumption: provider list price, confirm EIS rate
+  gemini-3.5-flash: {input_per_mtok: 1.50, output_per_mtok: 9.00}  # assumption: provider list price, confirm EIS rate
   google/gemma-4-31B-it: {gpu_hourly_usd: 6.0, assumed_tokens_per_hour: 1200000}

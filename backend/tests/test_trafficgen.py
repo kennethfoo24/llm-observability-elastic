@@ -8,8 +8,9 @@ from trafficgen.__main__ import MAX_REQUESTS_HARD_CAP, build_plan, main, run
 from trafficgen.prompts import BENIGN, INJECTION, PII
 
 MODELS = [
-    {"key": "flash-lite", "available": True},
-    {"key": "flash", "available": True},
+    {"key": "eis-gemini-flash", "available": True},
+    {"key": "eis-gpt-mini", "available": True},
+    {"key": "eis-claude-haiku", "available": True},
     {"key": "gemma", "available": True},
 ]
 
@@ -179,3 +180,10 @@ def test_main_caps_and_sanitises_max_requests(monkeypatch):
     monkeypatch.setenv("GEMMA_TRAFFIC", "1")
     main()
     assert got[-1][2] is True
+
+
+def test_model_mix_is_weighted_toward_the_cheapest_eis_model():
+    from collections import Counter
+    c = Counter(build_plan(random.Random(i), MODELS, gemma_ok=False).model for i in range(3000))
+    assert set(c) == {"eis-gpt-mini", "eis-claude-haiku", "eis-gemini-flash"}
+    assert 0.65 < c["eis-gpt-mini"] / 3000 < 0.75

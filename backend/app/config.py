@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     index_name: str = "hr-kb"
     persona_keys_path: str = "secrets/persona_keys.json"
 
-    vertex_project: str = "elastic-sa"
-    vertex_location: str = "global"
-    gemini_flash_lite_id: str = "gemini-3.1-flash-lite"
-    gemini_flash_id: str = "gemini-3.5-flash"  # in the 12-month-availability table of the Vertex model-versions page (fetched 2026-10-04); newer 3.6-3.8 are short-term-availability models
+    eis_gemini_flash_endpoint: str = ".google-gemini-3.5-flash-chat_completion"
+    eis_claude_haiku_endpoint: str = ".anthropic-claude-4.5-haiku-chat_completion"
+    eis_gpt_mini_endpoint: str = ".openai-gpt-5.4-mini-chat_completion"
+    eis_max_tokens: int = 2048  # max_completion_tokens per EIS chat call (bounds cost; thinking tokens count against it)
     gemma_base_url: str = "https://llm-34-126-172-79.nip.io/v1"
     gemma_api_key: str = ""
     gemma_model_id: str = "google/gemma-4-31B-it"
