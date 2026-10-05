@@ -9,7 +9,7 @@ Every script checks the gcloud project and the kube context before it changes an
 Run in this order from the repo root:
 
 1. `deploy/scripts/gcp_bootstrap.sh`: Artifact Registry repo `glassbox`, static IP `glassbox-ip`, service accounts `glassbox-app` (Vertex AI user) and `glassbox-monitoring` (monitoring viewer), Workload Identity bindings. Prints the host name.
-2. `deploy/scripts/build_push.sh`: Cloud Build image for linux/amd64. Prints `image@digest`.
+2. Image build: GitHub Actions (`.github/workflows/build-image.yml`) runs the backend and frontend tests, then pushes `docker.io/kennethfoo24/glassbox:<git sha>` (linux/amd64) on every push to `main` or `feat/glassbox-deploy` that touches the app. The run summary prints the digest; deploy with `IMAGE=docker.io/kennethfoo24/glassbox@<digest>`. Repo secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. `deploy/scripts/build_push.sh` (Cloud Build to Artifact Registry) remains as a fallback.
 3. Mint the persona keys with `docs/dev-tools-mint-keys.md` (Kibana Dev Tools), save them to `backend/secrets/persona_keys.json`. Optional hardening: ingest-only log keys from `docs/dev-tools-mint-ingest-keys.md`.
 4. `deploy/scripts/create_secrets.sh`: writes the Kubernetes Secrets from local gitignored files and prints key names only. It creates the demo password in `backend/secrets/app_password.txt` the first time. Today it runs with `ALLOW_ADMIN_LOG_KEYS=1` (see section 5).
 5. `IMAGE=<image@digest> WITH_TRAFFICGEN=1 deploy/scripts/deploy.sh`: applies the manifests, waits for the rollout and the managed certificate (up to 90 minutes), then checks `https://<host>/healthz`. It only says "ok" after healthz returns 200.
@@ -42,7 +42,7 @@ deploy/scripts/demo_down.sh              # suspends the traffic generator, stops
 deploy/scripts/demo_down.sh --teardown   # also removes the Ingress and load balancer and scales the app to 0
 ```
 
-`demo_down.sh` fails loudly if the CronJob is not suspended or the Gemma VM is not TERMINATED. After `--teardown`, bring the site back with `IMAGE=<image@digest> deploy/scripts/deploy.sh` (the certificate wait applies again; get the full image reference of what is running with `kubectl -n genai-demo get deploy glassbox -o jsonpath='{.spec.template.spec.containers[0].image}'`, or use the output of `deploy/scripts/build_push.sh` for a new build) and then `demo_up.sh`. `teardown.sh --all` additionally deletes the namespace after you type `delete genai-demo`; it is rarely needed.
+`demo_down.sh` fails loudly if the CronJob is not suspended or the Gemma VM is not TERMINATED. After `--teardown`, bring the site back with `IMAGE=<image@digest> deploy/scripts/deploy.sh` (the certificate wait applies again; get the full image reference of what is running with `kubectl -n genai-demo get deploy glassbox -o jsonpath='{.spec.template.spec.containers[0].image}'`, or use the digest from the latest GitHub Actions run for a new build) and then `demo_up.sh`. `teardown.sh --all` additionally deletes the namespace after you type `delete genai-demo`; it is rarely needed.
 Leave the CronJob suspended between demos. The traffic generator is the only part that spends money on its own.
 
 ## 5. Key lifecycle

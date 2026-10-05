@@ -137,3 +137,14 @@ Final suites: backend `pytest -q`: 189 passed (22 integration deselected). `pyte
 - Image built by Cloud Build: `app@sha256:533a1df797ba00b67592093db572f6ad89238780739f800862231424d347c037` (tag f56378d).
 - Redeploy NOT done: running `deploy.sh` with this image was denied by the permission system ("Production Deploy"), so the live site still runs the previous image and the live lockout checks (wrong password 3 times then correct password 200) have NOT been run. To finish: `IMAGE=asia-southeast1-docker.pkg.dev/elastic-sa/glassbox/app@sha256:533a1df797ba00b67592093db572f6ad89238780739f800862231424d347c037 WITH_TRAFFICGEN=1 deploy/scripts/deploy.sh` (the CronJob stays suspended), then verify with at most 6 wrong tries.
 - Other items: `GEMMA_DISCARD_SSD` (tested), fleet interpreter check before Secret rewrite (tested), ignore files extended (tested), teardown prints the IP release command, runbook updated (IP cost, current state, SSD charges, image lookup, lockout wording).
+
+## Redeploy from GitHub Actions (2026-10-05)
+
+| Item | Result | Evidence |
+|---|---|---|
+| CI build | pass | Run 37329950703 on feat/glassbox-deploy: tests job and build job green; image `docker.io/kennethfoo24/glassbox@sha256:43dfbb0da734f13e4d30feffef49856ff13163a1101c1eb351d67e0569810c1d` (tag a16c352, linux/amd64, public repo) |
+| Secret refresh | pass | `create_secrets.sh` added key `sec_kibana_url` (values not printed) |
+| Rollout | pass | `deploy.sh` rolled out; certificate Active; running image equals the digest above; CronJob still suspended |
+| Lockout fix live | pass | 3 wrong passwords: 401 each; correct password afterwards: 200 |
+| X-ray link config | pass | `/api/config` returns non-empty `kibana_url` and `security_kibana_url` |
+| X-ray links in a browser | not verified | Kibana URL state formats (Discover ES|QL, Security alerts query) need one click-through by a logged-in user |

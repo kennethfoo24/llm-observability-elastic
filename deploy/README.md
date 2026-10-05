@@ -21,7 +21,7 @@ context is `gke_elastic-sa_asia-southeast1-a_kenneth-gke`.
 1. `deploy/scripts/gcp_bootstrap.sh`: Artifact Registry repo `glassbox`, global static IP `glassbox-ip`, service
    accounts `glassbox-app` (`roles/aiplatform.user`) and `glassbox-monitoring` (`roles/monitoring.viewer`) with
    Workload Identity bindings for `genai-demo`. No service account keys. Prints the sslip.io host.
-2. `deploy/scripts/build_push.sh`: Cloud Build, prints `image@digest`. `.gcloudignore` keeps secrets out of the context.
+2. Image: built by GitHub Actions (`.github/workflows/build-image.yml`) and pushed to Docker Hub `kennethfoo24/glassbox`; take the digest from the run summary. Fallback: `deploy/scripts/build_push.sh` (Cloud Build), where `.gcloudignore` keeps secrets out of the context.
 3. Mint ingest-only keys (`docs/dev-tools-mint-ingest-keys.md`), then `deploy/scripts/create_secrets.sh`
    (reads only gitignored local files, prints key names only; refuses admin keys for log export unless `ALLOW_ADMIN_LOG_KEYS=1`).
 4. `IMAGE=<image@digest> deploy/scripts/deploy.sh`: renders `deploy/k8s/*.yaml` with `deploy/render.py`, applies, waits
