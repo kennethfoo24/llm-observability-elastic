@@ -31,7 +31,11 @@ export function useBootstrap() {
     const mine = ++gen.current;
     inflight.current += 1;
     try {
-      const [p, m, c] = await Promise.all([api.personas(), api.models(), api.config()]);
+      // One request first: a wrong password must count as ONE failure at the server (10 per 5 minutes lock
+      // an IP out for wrong credentials). Only after it succeeds are the other two sent in parallel.
+      const p = await api.personas();
+      if (mine !== gen.current) return false;
+      const [m, c] = await Promise.all([api.models(), api.config()]);
       if (mine !== gen.current) return false;
       if (!alive.current) return true;
       setPersonas(p);

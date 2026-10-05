@@ -44,6 +44,14 @@ test("unlock stores the password on success and clears it on a 401", async () =>
   expect(result.current.phase).toBe("ready");
 });
 
+test("a wrong password sends exactly one authenticated request", async () => {
+  const f = vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 }));
+  vi.stubGlobal("fetch", f);
+  const { result } = renderHook(() => useBootstrap());
+  await act(async () => { await result.current.unlock("bad"); });
+  expect(f).toHaveBeenCalledTimes(1);
+});
+
 test("a real 401 response (subscription plus thrown error) locks without flapping", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })));
   const phases: string[] = [];

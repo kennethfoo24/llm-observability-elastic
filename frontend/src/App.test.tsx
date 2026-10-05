@@ -29,7 +29,7 @@ test("a server failure shows an alert message with a retry button outside it, an
   let calls = 0;
   vi.stubGlobal("fetch", vi.fn(async () => {
     calls += 1;
-    if (calls > 3) await gate;
+    if (calls > 1) await gate;
     return new Response("{}", { status: 502 });
   }));
   render(<App />);

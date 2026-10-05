@@ -1,3 +1,4 @@
+import hmac
 import ipaddress
 import time
 from collections import defaultdict, deque
@@ -113,8 +114,12 @@ def install_security(app: FastAPI, s: Settings) -> None:
                        request.headers.get("x-forwarded-for"), s.trusted_proxy_hops)
         path = request.url.path
         response = None
+        # Valid credentials bypass the lockout: it exists only to throttle password guessing, so the
+        # owner who knows the password is never locked out by someone else's failures (or their own typos).
+        authed = bool(s.app_password) and hmac.compare_digest(
+            request.headers.get("x-demo-password", "").encode(), s.app_password.encode())
         if path.startswith("/api/"):
-            if auth_fail.blocked(ip):
+            if not authed and auth_fail.blocked(ip):
                 response = _limited(auth_fail, ip)
             elif not general.allow(ip):
                 response = _limited(general, ip)

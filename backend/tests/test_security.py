@@ -85,12 +85,13 @@ def test_chat_rate_limit_returns_429_with_retry_after():
     assert c.get("/healthz").status_code == 200  # health is never limited
 
 
-def test_repeated_wrong_passwords_lock_the_ip_out_even_with_the_right_one():
+def test_repeated_wrong_passwords_lock_wrong_credentials_but_never_the_right_one():
     c = _client(auth_fail_limit=3)
     for _ in range(3):
         assert c.get("/api/personas", headers={"X-Demo-Password": "nope"}).status_code == 401
     assert c.get("/api/personas", headers={"X-Demo-Password": "nope"}).status_code == 429
-    assert c.get("/api/personas", headers=H).status_code == 429
+    assert c.get("/api/personas").status_code == 429  # missing credentials are throttled too
+    assert c.get("/api/personas", headers=H).status_code == 200  # valid credentials bypass the lockout
 
 
 def test_forged_forwarded_for_does_not_evade_the_lockout():
