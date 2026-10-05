@@ -29,7 +29,8 @@ cmd_start() {
 }
 
 cmd_stop() {
-  run gcloud compute instances stop "$VM" --zone="$VM_ZONE" --project="$PROJECT_ID"
+  # The VM has a Local SSD: gcloud refuses a stop without an explicit choice; keep its contents.
+  run gcloud compute instances stop "$VM" --zone="$VM_ZONE" --project="$PROJECT_ID" --discard-local-ssd=false
 }
 
 cmd_wait() {
