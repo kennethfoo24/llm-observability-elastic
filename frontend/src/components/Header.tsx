@@ -16,7 +16,7 @@ export function Header({ spendUsd, onReset, canReset }: { spendUsd: number; onRe
         </div>
         <button
           type="button" onClick={onReset} disabled={!canReset}
-          className="flex items-center gap-2 whitespace-nowrap rounded-control border border-line px-3 py-2 text-sm font-medium text-ink transition hover:bg-canvas active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-2 whitespace-nowrap rounded-control border border-field px-3 py-2 text-sm font-medium text-ink transition hover:bg-canvas active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ArrowCounterClockwise size={16} weight="regular" aria-hidden />
           <span className="sr-only sm:not-sr-only">New conversation</span>

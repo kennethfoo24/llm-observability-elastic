@@ -82,3 +82,21 @@ test("a server failure while loading yields the error phase, not a blank screen"
   expect(result.current.error).toMatch(/could not reach/i);
   expect(auth.get()).toBe("pw");
 });
+
+test("a stale 401 from an older unlock does not clear a newer password", async () => {
+  const { result } = renderHook(() => useBootstrap());
+  let rejectBad!: (e: unknown) => void;
+  vi.spyOn(apiMod.api, "personas")
+    .mockImplementationOnce(() => new Promise((_, rej) => { rejectBad = rej; }))
+    .mockResolvedValue(personas);
+  vi.spyOn(apiMod.api, "models").mockResolvedValue(models);
+  vi.spyOn(apiMod.api, "config").mockResolvedValue(config);
+  let badP!: Promise<boolean>;
+  let goodOk = false;
+  await act(async () => { badP = result.current.unlock("bad"); });
+  await act(async () => { goodOk = await result.current.unlock("good"); });
+  await act(async () => { rejectBad(new ApiError(401, "unauthorized")); await badP; });
+  expect(goodOk).toBe(true);
+  expect(auth.get()).toBe("good");
+  expect(result.current.phase).toBe("ready");
+});
