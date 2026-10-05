@@ -1,0 +1,33 @@
+# Suspended by default. Resume with: kubectl -n genai-demo patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":false}}'
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: glassbox-trafficgen, namespace: genai-demo}
+spec:
+  schedule: "*/5 7-21 * * *"
+  timeZone: Asia/Singapore
+  concurrencyPolicy: Forbid
+  suspend: true
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: gen
+              image: ${IMAGE}
+              command: ["python", "-m", "trafficgen"]
+              env:
+                - {name: TARGET_URL, value: "http://glassbox.genai-demo.svc:80"}
+                - {name: MAX_REQUESTS, value: "1"}
+                - {name: GEMMA_TRAFFIC, value: "0"}
+                - {name: APP_PASSWORD, valueFrom: {secretKeyRef: {name: glassbox-app, key: app_password}}}
+              resources: {requests: {cpu: 20m, memory: 64Mi}, limits: {cpu: 200m, memory: 128Mi}}
+              securityContext: {readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+              volumeMounts: [{name: tmp, mountPath: /tmp}]
+          volumes: [{name: tmp, emptyDir: {}}]

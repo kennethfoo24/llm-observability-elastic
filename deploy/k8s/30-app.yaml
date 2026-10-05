@@ -1,0 +1,66 @@
+# No collector is created here: the app is a client of the EXISTING daemon collector Service and
+# exports guardrail prompt logs itself (GUARDRAIL_LOG_* from the glassbox-app Secret).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: glassbox, namespace: genai-demo}
+spec:
+  replicas: 1
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app: glassbox}}
+  template:
+    metadata: {labels: {app: glassbox}}
+    spec:
+      serviceAccountName: glassbox
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: app
+          image: ${IMAGE}
+          ports: [{containerPort: 8000}]
+          env:
+            - {name: POD_NAMESPACE, valueFrom: {fieldRef: {fieldPath: metadata.namespace}}}
+            - {name: POD_NAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: NODE_NAME, valueFrom: {fieldRef: {fieldPath: spec.nodeName}}}
+            - {name: OBS_ES_URL, valueFrom: {secretKeyRef: {name: glassbox-app, key: obs_es_url}}}
+            - {name: OBS_ES_ADMIN_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: guardrail_key}}}
+            - {name: OBS_ES_GUARDRAIL_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: guardrail_key}}}
+            - {name: OBS_KIBANA_URL, valueFrom: {secretKeyRef: {name: glassbox-app, key: kibana_url}}}
+            - {name: APP_PASSWORD, valueFrom: {secretKeyRef: {name: glassbox-app, key: app_password}}}
+            - {name: GEMMA_API_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: gemma_api_key}}}
+            - {name: GUARDRAIL_LOG_OBS_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_endpoint}}}
+            - {name: GUARDRAIL_LOG_OBS_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_key}}}
+            - {name: GUARDRAIL_LOG_SEC_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_sec_endpoint}}}
+            - {name: GUARDRAIL_LOG_SEC_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_sec_key}}}
+            - {name: PERSONA_KEYS_PATH, value: /srv/secrets/persona_keys.json}
+            - {name: TRUSTED_PROXY_HOPS, value: "1"}
+            - {name: GEMMA_BASE_URL, value: "https://llm-34-126-172-79.nip.io/v1"}
+            - {name: VERTEX_PROJECT, value: "${PROJECT}"}
+            - {name: VERTEX_LOCATION, value: "global"}
+            - {name: OTEL_SERVICE_NAME, value: "glassbox-backend"}
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318"}
+            - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: "http/protobuf"}
+            - {name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT, value: "SPAN_ONLY"}
+            - {name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true"}
+            - {name: OTEL_RESOURCE_ATTRIBUTES, value: "deployment.environment=demo,service.namespace=glassbox,k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.node.name=$(NODE_NAME)"}
+          readinessProbe: {httpGet: {path: /healthz, port: 8000}, periodSeconds: 5, failureThreshold: 3}
+          livenessProbe: {httpGet: {path: /healthz, port: 8000}, periodSeconds: 20, failureThreshold: 3, initialDelaySeconds: 20}
+          resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+          securityContext: {readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          volumeMounts:
+            - {name: persona-keys, mountPath: /srv/secrets, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: persona-keys, secret: {secretName: glassbox-persona-keys, defaultMode: 0440}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glassbox
+  namespace: genai-demo
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "glassbox"}'
+spec:
+  type: ClusterIP
+  selector: {app: glassbox}
+  ports: [{name: http, port: 80, targetPort: 8000}]
