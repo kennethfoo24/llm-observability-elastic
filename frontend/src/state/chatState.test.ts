@@ -1,0 +1,111 @@
+import { initialState, lastUserQuestion, newId, pendingCount, reducer, userMessageFor, type AssistantMsg } from "./chatState";
+import type { ChatResponse } from "../lib/types";
+
+const resp = (over: Partial<ChatResponse> = {}): ChatResponse => ({
+  answer: "18 days [pto-policy]", blocked: false, block_reason: [], trace_id: "abc", persona: "employee", model: "gemini-3.1-flash-lite",
+  engine: "sdk", docs: [], hidden: [], usage: { input_tokens: 10, output_tokens: 5, thinking_tokens: 0 }, cost_usd: 0.001,
+  guardrail: { verdict: "CLEAN", reasons: [], status: "ok", latency_ms: 4, injection_score: 0 }, stages: [], ...over,
+});
+
+const start = () => initialState("employee", "flash-lite");
+const sendAction = (text: string) => ({ type: "send" as const, text, userId: newId(), assistantId: newId() });
+
+test("send adds the user message and a pending assistant bound to the current persona, model and engine", () => {
+  let s = reducer(start(), { type: "setEngine", engine: "langchain" });
+  s = reducer(s, sendAction("How many PTO days?"));
+  const [u, a] = s.messages as [any, AssistantMsg];
+  expect(u).toMatchObject({ kind: "user", text: "How many PTO days?", persona: "employee" });
+  expect(a).toMatchObject({ kind: "assistant", status: "pending", replyTo: u.id, persona: "employee", model: "flash-lite", engine: "langchain" });
+  expect(s.selectedId).toBe(a.id);
+  expect(pendingCount(s)).toBe(1);
+});
+
+test("receive completes the right message and accumulates spend", () => {
+  let s = reducer(start(), sendAction("q1"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.002 }) });
+  expect((s.messages[1] as AssistantMsg).status).toBe("done");
+  expect(s.spendUsd).toBeCloseTo(0.002);
+  expect(pendingCount(s)).toBe(0);
+});
+
+test("a persona switch while a request is pending does not change that pending message", () => {
+  let s = reducer(start(), sendAction("Show salary bands"));
+  const pendingId = s.messages[1].id;
+  s = reducer(s, { type: "setPersona", persona: "exec", label: "Rachel Tan, Chief People Officer" });
+  expect(s.persona).toBe("exec");
+  s = reducer(s, { type: "receive", id: pendingId, response: resp({ persona: "employee" }) });
+  const a = s.messages.find((m) => m.id === pendingId) as AssistantMsg;
+  expect(a.persona).toBe("employee");
+  expect(a.response?.persona).toBe("employee");
+});
+
+test("switching persona inserts one divider only when the conversation has messages", () => {
+  const empty = reducer(start(), { type: "setPersona", persona: "hr", label: "Priya Nair, HR Business Partner" });
+  expect(empty.messages).toEqual([]);
+  let s = reducer(start(), sendAction("hi"));
+  s = reducer(s, { type: "setPersona", persona: "hr", label: "Priya Nair, HR Business Partner" });
+  expect(s.messages[s.messages.length - 1]).toMatchObject({ kind: "divider", text: "Now asking as Priya Nair, HR Business Partner" });
+  const same = reducer(s, { type: "setPersona", persona: "hr", label: "x" });
+  expect(same.messages.length).toBe(s.messages.length);
+});
+
+test("fail marks the message as an error and retry re-opens it as pending", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "fail", id, error: { status: 503, code: "gemma_offline", hint: "start it" } });
+  expect(s.messages[1]).toMatchObject({ status: "error", error: { code: "gemma_offline" } });
+  s = reducer(s, { type: "retry", id });
+  expect(s.messages[1]).toMatchObject({ status: "pending" });
+  expect((s.messages[1] as AssistantMsg).error).toBeUndefined();
+});
+
+test("userMessageFor and lastUserQuestion find the question behind an answer", () => {
+  let s = reducer(start(), sendAction("first"));
+  s = reducer(s, sendAction("second"));
+  expect(lastUserQuestion(s)?.text).toBe("second");
+  const firstAssistant = s.messages.find((m) => m.kind === "assistant") as AssistantMsg;
+  expect(userMessageFor(s, firstAssistant.id)?.text).toBe("first");
+});
+
+test("select, reset and unknown ids are safe", () => {
+  let s = reducer(start(), sendAction("q"));
+  expect(reducer(s, { type: "receive", id: "nope", response: resp() })).toEqual(s);
+  expect(reducer(s, { type: "fail", id: "nope", error: { status: 500, code: "x" } })).toEqual(s);
+  s = reducer(s, { type: "select", id: null });
+  expect(s.selectedId).toBeNull();
+  s = reducer(s, { type: "reset" });
+  expect(s).toMatchObject({ messages: [], spendUsd: 0, selectedId: null, persona: "employee", model: "flash-lite" });
+});
+
+test("receive/fail/retry for unknown ids return the same state, add no spend and never throw", () => {
+  const s = reducer(start(), sendAction("q"));
+  expect(() => reducer(s, { type: "receive", id: "nope", response: resp({ cost_usd: 5 }) })).not.toThrow();
+  const r = reducer(s, { type: "receive", id: "nope", response: resp({ cost_usd: 5 }) });
+  expect(r).toBe(s);
+  expect(r.spendUsd).toBe(0);
+  expect(reducer(s, { type: "fail", id: "nope", error: { status: 500, code: "x" } })).toBe(s);
+  expect(reducer(s, { type: "retry", id: "nope" })).toBe(s);
+});
+
+test("receive selects the answered message even when the user is inspecting another one", () => {
+  let s = reducer(start(), sendAction("first"));
+  const firstId = s.messages[1].id;
+  s = reducer(s, sendAction("second"));
+  const secondId = s.messages[3].id;
+  s = reducer(s, { type: "select", id: firstId });
+  expect(s.selectedId).toBe(firstId);
+  s = reducer(s, { type: "receive", id: secondId, response: resp() });
+  expect(s.selectedId).toBe(secondId);
+  expect(pendingCount(s)).toBe(1); // the first message is still pending
+});
+
+test("retry on a message that is not in error is harmless", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "receive", id, response: resp() });
+  s = reducer(s, { type: "retry", id });
+  expect(s.messages[1]).toMatchObject({ status: "pending" });
+  expect((s.messages[1] as AssistantMsg).error).toBeUndefined();
+  expect(s.messages).toHaveLength(2);
+});
