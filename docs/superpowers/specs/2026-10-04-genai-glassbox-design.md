@@ -10,7 +10,8 @@ The goal is a polished, interactive demo app for customers. It shows Elastic's L
 It also shows document-level security (DLS) as you swap personas. The design is inspired by elasticsearch-labs `chatbot-rag-app`, but rebuilt from scratch so the trace waterfall and the UI read cleanly.
 
 **Constraints and decisions, confirmed with the user**
-- No OpenAI key. The cheapest way to get the most OOTB dashboards is **Vertex AI Gemini** in the `elastic-sa` project:
+- **Update 2026-10-05:** the LLM provider is the **Elastic Inference Service (EIS)**, replacing Vertex AI Gemini. The model picker offers GPT-5.4 mini (default, cheapest), Claude 4.5 Haiku and Gemini 3.5 Flash through EIS chat completion endpoints, plus the self-hosted Gemma. The Vertex AI integration and its dashboards are dropped. The original text follows for history:
+- No OpenAI key. The cheapest way to get the most OOTB dashboards was **Vertex AI Gemini** in the `elastic-sa` project:
   - The Elastic GCP Vertex AI integration supplies the dashboards.
   - Expected spend is about $2/month for demos and about $13/month with the traffic generator.
 - **Self-hosted Gemma 4 31B** on the existing `gemma-llm` VM (A100, vLLM, about $5–6/hr) is an on-demand third model. In P0, rename the VM to **`kenneth-gemma-llm`**: run `gcloud compute instances set-name` while it is TERMINATED, then check that the startup script, firewall tags and labels don't reference the old name. The vLLM hostname is IP-based (`llm-34-126-172-79.nip.io`), so the rename doesn't affect it. Check whether the external IP is static; if it isn't, reserve one.
@@ -35,9 +36,9 @@ Browser (React) ──HTTPS/SSE──> FastAPI (EDOT Python + OTel GenAI instrum
    │                      rrf(semantic_text[ELSER via EIS], BM25) → text_similarity_reranker(.jina-reranker-v3)
    │                      + catalog-key query (FLS: title/classification only) → "hidden by DLS" ghost cards
    ├─ prompt.build      → context enrichment (citations, persona system prompt)
-   ├─ LLM call          → Direct: google-genai(vertexai=True) | openai→vLLM Gemma
-   │                      LangChain: LCEL retriever→prompt→ChatGoogleGenerativeAI/ChatOpenAI (SDK span nested)
-   └─ cost.compute      → prices.yaml (incl. Gemini thinking tokens; Gemma = GPU-hr amortised)
+   ├─ LLM call          → Direct: EIS chat completion (httpx stream, own `chat <model>` GenAI span) | openai→vLLM Gemma
+   │                      LangChain: LCEL retriever→prompt→ChatElasticInference/ChatOpenAI (LangChain instrumentation emits the chat span)
+   └─ cost.compute      → prices.yaml (EIS models per million tokens, thinking tokens bill as output; Gemma = GPU-hr amortised)
   + OTel log record: data_stream.dataset=genai_guardrail (prompt, persona, model, trace.id)
         │ OTLP → existing opentelemetry-kube-stack daemon collector → Obs managed OTLP
         ▼
@@ -114,7 +115,7 @@ Models are imported with the eland Docker image and use adaptive allocations.
 4. Execute, starting with the P0 risk tests.
 
 ## Verification
-- **Pillar 1:** the Vertex AI integration dashboard shows Gemini request and token metrics within about 6 minutes of traffic. The infrastructure dashboards link from the APM service.
+- **Pillar 1:** APM GenAI service views, the Kubernetes infrastructure dashboards linked from the APM service, the Glass Box dashboard, and EIS token usage under Billing and subscription, Usage, Inference. (The Vertex OOTB dashboards were dropped on 2026-10-05.)
 - **Pillar 2:** one chat produces an APM waterfall: HTTP POST → guardrail.check → retrieval.hybrid (ES spans) → prompt.build → chat span with `gen_ai.input.messages` and `gen_ai.output.messages` and token usage. Repeat in LangChain mode and confirm the nested spans.
 - **Pillar 3:** the Red-team injection prompt is blocked in the UI. The guardrail log document has `security.threat_verdict: FLAGGED`. A Security alert fires within one rule interval through CPS (or the fallback).
 - **Pillar 4:** `app.genai.cost_usd` on the root span matches a hand calculation from the token counts. Lowering the threshold fires the cost alert.
@@ -135,5 +136,5 @@ Models are imported with the eland Docker image and use adaptive allocations.
 
 ## Open items, handled in P0
 - The CPS billing rate for the Observability project's current retained volume. This decides CPS versus fan-out.
-- Final Gemini model IDs and prices.
+- Final EIS model endpoints and the confirmed EIS per-token rates (`backend/prices.yaml` carries provider list prices until then).
 - Whether the VM rename has side effects (startup script references, static IP).

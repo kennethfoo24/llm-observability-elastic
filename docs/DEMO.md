@@ -9,8 +9,8 @@ People in the app: Maya Lim (Software Engineer, role employee) and Rachel Tan (C
 1. Run `deploy/scripts/demo_up.sh` (add `--gemma` at least 10 minutes ahead if you will show Gemma).
 2. Open https://107-178-251-254.sslip.io and enter the password from `backend/secrets/app_password.txt`. Do not show the file on screen.
 3. Open Kibana in a second tab: APM service `glassbox-backend`, the dashboard `Glass Box: LLM observability`, and the Security alerts page.
-4. Pick Gemini Flash-Lite as the model and Direct SDK as the engine.
-5. Vertex AI dashboards: available once Vertex credentials are in place (see the runbook, open item 1). The demo works without them; skip step 4d if they are empty.
+4. Pick GPT-5.4 mini as the model and Direct SDK as the engine.
+5. Provider usage: EIS token usage is under Billing and subscription, Usage, Inference in Elastic Cloud (it lags real traffic).
 
 ## Step 1: Same question, different person (2 minutes) - pillar: access control (DLS)
 
@@ -28,8 +28,8 @@ Key point: the control is document level security in the data layer, not a promp
 | Do | Say | Expect |
 |---|---|---|
 | In the X-ray drawer click "Open trace in Kibana". | "Every answer links to its trace." | Kibana APM opens a new tab on the trace. |
-| Walk the waterfall from the top. | "The request enters the API, then the guardrail check, then hybrid search in Elasticsearch, then prompt build, then the Gemini call." | Spans `POST /api/chat`, `guardrail.check`, `retrieval.hybrid`, `prompt.build`, `generate_content gemini-3.1-flash-lite`. |
-| Click the Gemini span and open its attributes. | "Prompt and response are captured on the span, plus token counts and the cost." | `gen_ai.input.messages`, `gen_ai.output.messages`, token counts, and `app.genai.cost_usd` on the root span. |
+| Walk the waterfall from the top. | "The request enters the API, then the guardrail check, then hybrid search in Elasticsearch, then prompt build, then the LLM call through the Elastic Inference Service." | Spans `POST /api/chat`, `guardrail.check`, `retrieval.hybrid`, `prompt.build`, `chat gpt-5.4-mini`. |
+| Click the `chat` span and open its attributes. | "Prompt and response are captured on the span, plus token counts and the cost." | `gen_ai.input.messages`, `gen_ai.output.messages`, token counts, and `app.genai.cost_usd` on the root span. |
 | Back in the app switch the engine to LangChain and ask `How many PTO days do I get?` as Maya. Open its trace. | "Same product, a different framework. The instrumentation still shows each step nested under the chain." | Stages `guardrail.check`, `retrieval.hybrid`, `llm.generate`, plus an `invoke_workflow RunnableSequence` span. The trace arrives about 1 minute after the request. |
 
 ## Step 3: Guardrails (2 minutes) - pillar: guardrails and security
@@ -54,8 +54,9 @@ After the table, show where the prompt itself lives (blocked requests have no LL
 | Do | Say | Expect |
 |---|---|---|
 | Point at "Session cost" in the app header after a few chats. | "The app shows what this session has cost, in dollars." | A small figure, a fraction of a cent per answer. |
-| Kibana, dashboard `Glass Box: LLM observability`. | "Spend over time by model, tokens, average cost per person, guardrail verdicts and stage latency, all from the same traces." | Eight panels with data. Measured average is about $0.00057 per request. |
-| Open `[GCP VertexAI] Metrics Overview`. | "The standard Elastic Vertex AI integration gives the provider side view." | Available once Vertex credentials are in place. Today the dashboard exists with no data, so skip it. |
+| Kibana, dashboard `Glass Box: LLM observability`. | "Spend over time by model, tokens, average cost per person, guardrail verdicts and stage latency, all from the same traces." | Eight panels with data. Average cost is a fraction of a cent per request. |
+| Open Kibana, Observability, APM, Services, `glassbox-backend`, and the Kubernetes dashboards linked from it. | "Out of the box views: the GenAI service view for the model calls, and Kubernetes infrastructure for the pods." | Latency, throughput, token usage per model, and pod CPU and memory. |
+| In Elastic Cloud open Billing and subscription, Usage, Inference. | "The model calls run on the Elastic Inference Service, so the token usage is billed and visible per model in Elastic." | EIS token usage; it can lag real traffic. |
 | Show the alert firing. In a terminal run `source backend/.venv/bin/activate && python -m elastic.apply --project observability --cost-threshold 0.0001`, send two chats, then open Observability, Rules, `Glass Box: LLM spend above threshold`. | "The budget rule watches hourly spend. I lowered the limit to nearly nothing to trigger it live." | An active alert within about a minute. |
 | Restore the real threshold: `python -m elastic.apply --project observability --cost-threshold 0.25` | "Back to the real limit of 25 cents per hour." | Rule back at 0.25. Do this before you leave the demo. |
 
@@ -67,7 +68,7 @@ After the table, show where the prompt itself lives (blocked requests have no LL
 | Select Gemma, ask `What is the remote work policy?` | "Same app, same guardrails, same traces, different model, and cost is estimated from GPU time." | An answer in a few seconds. The trace span is named `chat google/gemma-4-31B-it`. |
 | Afterwards run `deploy/scripts/demo_down.sh`. | "One command stops the GPU and the traffic generator." | Output ends with "traffic generator suspended, gemma TERMINATED". |
 
-If Gemma is not running and someone selects it, the app shows an inline error with a "Try with Gemini Flash-Lite" button.
+If Gemma is not running and someone selects it, the app shows an inline error with a "Try with GPT-5.4 mini" button.
 
 ## After the demo
 

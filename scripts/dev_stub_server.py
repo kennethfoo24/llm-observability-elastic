@@ -1,4 +1,4 @@
-"""Run the offline stub backend (no Elastic, no Vertex) on http://localhost:8000, password 'demo'.
+"""Run the offline stub backend (no Elastic, no EIS) on http://localhost:8000, password 'demo'.
 
 STUB_GEMMA_UP=1 to make the Gemma model available. Serves frontend/dist if it has been built.
 """

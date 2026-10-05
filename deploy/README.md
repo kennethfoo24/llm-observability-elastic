@@ -18,9 +18,8 @@ deployment so the socket peer is always used.
 Every script first checks that the gcloud project is `elastic-sa` and (before any cluster change) that the kube
 context is `gke_elastic-sa_asia-southeast1-a_kenneth-gke`.
 
-1. `deploy/scripts/gcp_bootstrap.sh`: Artifact Registry repo `glassbox`, global static IP `glassbox-ip`, service
-   accounts `glassbox-app` (`roles/aiplatform.user`) and `glassbox-monitoring` (`roles/monitoring.viewer`) with
-   Workload Identity bindings for `genai-demo`. No service account keys. Prints the sslip.io host.
+1. `deploy/scripts/gcp_bootstrap.sh`: Artifact Registry repo `glassbox` and global static IP `glassbox-ip`. No service
+   accounts: the LLM is the Elastic Inference Service, reached with the guardrail API key (Secret key `guardrail_key`). Prints the sslip.io host.
 2. Image: built by GitHub Actions (`.github/workflows/build-image.yml`) and pushed to Docker Hub `kennethfoo24/glassbox`; take the digest from the run summary. Fallback: `deploy/scripts/build_push.sh` (Cloud Build), where `.gcloudignore` keeps secrets out of the context.
 3. Mint ingest-only keys (`docs/dev-tools-mint-ingest-keys.md`), then `deploy/scripts/create_secrets.sh`
    (reads only gitignored local files, prints key names only; refuses admin keys for log export unless `ALLOW_ADMIN_LOG_KEYS=1`).
@@ -41,12 +40,14 @@ Guardrail prompt logs are exported by the app itself. The hostname depends on th
 The external HTTPS load balancer is about $18 per month; the static IP is small; pods fit on existing nodes; the Gemma
 VM costs money only while running. `teardown.sh` stops the load balancer cost; suspending the CronJob stops traffic.
 
-### Measured traffic generator cost (2026-10-05, one hour live, 13 requests)
+### Traffic generator cost, measured on the previous Vertex Gemini version (2026-10-05, one hour live, 13 requests)
+
+Historical: the app now calls the Elastic Inference Service (GPT-5.4 mini 70 percent, Claude 4.5 Haiku 15, Gemini 3.5 Flash 15). Re-measure after the EIS deploy; the per-token rates in `backend/prices.yaml` are provider list prices pending confirmation of the EIS rate.
 
 | Item | Measured |
 |---|---|
-| Gemini Flash-Lite, answered requests (11) | about $0.000185 each |
-| Gemini Flash, answered requests (1) | $0.00539 each |
+| Previous cheap model (Vertex Gemini Flash-Lite), answered requests (11) | about $0.000185 each |
+| Previous larger model (Vertex Gemini Flash), answered requests (1) | $0.00539 each |
 | Blocked by guardrail (1 of 13) | $0 (no model call) |
 | Average per request (13, all included) | $0.00057 |
 | Spend for the hour | $0.0074 |
