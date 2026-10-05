@@ -12,8 +12,9 @@ export function layoutStages(stages: Stage[]): StageRow[] {
   return stages.map((s) => {
     const offsetPct = (cursor / total) * 100;
     const raw = (Math.max(0, s.ms) / total) * 100;
-    const widthPct = Math.min(Math.max(raw, MIN_WIDTH), Math.max(MIN_WIDTH, 100 - offsetPct));
+    const widthPct = Math.min(Math.max(raw, MIN_WIDTH), 100);
+    const shiftedOffset = Math.min(offsetPct, 100 - widthPct);
     cursor += Math.max(0, s.ms);
-    return { name: s.name, label: STAGE_LABELS[s.name] ?? s.name, ms: s.ms, offsetPct, widthPct };
+    return { name: s.name, label: STAGE_LABELS[s.name] ?? s.name, ms: s.ms, offsetPct: shiftedOffset, widthPct };
   });
 }

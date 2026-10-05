@@ -29,3 +29,9 @@ test("empty or zero-duration input does not divide by zero", () => {
 test("unknown stage names fall back to the raw name", () => {
   expect(layoutStages([{ name: "custom.step", ms: 5 }])[0].label).toBe("custom.step");
 });
+
+test("a tiny last stage is shifted left so offset + width never exceeds 100", () => {
+  const rows = layoutStages([{ name: "llm.generate", ms: 1999 }, { name: "guardrail.check", ms: 1 }]);
+  for (const r of rows) expect(r.offsetPct + r.widthPct).toBeLessThanOrEqual(100.0001);
+  expect(rows[1].widthPct).toBeGreaterThanOrEqual(1.5);
+});
