@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource/space-mono/400.css";
+@import "@fontsource/space-mono/700.css";
+
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, "SF Mono", monospace;
+
+  --color-ink: #0e1b35;
+  --color-ink-2: #15254a;
+  --color-ink-3: #22345f;
+  --color-ink-line: #2d4170;
+  --color-on-ink: #e6ecf7;
+  --color-on-ink-muted: #9fb0cf;
+
+  --color-blue: #0b64dd;
+  --color-blue-strong: #0a55bd;
+  --color-blue-soft: #e8f0fc;
+  --color-blue-bright: #4a90f2;
+
+  --color-canvas: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-line: #d4dae5;
+  --color-text: #1b2840;
+  --color-muted: #535966;
+
+  --color-clean: #00bfb3;
+  --color-clean-soft: #dff6f3;
+  --color-clean-ink: #00574f;
+  --color-flag: #f04e98;
+  --color-flag-soft: #fde8f2;
+  --color-flag-ink: #8a1a50;
+  --color-cost: #fec514;
+
+  --radius-card: 16px;
+  --radius-control: 10px;
+}
+
+@layer base {
+  html {
+    background: var(--color-canvas);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body { min-height: 100dvh; }
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
+  .on-ink :focus-visible { outline-color: var(--color-blue-bright); }
+  ::selection { background: var(--color-blue-soft); }
+}
+
+/* Tabular figures for every telemetry number */
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
