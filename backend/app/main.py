@@ -67,7 +67,10 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
                static_dir: Path | None = None) -> FastAPI:
     s = settings or get_settings()
     gate = gate or GemmaGate(s.gemma_base_url, s.gemma_api_key)
-    setup_guardrail_log_export(s)
+    try:
+        setup_guardrail_log_export(s)
+    except Exception as e:  # telemetry must never stop the app starting; log the type only (no key, no URL)
+        logger.warning("guardrail log export disabled: %s", type(e).__name__)
     deps = deps or _default_deps(s, gate)
     if deps.gate is None:
         deps.gate = gate

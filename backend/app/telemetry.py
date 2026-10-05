@@ -29,6 +29,7 @@ def emit_prompt_log(*, prompt: str, persona: str, model: str, engine: str, statu
 
 
 _HANDLERS: list[logging.Handler] = []
+_PROVIDERS: list = []
 
 
 def setup_guardrail_log_export(s, exporter_factory=None, simple: bool = False) -> list[logging.Handler]:
@@ -44,6 +45,12 @@ def setup_guardrail_log_export(s, exporter_factory=None, simple: bool = False) -
     for h in _HANDLERS:
         _log.removeHandler(h)
     _HANDLERS.clear()
+    for p in _PROVIDERS:
+        try:
+            p.shutdown()
+        except Exception:  # noqa: BLE001 - never let telemetry teardown raise
+            pass
+    _PROVIDERS.clear()
     factory = exporter_factory or (lambda endpoint, key: _log_exporter.OTLPLogExporter(
         endpoint=endpoint.rstrip("/") + "/v1/logs", headers={"Authorization": f"ApiKey {key}"}))
     for endpoint, key in ((s.guardrail_log_obs_endpoint, s.guardrail_log_obs_key),
@@ -56,6 +63,7 @@ def setup_guardrail_log_export(s, exporter_factory=None, simple: bool = False) -
         provider.add_log_record_processor(processor_cls(factory(endpoint, key)))
         handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
         _log.addHandler(handler)
+        _PROVIDERS.append(provider)
         _HANDLERS.append(handler)
     _log.propagate = not _HANDLERS
     return list(_HANDLERS)

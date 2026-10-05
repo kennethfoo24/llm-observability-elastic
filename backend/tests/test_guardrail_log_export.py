@@ -87,3 +87,41 @@ def test_a_failing_exporter_never_leaks_the_key_into_logs(caplog):
     with caplog.at_level(logging.DEBUG):
         emit_prompt_log(prompt="hello", persona="employee", model="m", engine="sdk", status="ok")
     assert "SECRETKEY" not in caplog.text
+
+
+def test_rerun_shuts_down_the_previous_providers():
+    from app.telemetry import _PROVIDERS
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="k1")
+    exp = InMemoryLogRecordExporter()
+    setup_guardrail_log_export(s, exporter_factory=lambda e, k: exp, simple=True)
+    assert len(_PROVIDERS) == 1
+    setup_guardrail_log_export(_settings())
+    assert _PROVIDERS == [] and exp._stopped is True
+
+
+def test_create_app_survives_a_failing_log_exporter_setup(monkeypatch, caplog):
+    from app.chat_service import Deps
+    from app.main import create_app
+
+    def boom(s):
+        raise RuntimeError("https://obs.example/v1/logs?key=SECRETKEY")
+
+    monkeypatch.setattr("app.main.setup_guardrail_log_export", boom)
+    deps = Deps(None, None, None, None, {}, {"models": {}}, emit_log=lambda **kw: None, gate=object())
+    with caplog.at_level(logging.WARNING):
+        assert create_app(deps, _settings(), gate=object()) is not None
+    assert "SECRETKEY" not in caplog.text and "RuntimeError" in caplog.text
+
+
+def test_prompt_record_inside_a_span_carries_its_trace_and_span_ids():
+    from opentelemetry.sdk.trace import TracerProvider
+
+    exp = InMemoryLogRecordExporter()
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="k1")
+    setup_guardrail_log_export(s, exporter_factory=lambda e, k: exp, simple=True)
+    tracer = TracerProvider().get_tracer("t")
+    with tracer.start_as_current_span("chat") as span:
+        emit_prompt_log(prompt="hi", persona="employee", model="m", engine="sdk", status="ok")
+        ctx = span.get_span_context()
+    rec = exp.get_finished_logs()[0].log_record
+    assert rec.trace_id == ctx.trace_id and rec.span_id == ctx.span_id
