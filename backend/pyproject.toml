@@ -26,4 +26,4 @@ dependencies = [
 dev = ["pytest>=8", "pytest-timeout>=2"]
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+include = ["app*", "trafficgen*"]

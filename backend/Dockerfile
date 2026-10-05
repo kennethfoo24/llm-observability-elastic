@@ -14,6 +14,7 @@ COPY --chmod=a+rX backend/requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock
 COPY --chmod=a+rX backend/pyproject.toml ./
 COPY --chmod=a+rX backend/app ./app
+COPY --chmod=a+rX backend/trafficgen ./trafficgen
 COPY --chmod=a+rX backend/prices.yaml ./
 RUN pip install --no-cache-dir --no-deps -e .
 # edot-bootstrap adds the instrumentation packages for the libraries installed above (fastapi, httpx, ...).
