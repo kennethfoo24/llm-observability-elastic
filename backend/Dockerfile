@@ -40,4 +40,4 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN test -z "$(find /srv -type f ! -perm -o=r -print -quit)" || (echo "unreadable file in /srv" >&2 && exit 1)
 USER 10001
 EXPOSE 8000
-CMD ["opentelemetry-instrument", "uvicorn", "app.main:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["opentelemetry-instrument", "uvicorn", "app.main:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "620"]
