@@ -10,7 +10,7 @@ export function AppShell({ header, rail, thread, composer, xray, xrayOpen, onXra
       {header}
       <div className="grid min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_420px]">
         <aside className="border-b border-line bg-surface lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">{rail}</aside>
-        <main className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] lg:min-h-0">
+        <main className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] lg:min-h-0">
           <div className="min-h-0 overflow-y-auto">{thread}</div>
           <div className="border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">{composer}</div>
         </main>

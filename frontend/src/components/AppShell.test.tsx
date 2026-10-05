@@ -14,4 +14,9 @@ describe("AppShell breakpoints", () => {
     expect(xray.className).toContain("xl:block");
     expect(xray.className).not.toMatch(/(^|\s)lg:block/);
   });
+
+  it("pins the chat column track so long thread content cannot widen the page at 320px", () => {
+    const { container } = render(<AppShell {...slots} />);
+    expect(container.querySelector("main")!.className).toContain("grid-cols-[minmax(0,1fr)]");
+  });
 });
