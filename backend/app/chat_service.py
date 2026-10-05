@@ -2,7 +2,7 @@ import logging
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .cost import compute_cost
 from .guardrail import GuardrailResult, aggregate_verdict
@@ -74,7 +74,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
         except Exception:
             # Fail open on model faults; regex PII detection still applies.
             logger.warning("guardrail check failed; degrading", exc_info=True)
-            g = GuardrailResult(aggregate_verdict("SAFE", 0.0, [], find_pii(req.message)), "degraded", 0)
+            g = GuardrailResult(replace(aggregate_verdict("SAFE", 0.0, [], find_pii(req.message)), injection_score=None), "degraded", 0)
     deps.emit_log(prompt=req.message, persona=persona.id, model=spec.model_id,
                   engine=req.engine, status=g.status)
     guard = {"verdict": g.verdict.verdict, "reasons": g.verdict.reasons, "status": g.status,

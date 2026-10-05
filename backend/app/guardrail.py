@@ -16,10 +16,11 @@ POOL_WORKERS = 16
 @dataclass
 class Verdict:
     """injection_score is P(injection) in [0, 1]: ~0 for confident SAFE predictions, ~1 for confident
-    INJECTION ones, and 0.0 when the injection model gave no prediction."""
+    INJECTION ones, and None when the injection model gave no usable prediction (timeout, error or
+    malformed). None means "not scored"; it must never be shown as a clean 0."""
     verdict: str
     reasons: list[str] = field(default_factory=list)
-    injection_score: float = 0.0
+    injection_score: float | None = 0.0
     person_count: int = 0
 
 
@@ -73,7 +74,8 @@ class Guardrail:
         start = time.perf_counter()
         with tracer.start_as_current_span("guardrail.check") as span:
             pii = find_pii(text)
-            label, score, entities, p_inj = "SAFE", 0.0, [], 0.0
+            label, score, entities = "SAFE", 0.0, []
+            p_inj: float | None = None
             futures = {"injection": self._submit(self._inj, text),
                        "ner": self._submit(self._ner, text)}
             done, _ = wait(list(futures.values()), timeout=self._timeout)
@@ -91,9 +93,14 @@ class Guardrail:
                     continue
                 res = f.result()
                 if name == "injection":
-                    label = res.get("predicted_value", "SAFE")
-                    score = float(res.get("prediction_probability", 0.0))
-                    p_inj = injection_probability(label, score)
+                    try:
+                        label = res["predicted_value"]
+                        score = float(res["prediction_probability"])
+                    except (KeyError, TypeError, ValueError):
+                        label, score = "SAFE", 0.0
+                        degraded.append("injection:malformed")
+                    else:
+                        p_inj = injection_probability(label, score)
                 else:
                     entities = res.get("entities", [])
             status = "degraded" if degraded else "ok"
@@ -101,7 +108,8 @@ class Guardrail:
             ms = int((time.perf_counter() - start) * 1000)
             span.set_attribute("guardrail.status", status)
             span.set_attribute("guardrail.verdict", verdict.verdict)
-            span.set_attribute("guardrail.injection_score", verdict.injection_score)
+            if verdict.injection_score is not None:
+                span.set_attribute("guardrail.injection_score", verdict.injection_score)
             span.set_attribute("guardrail.reasons", ",".join(verdict.reasons))
             span.set_attribute("guardrail.person_count", verdict.person_count)
             span.set_attribute("guardrail.latency_ms", ms)

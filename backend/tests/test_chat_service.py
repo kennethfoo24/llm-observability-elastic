@@ -131,6 +131,7 @@ def test_guardrail_exception_fails_open_for_benign_prompt(caplog):
         out = run_chat(REQ, d)
     assert not out["blocked"] and out["answer"] == "18 days [pto]"
     assert out["guardrail"]["status"] == "degraded" and out["guardrail"]["verdict"] == "CLEAN"
+    assert out["guardrail"]["injection_score"] is None
     assert len(d.emit_log.calls) == 1 and d.emit_log.calls[0]["status"] == "degraded"
     assert any(r.name == "app.chat_service" and r.exc_info for r in caplog.records)
 

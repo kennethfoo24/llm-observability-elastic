@@ -146,10 +146,41 @@ def test_injection_score_is_p_injection_not_confidence_of_predicted_class():
     assert inj.verdict.verdict == "FLAGGED" and safe.verdict.verdict == "CLEAN"
 
 
-def test_injection_score_is_zero_when_injection_model_unavailable():
-    # No prediction means no evidence; it must not become 1 - 0.0.
+def test_injection_score_is_none_when_injection_model_unavailable():
+    # No prediction means no evidence; it must not become 1 - 0.0 and must not read as a clean 0.
     r = _guard(FakeMl(("SAFE", 0), [], boom_inj=True)).check("hello")
-    assert r.status == "degraded" and r.verdict.injection_score == 0.0
+    assert r.status == "degraded" and r.verdict.injection_score is None
+
+
+def test_injection_score_is_none_on_timeout():
+    r = _guard(FakeMl(("SAFE", 0.0), [], delay=0.6), timeout=0.1).check("hello")
+    assert r.status == "degraded" and r.verdict.injection_score is None
+
+
+def test_injection_score_is_none_when_models_down():
+    r = _guard(FakeMl(("SAFE", 0), [], boom=True)).check("hello")
+    assert r.verdict.injection_score is None
+
+
+def test_injection_score_is_none_on_malformed_response():
+    r = _guard(FakeMl(("SAFE", 0), [], malformed=True)).check("hello")
+    assert r.status == "degraded" and r.verdict.injection_score is None
+
+
+def test_injection_score_is_none_when_prediction_fields_are_missing():
+    class NoPrediction(FakeMl):
+        def infer_trained_model(self, model_id, docs, **kw):
+            out = super().infer_trained_model(model_id, docs, **kw)
+            if "deberta" in model_id:
+                out["inference_results"][0].pop("predicted_value", None)
+            return out
+    r = _guard(NoPrediction(("SAFE", 0.1), [])).check("hello")
+    assert r.status == "degraded" and r.verdict.injection_score is None
+
+
+def test_a_float_score_is_kept_when_the_model_answered():
+    r = _guard(FakeMl(("SAFE", 0.9), [])).check("pto days?")
+    assert r.status == "ok" and isinstance(r.verdict.injection_score, float)
 
 
 def test_low_confidence_injection_label_reports_its_own_probability_and_is_not_flagged():
