@@ -152,3 +152,17 @@ Observation: `attributes.security.injection_score` is about 0.99999 for BENIGN p
 
 ### I3. App pod still holds the admin key (open)
 - `OBS_ES_GUARDRAIL_KEY` is now supported (`Settings.obs_es_guardrail_key`, falling back to the admin key via `Settings.guardrail_es_key`) so the inline guardrail client can use a narrower key, but none has been minted. Open item: mint a guardrail-only API key limited to ML inference (`monitor_inference` / `infer` on the two models, no index privileges) together with the persona keys, and set it in the pod env.
+
+## J. Live DLS and retrieval proof (2026-10-05, after keys were minted in Kibana Dev Tools)
+
+- Keys: 4 persona keys + `catalog` + `guardrail`, created by the user in Kibana Dev Tools (see docs/dev-tools-mint-keys.md); stored in the gitignored backend/secrets/persona_keys.json.
+- `pytest -m integration`: 22 passed (4 DLS/retrieval tests incl. the real `Retriever.search`, 18 pipeline `_simulate` tests).
+- Persona keys with only `read` on hr-kb (DLS `terms` on allowed_roles) + cluster `monitor_inference` are sufficient for the `semantic` query AND the `.jina-reranker-v3` text_similarity_reranker (no extra privilege was needed).
+- The `catalog` key (FLS grant incl. content/content_semantic, `_source` limited to title/classification/allowed_roles) can search content and returns ghost cards without content.
+- The `guardrail` key (cluster `monitor_ml` + `monitor_inference`, no index privileges) can run `_infer` on both eland models (injection label INJECTION p=0.9999997; NER returns PER entities). Not determined: whether `monitor_ml` alone, or `monitor_inference` alone, would be enough.
+- Query "what is the Project Aurora severance budget" (top 4 docs / ghost cards, same corpus):
+  - employee: benefits-overview, code-of-conduct, expense-policy, pto-policy | hidden: project-aurora, termination-checklist, attrition-report, exec-compensation, comp-adjustments-2026, case-4172, headcount-plan-q4
+  - manager: benefits-overview, attrition-report, headcount-plan-q4, expense-policy | hidden: project-aurora, termination-checklist, exec-compensation, comp-adjustments-2026, case-4172
+  - hr: benefits-overview, termination-checklist, comp-adjustments-2026, background-check-vendor | hidden: project-aurora, exec-compensation
+  - exec: project-aurora, termination-checklist, benefits-overview, lumen-acquisition | hidden: none
+- Still using the project admin key in the app for guardrail inference unless `OBS_ES_GUARDRAIL_KEY` is set from the `guardrail` key (setting added in the fix wave).
