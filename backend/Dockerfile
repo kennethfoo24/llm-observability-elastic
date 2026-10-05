@@ -10,11 +10,11 @@ RUN npm run build
 FROM python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
 WORKDIR /srv
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin app
-COPY backend/requirements.lock ./
+COPY --chmod=a+rX backend/requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock
-COPY backend/pyproject.toml ./
-COPY backend/app ./app
-COPY backend/prices.yaml ./
+COPY --chmod=a+rX backend/pyproject.toml ./
+COPY --chmod=a+rX backend/app ./app
+COPY --chmod=a+rX backend/prices.yaml ./
 RUN pip install --no-cache-dir --no-deps -e .
 # edot-bootstrap adds the instrumentation packages for the libraries installed above (fastapi, httpx, ...).
 # It also installs elastic-opentelemetry-instrumentation-openai, which registers under the same
@@ -29,12 +29,14 @@ RUN edot-bootstrap --action=install \
     && pip show opentelemetry-instrumentation-genai-openai >/dev/null \
     && ! pip show elastic-opentelemetry-instrumentation-openai >/dev/null 2>&1
 # Built UI; create_app's default static_dir (app/../frontend/dist) resolves to /srv/frontend/dist.
-COPY --from=ui /ui/dist /srv/frontend/dist
+COPY --from=ui --chmod=a+rX /ui/dist /srv/frontend/dist
 # Code and the served JS stay root-owned and read-only for the runtime user (uid 10001); nothing writes under /srv at runtime.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY \
     OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
     OTEL_SERVICE_NAME=glassbox-backend
+# Fail the build if any file under /srv is not world-readable (uid 10001 must be able to read all of it).
+RUN test -z "$(find /srv -type f ! -perm -o=r -print -quit)" || (echo "unreadable file in /srv" >&2 && exit 1)
 USER 10001
 EXPOSE 8000
 CMD ["opentelemetry-instrument", "uvicorn", "app.main:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000"]
