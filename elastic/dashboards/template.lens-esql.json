@@ -1,0 +1,179 @@
+{
+  "type": "lens",
+  "embeddableConfig": {
+    "attributes": {
+      "title": "Shares Traded Per Symbol",
+      "references": [],
+      "state": {
+        "datasourceStates": {
+          "textBased": {
+            "layers": {
+              "73367308-091b-49d2-9220-68266ff255ba": {
+                "index": "d724388741a247920ae91ff465cf15cafb200931a1f29e9321f0c4ab1bb464e2",
+                "query": {
+                  "esql": "TS metrics-trader\n  | STATS avg_shares_traded = AVG(metrics.shares_traded_per_customer) BY BUCKET(@timestamp, 100, ?_tstart, ?_tend), symbol"
+                },
+                "columns": [
+                  {
+                    "columnId": "avg_shares_traded",
+                    "fieldName": "avg_shares_traded",
+                    "label": "avg_shares_traded",
+                    "customLabel": false,
+                    "meta": {
+                      "type": "number",
+                      "esType": "double",
+                      "sourceParams": {
+                        "indexPattern": "metrics-trader",
+                        "sourceField": "avg_shares_traded"
+                      },
+                      "params": {
+                        "id": "number"
+                      }
+                    },
+                    "inMetricDimension": true
+                  },
+                  {
+                    "columnId": "BUCKET(@timestamp, 100, ?_tstart, ?_tend)",
+                    "fieldName": "BUCKET(@timestamp, 100, ?_tstart, ?_tend)",
+                    "label": "BUCKET(@timestamp, 100, ?_tstart, ?_tend)",
+                    "customLabel": false,
+                    "meta": {
+                      "type": "date",
+                      "esType": "date",
+                      "sourceParams": {
+                        "params": {},
+                        "indexPattern": "metrics-trader",
+                        "sourceField": "BUCKET(@timestamp, 100, ?_tstart, ?_tend)"
+                      },
+                      "params": {
+                        "id": "date"
+                      }
+                    }
+                  },
+                  {
+                    "columnId": "symbol",
+                    "fieldName": "symbol",
+                    "label": "symbol",
+                    "customLabel": false,
+                    "meta": {
+                      "type": "string",
+                      "esType": "keyword",
+                      "sourceParams": {
+                        "indexPattern": "metrics-trader",
+                        "sourceField": "symbol"
+                      },
+                      "params": {
+                        "id": "string"
+                      }
+                    }
+                  }
+                ],
+                "timeField": "@timestamp"
+              }
+            },
+            "indexPatternRefs": [
+              {
+                "id": "d724388741a247920ae91ff465cf15cafb200931a1f29e9321f0c4ab1bb464e2",
+                "title": "metrics-trader",
+                "timeField": "@timestamp"
+              }
+            ]
+          }
+        },
+        "filters": [],
+        "query": {
+          "esql": "TS metrics-trader\n  | STATS avg_shares_traded = AVG(metrics.shares_traded_per_customer) BY BUCKET(@timestamp, 100, ?_tstart, ?_tend), symbol"
+        },
+        "visualization": {
+          "legend": {
+            "isVisible": true,
+            "position": "bottom",
+            "layout": "list"
+          },
+          "valueLabels": "hide",
+          "fittingFunction": "Linear",
+          "axisTitlesVisibilitySettings": {
+            "x": true,
+            "yLeft": true,
+            "yRight": true
+          },
+          "tickLabelsVisibilitySettings": {
+            "x": true,
+            "yLeft": true,
+            "yRight": true
+          },
+          "labelsOrientation": {
+            "x": 0,
+            "yLeft": 0,
+            "yRight": 0
+          },
+          "gridlinesVisibilitySettings": {
+            "x": true,
+            "yLeft": true,
+            "yRight": true
+          },
+          "preferredSeriesType": "line",
+          "layers": [
+            {
+              "layerId": "73367308-091b-49d2-9220-68266ff255ba",
+              "seriesType": "line",
+              "xAccessor": "BUCKET(@timestamp, 100, ?_tstart, ?_tend)",
+              "splitAccessors": [
+                "symbol"
+              ],
+              "accessors": [
+                "avg_shares_traded"
+              ],
+              "layerType": "data",
+              "colorMapping": {
+                "assignments": [],
+                "specialAssignments": [
+                  {
+                    "rules": [
+                      {
+                        "type": "other"
+                      }
+                    ],
+                    "color": {
+                      "type": "loop"
+                    },
+                    "touched": false
+                  }
+                ],
+                "paletteId": "elastic_line_optimized",
+                "colorMode": {
+                  "type": "categorical"
+                }
+              }
+            }
+          ]
+        },
+        "adHocDataViews": {
+          "d724388741a247920ae91ff465cf15cafb200931a1f29e9321f0c4ab1bb464e2": {
+            "id": "d724388741a247920ae91ff465cf15cafb200931a1f29e9321f0c4ab1bb464e2",
+            "title": "metrics-trader",
+            "timeFieldName": "@timestamp",
+            "sourceFilters": [],
+            "type": "esql",
+            "fieldFormats": {},
+            "runtimeFieldMap": {},
+            "allowNoIndex": false,
+            "name": "metrics-trader",
+            "allowHidden": false,
+            "managed": false
+          }
+        }
+      },
+      "visualizationType": "lnsXY",
+      "version": 2,
+      "type": "lens",
+      "description": ""
+    }
+  },
+  "gridData": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 15
+  }
+}

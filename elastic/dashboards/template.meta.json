@@ -1,0 +1,18 @@
+{
+  "description": "By-value Lens panel (type lens, ES|QL textBased datasource, lnsXY line chart with a split column) taken read-only from an existing dashboard; ids, panelIndex and appliedTimeRange removed. Pointers are RFC 6901 into template.lens-esql.json. The ES|QL string appears at both esql_string and esql_string_state_query and both must be set; the column identifiers must also be changed consistently in the datasource columns (columnId, fieldName, label) and the visualization layer accessors.",
+  "source": "dashboard 'Trading Operations', panel 'Shares Traded Per Symbol' (read only, not modified)",
+  "pointers": {
+    "panel_title": "/embeddableConfig/attributes/title",
+    "esql_string": "/embeddableConfig/attributes/state/datasourceStates/textBased/layers/73367308-091b-49d2-9220-68266ff255ba/query/esql",
+    "esql_string_state_query": "/embeddableConfig/attributes/state/query/esql",
+    "x_column": "/embeddableConfig/attributes/state/visualization/layers/0/xAccessor",
+    "y_column": "/embeddableConfig/attributes/state/visualization/layers/0/accessors/0",
+    "split_column": "/embeddableConfig/attributes/state/visualization/layers/0/splitAccessors/0",
+    "visualization_type": "/embeddableConfig/attributes/visualizationType",
+    "series_type": "/embeddableConfig/attributes/state/visualization/layers/0/seriesType",
+    "layer_id": "/embeddableConfig/attributes/state/visualization/layers/0/layerId",
+    "datasource_columns": "/embeddableConfig/attributes/state/datasourceStates/textBased/layers/73367308-091b-49d2-9220-68266ff255ba/columns",
+    "ad_hoc_data_view": "/embeddableConfig/attributes/state/adHocDataViews",
+    "grid": "/gridData"
+  }
+}
