@@ -177,6 +177,26 @@ test("the rail disclosure is collapsed by default, toggles aria-expanded and kee
   expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
+test("picking a model by click closes the open disclosure and returns focus to its toggle, picking a persona keeps it open", async () => {
+  render(<App />);
+  const toggle = await screen.findByRole("button", { name: /change person or model/i });
+  await userEvent.click(toggle);
+  await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await userEvent.click(screen.getByRole("radio", { name: /gemini flash-lite/i }));
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(toggle).toHaveFocus();
+});
+
+test("arrowing through the models with the keyboard does not close the disclosure", async () => {
+  render(<App />);
+  const toggle = await screen.findByRole("button", { name: /change person or model/i });
+  await userEvent.click(toggle);
+  screen.getByRole("radio", { name: /gemini flash-lite/i }).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+});
+
 test("the red-team pick appends to a non-empty draft on a new line and sets an empty one", async () => {
   render(<App />);
   const box = await screen.findByRole("textbox", { name: /your question/i });

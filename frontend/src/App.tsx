@@ -36,10 +36,14 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
       header={<Header spendUsd={state.spendUsd} canReset={hasMessages} onReset={() => { dispatch({ type: "reset" }); setDraft(""); closeXray(); }} pending={pending} />}
       rail={
         <RailDisclosure persona={personaObj?.name ?? ""} model={models.find((m) => m.key === state.model)?.label ?? state.model}>
-          <PersonaRail personas={personas} selected={state.persona} onSelect={(id) => { const p = personas.find((x) => x.id === id); if (p) dispatch({ type: "setPersona", persona: id, label: personaLabel(p) }); }} />
-          <div className="border-t border-line">
-            <ModelControls models={models} selectedModel={state.model} onModel={(model) => dispatch({ type: "setModel", model })} engine={state.engine} onEngine={(engine) => dispatch({ type: "setEngine", engine })} />
-          </div>
+          {({ closeAfterPick }) => (
+            <>
+              <PersonaRail personas={personas} selected={state.persona} onSelect={(id) => { const p = personas.find((x) => x.id === id); if (p) dispatch({ type: "setPersona", persona: id, label: personaLabel(p) }); }} />
+              <div className="border-t border-line">
+                <ModelControls models={models} selectedModel={state.model} onModel={(model) => dispatch({ type: "setModel", model })} onModelPicked={closeAfterPick} engine={state.engine} onEngine={(engine) => dispatch({ type: "setEngine", engine })} />
+              </div>
+            </>
+          )}
         </RailDisclosure>
       }
       thread={

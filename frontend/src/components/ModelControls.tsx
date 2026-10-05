@@ -12,11 +12,13 @@ const BLURB: Record<string, string> = {
 type Props = {
   models: ModelInfo[]; selectedModel: string; onModel: (key: string) => void;
   engine: Engine; onEngine: (e: Engine) => void; disabled?: boolean;
+  /** called only when a model is chosen by click (not while arrowing), so a parent can collapse its panel */
+  onModelPicked?: () => void;
 };
 
 const NAV_KEYS = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
 
-export function ModelControls({ models, selectedModel, onModel, engine, onEngine, disabled }: Props) {
+export function ModelControls({ models, selectedModel, onModel, engine, onEngine, disabled, onModelPicked }: Props) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const availableIdx = models.map((m, i) => (m.available ? i : -1)).filter((i) => i >= 0);
   const selectedIdx = models.findIndex((m) => m.key === selectedModel && m.available);
@@ -57,7 +59,7 @@ export function ModelControls({ models, selectedModel, onModel, engine, onEngine
               <button
                 key={m.key} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={active}
                 tabIndex={i === tabbableIdx ? 0 : -1} disabled={off || disabled}
-                onClick={() => !off && onModel(m.key)} onKeyDown={(e) => onKeyDown(e, i)}
+                onClick={() => { if (off) return; onModel(m.key); onModelPicked?.(); }} onKeyDown={(e) => onKeyDown(e, i)}
                 className={`flex items-start gap-3 rounded-control border p-3 text-left transition active:scale-[0.99] disabled:cursor-not-allowed ${
                   active ? "border-blue bg-blue-soft/50" : "border-line bg-surface hover:border-blue/50"
                 } ${off ? "" : "disabled:opacity-60"}`}
