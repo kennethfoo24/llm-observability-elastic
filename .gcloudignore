@@ -1,0 +1,17 @@
+.git
+.superpowers
+.playwright-mcp
+docs
+**/node_modules
+**/.venv
+**/secrets
+**/.env
+*.env
+elasticsearch.txt
+*-sa-key.json
+**/__pycache__
+frontend/dist
+backend/tests
+deploy
+elastic
+scripts
