@@ -100,12 +100,46 @@ test("receive selects the answered message even when the user is inspecting anot
   expect(pendingCount(s)).toBe(1); // the first message is still pending
 });
 
-test("retry on a message that is not in error is harmless", () => {
+test("retry on a done message is a no-op and spend is unchanged", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.002 }) });
+  const r = reducer(s, { type: "retry", id });
+  expect(r).toBe(s);
+  expect(r.spendUsd).toBeCloseTo(0.002);
+});
+
+test("a duplicate receive for an already-done message does not add spend again", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.002 }) });
+  s = reducer(s, { type: "select", id: null });
+  const r = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.002 }) });
+  expect(r).toBe(s);
+  expect(r.spendUsd).toBeCloseTo(0.002);
+  expect(r.selectedId).toBeNull();
+});
+
+test("fail on an already-done message leaves it done", () => {
   let s = reducer(start(), sendAction("q"));
   const id = s.messages[1].id;
   s = reducer(s, { type: "receive", id, response: resp() });
+  const r = reducer(s, { type: "fail", id, error: { status: 500, code: "x" } });
+  expect(r).toBe(s);
+  expect((r.messages[1] as AssistantMsg).status).toBe("done");
+});
+
+test("retry on an error message re-opens it and the following receive adds cost exactly once", () => {
+  let s = reducer(start(), sendAction("q"));
+  const id = s.messages[1].id;
+  s = reducer(s, { type: "fail", id, error: { status: 503, code: "gemma_offline" } });
+  expect(s.spendUsd).toBe(0);
   s = reducer(s, { type: "retry", id });
   expect(s.messages[1]).toMatchObject({ status: "pending" });
-  expect((s.messages[1] as AssistantMsg).error).toBeUndefined();
-  expect(s.messages).toHaveLength(2);
+  expect((s.messages[1] as AssistantMsg).response).toBeUndefined();
+  expect(s.spendUsd).toBe(0);
+  s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.003 }) });
+  expect(s.spendUsd).toBeCloseTo(0.003);
+  s = reducer(s, { type: "receive", id, response: resp({ cost_usd: 0.003 }) });
+  expect(s.spendUsd).toBeCloseTo(0.003);
 });

@@ -25,16 +25,17 @@ export type Action =
 
 let counter = 0;
 export const newId = (): string => `m${++counter}`;
-const nid = newId;
 
 export function initialState(persona: string, model: string): ChatState {
   return { persona, model, engine: "sdk", messages: [], selectedId: null, spendUsd: 0 };
 }
 
-function mapAssistant(state: ChatState, id: string, fn: (a: AssistantMsg) => AssistantMsg): ChatState {
+function mapAssistant(
+  state: ChatState, id: string, from: AssistantMsg["status"], fn: (a: AssistantMsg) => AssistantMsg,
+): ChatState {
   let hit = false;
   const messages = state.messages.map((m) => {
-    if (m.kind === "assistant" && m.id === id) {
+    if (m.kind === "assistant" && m.id === id && m.status === from) {
       hit = true;
       return fn(m);
     }
@@ -50,7 +51,7 @@ export function reducer(state: ChatState, action: Action): ChatState {
       const messages =
         state.messages.length === 0
           ? state.messages
-          : [...state.messages, { id: nid(), kind: "divider" as const, text: `Now asking as ${action.label}` }];
+          : [...state.messages, { id: newId(), kind: "divider" as const, text: `Now asking as ${action.label}` }];
       return { ...state, persona: action.persona, messages };
     }
     case "setModel":
@@ -65,13 +66,13 @@ export function reducer(state: ChatState, action: Action): ChatState {
       return { ...state, messages: [...state.messages, user, assistant], selectedId: assistant.id };
     }
     case "receive": {
-      const next = mapAssistant(state, action.id, (a) => ({ ...a, status: "done", response: action.response, error: undefined }));
+      const next = mapAssistant(state, action.id, "pending", (a) => ({ ...a, status: "done", response: action.response, error: undefined }));
       return next === state ? state : { ...next, spendUsd: next.spendUsd + action.response.cost_usd, selectedId: action.id };
     }
     case "fail":
-      return mapAssistant(state, action.id, (a) => ({ ...a, status: "error", error: action.error }));
+      return mapAssistant(state, action.id, "pending", (a) => ({ ...a, status: "error", error: action.error }));
     case "retry":
-      return mapAssistant(state, action.id, (a) => ({ ...a, status: "pending", error: undefined }));
+      return mapAssistant(state, action.id, "error", (a) => ({ ...a, status: "pending", error: undefined, response: undefined }));
     case "select":
       return { ...state, selectedId: action.id };
     case "reset":
