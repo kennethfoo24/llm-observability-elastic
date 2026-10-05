@@ -66,3 +66,9 @@ If Gemma is not running and someone selects it, the app shows an inline error wi
 ## After the demo
 
 Run `deploy/scripts/demo_down.sh` (add `--teardown` to remove the load balancer too). Confirm the threshold was restored to 0.25.
+
+## X-ray deep links
+
+- Flagged or blocked prompt: in the Guardrail section click "See where it was blocked" (APM trace, span `guardrail.check`) and "View detection in Elastic Security" (Alerts filtered to rule `glassbox-flagged-prompts`). The alert can take a few minutes to appear.
+- Retrieval: click a document title to open it in Kibana Discover (Kibana login needed; your Kibana role applies, not the persona). Hidden cards have no link.
+- Model and cost: "Open cost dashboard" opens `Glass Box: LLM observability`.

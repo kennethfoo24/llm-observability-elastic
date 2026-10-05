@@ -32,3 +32,6 @@ export const CLASSIFICATION_LABEL: Record<string, string> = {
   confidential: "Confidential",
   restricted: "Restricted",
 };
+
+// Mirrors the interval of the glassbox-flagged-prompts rule in elastic/rules/guardrail_detection.py (checked by elastic/tests).
+export const DETECTION_INTERVAL_MINUTES = 1;

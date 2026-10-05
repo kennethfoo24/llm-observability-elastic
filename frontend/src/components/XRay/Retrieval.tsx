@@ -1,11 +1,13 @@
 import { Lock } from "@phosphor-icons/react";
 import { CLASSIFICATION_LABEL } from "../../lib/copy";
 import { formatScore } from "../../lib/format";
+import { docDiscoverUrl } from "../../lib/kibanaLinks";
+import { ExtLink } from "./ExtLink";
 import type { DocHit, Ghost } from "../../lib/types";
 
 const chip = "shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-xs text-on-ink-muted";
 
-export function Retrieval({ docs, hidden, personaName, highlightDocId }: { docs: DocHit[]; hidden: Ghost[]; personaName: string; highlightDocId: string | null }) {
+export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl }: { docs: DocHit[]; hidden: Ghost[]; personaName: string; highlightDocId: string | null; kibanaUrl?: string }) {
   return (
     <div className="grid min-w-0 gap-5">
       {docs.length === 0 ? (
@@ -20,7 +22,11 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId }: { docs:
                 className={`flex min-w-0 items-start justify-between gap-3 rounded-control border p-3 transition ${cited ? "border-blue-bright bg-ink-3 ring-2 ring-blue-bright" : "border-ink-line bg-ink-2"}`}
               >
                 <span className="min-w-0">
-                  <span className="block break-words text-sm font-medium">{d.title}</span>
+                  {kibanaUrl ? (
+                    <ExtLink href={docDiscoverUrl(kibanaUrl, d.id)} icon={false} className="block break-words text-sm font-medium underline decoration-ink-line underline-offset-2 hover:decoration-current">{d.title}</ExtLink>
+                  ) : (
+                    <span className="block break-words text-sm font-medium">{d.title}</span>
+                  )}
                   <span className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                     <span className={chip}>{CLASSIFICATION_LABEL[d.classification] ?? d.classification}</span>
                     {cited && <span className="shrink-0 rounded-full bg-blue-bright px-2 py-0.5 text-xs font-semibold text-ink">Cited</span>}
@@ -33,6 +39,7 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId }: { docs:
           })}
         </ul>
       )}
+      {kibanaUrl && docs.length > 0 && <p className="-mt-3 text-xs text-on-ink-muted">Opens in Kibana (your Kibana role applies, not the persona)</p>}
 
       <div>
         <h4 className="text-sm font-semibold">Hidden by DLS ({hidden.length})</h4>

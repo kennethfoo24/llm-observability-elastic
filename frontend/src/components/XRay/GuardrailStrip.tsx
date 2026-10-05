@@ -1,9 +1,12 @@
 import { ShieldCheck, ShieldWarning, ShieldSlash } from "@phosphor-icons/react";
 import { reasonLabel } from "../../lib/copy";
 import { formatMs } from "../../lib/format";
+import { alertsUrl, traceUrl } from "../../lib/kibanaLinks";
+import { DETECTION_INTERVAL_MINUTES } from "../../lib/copy";
+import { ExtLink } from "./ExtLink";
 import type { ChatResponse } from "../../lib/types";
 
-export function GuardrailStrip({ r }: { r: ChatResponse }) {
+export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl }: { r: ChatResponse; kibanaUrl?: string; securityKibanaUrl?: string | null }) {
   const g = r.guardrail;
   const flagged = g.verdict === "FLAGGED";
   const scored = typeof g.injection_score === "number" && Number.isFinite(g.injection_score);
@@ -30,6 +33,20 @@ export function GuardrailStrip({ r }: { r: ChatResponse }) {
       </dl>
       {patternsOnly && <p className="mt-3 text-sm text-on-ink-muted">The injection model did not answer, so only pattern checks ran.</p>}
       {r.blocked && <p className="mt-3 text-sm text-on-ink-muted">Stopped before any search or model call, so nothing was retrieved or billed.</p>}
+      {(r.blocked || flagged) && (
+        <div className="mt-3 grid gap-3">
+          <p className="text-sm text-on-ink-muted">
+            {r.blocked ? <>Blocked in <code className="num">guardrail.check</code> before retrieval and the LLM call.</> : <>Flagged in <code className="num">guardrail.check</code>.</>}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {kibanaUrl && r.trace_id && <ExtLink href={traceUrl(kibanaUrl, r.trace_id)}>See where it was blocked</ExtLink>}
+            {securityKibanaUrl && <ExtLink href={alertsUrl(securityKibanaUrl)}>View detection in Elastic Security</ExtLink>}
+          </div>
+          {securityKibanaUrl && (
+            <p className="text-xs text-on-ink-muted">{`Detections run every ${DETECTION_INTERVAL_MINUTES === 1 ? "minute" : `${DETECTION_INTERVAL_MINUTES} minutes`}, so the alert can take a few minutes to appear.`}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

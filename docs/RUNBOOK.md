@@ -114,3 +114,7 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 4. Guardrail log export uses project admin keys (see section 5).
 5. Gemma `/metrics` is open (accepted risk) and the hardening proposal awaits approval.
 6. Decision for the project owner: keep the Gemma Local SSD on stop (fast boot, possible Local SSD storage charge) or set `GEMMA_DISCARD_SSD=1` (no charge, slower next boot, data lost). Check the actual charge in billing first.
+
+## X-ray deep links config
+
+The X-ray links use `OBS_KIBANA_URL` (trace, Discover, cost dashboard) and `SEC_KIBANA_URL` (Security alerts link). Both come from Secret `glassbox-app` (keys `kibana_url`, `sec_kibana_url`), which `deploy/scripts/create_secrets.sh` fills from `OBSERVABILITY_KIBANA` and `SECURITY_KIBANA` in `elasticsearch.txt`. Re-run it before deploying this version. If `sec_kibana_url` is empty the Security links are hidden. The Discover and alerts URL states use Kibana rison format; open each once in a logged-in browser.

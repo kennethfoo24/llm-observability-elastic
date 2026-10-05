@@ -3,7 +3,7 @@ export type Verdict = "CLEAN" | "FLAGGED" | "UNKNOWN";
 
 export type Persona = { id: string; name: string; title: string; can_read_docs: number; total_docs: number };
 export type ModelInfo = { key: string; label: string; provider: "vertex" | "gemma"; model_id: string; available: boolean };
-export type AppConfig = { kibana_url: string; company: string };
+export type AppConfig = { kibana_url: string; security_kibana_url?: string | null; company: string };
 
 export type Guardrail = {
   verdict: Verdict;

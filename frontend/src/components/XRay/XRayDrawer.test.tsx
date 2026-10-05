@@ -233,3 +233,57 @@ test("the guardrail bar is neutral when only patterns ran", () => {
   expect(bars[0].className).toContain("bg-on-ink-muted");
   expect(bars[0].className).not.toContain("bg-clean");
 });
+
+const flaggedResp = () => response({ blocked: true, docs: [], hidden: [], guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 41, injection_score: 0.97 } });
+const sec = { securityKibanaUrl: "https://sec.example" };
+
+test("a blocked prompt links to the Security alerts page, the trace, and explains where it was blocked", () => {
+  render(<XRayDrawer {...props} {...sec} msg={msg(flaggedResp())} />);
+  const alerts = screen.getByRole("link", { name: /view detection in elastic security/i });
+  expect(alerts).toHaveAttribute("href", expect.stringContaining("https://sec.example/app/security/alerts?query="));
+  expect(alerts).toHaveAttribute("target", "_blank");
+  expect(alerts).toHaveAttribute("rel", "noreferrer noopener");
+  expect(within(alerts).getByText(/opens in a new tab/i)).toHaveClass("sr-only");
+  expect(screen.getByText(/detections run every minute/i)).toBeInTheDocument();
+  const where = screen.getByRole("link", { name: /see where it was blocked/i });
+  expect(where).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/4bf92f3577b34da6a3ce929d0e0e4736");
+  expect(screen.getByText((_, el) => el?.tagName === "P" && /^Blocked in guardrail\.check before retrieval and the LLM call\.$/.test(el.textContent ?? ""))).toBeInTheDocument();
+});
+
+test("a clean prompt has no detection links", () => {
+  render(<XRayDrawer {...props} {...sec} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /view detection/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: /see where it was blocked/i })).toBeNull();
+});
+
+test("security links are hidden when the Security Kibana URL is null", () => {
+  render(<XRayDrawer {...props} securityKibanaUrl={null} msg={msg(flaggedResp())} />);
+  expect(screen.queryByRole("link", { name: /view detection/i })).toBeNull();
+  expect(screen.queryByText(/detections run every/i)).toBeNull();
+  expect(screen.getByRole("link", { name: /see where it was blocked/i })).toBeInTheDocument();
+});
+
+test("visible documents link to Discover with a note; hidden ghost cards get no link", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  const link = screen.getByRole("link", { name: /paid time off policy/i });
+  expect(link).toHaveAttribute("href", expect.stringContaining("https://kb.example/app/discover#/?_a="));
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveAttribute("rel", "noreferrer noopener");
+  expect(screen.getByText(/opens in kibana \(your kibana role applies, not the persona\)/i)).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /project aurora/i })).toBeNull();
+});
+
+test("document titles are plain text without a Kibana URL", () => {
+  render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /paid time off policy/i })).toBeNull();
+  expect(screen.getByText("Paid Time Off Policy")).toBeInTheDocument();
+  expect(screen.queryByText(/your kibana role applies/i)).toBeNull();
+});
+
+test("the cost section links to the cost dashboard, hidden without a Kibana URL", () => {
+  const { unmount } = render(<XRayDrawer {...props} msg={msg(response())} />);
+  expect(screen.getByRole("link", { name: /open cost dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-overview");
+  unmount();
+  render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /open cost dashboard/i })).toBeNull();
+});

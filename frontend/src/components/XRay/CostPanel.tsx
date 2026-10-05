@@ -1,7 +1,9 @@
 import { formatCost, formatTokens } from "../../lib/format";
+import { costDashboardUrl } from "../../lib/kibanaLinks";
+import { ExtLink } from "./ExtLink";
 import type { ChatResponse } from "../../lib/types";
 
-export function CostPanel({ r }: { r: ChatResponse }) {
+export function CostPanel({ r, kibanaUrl }: { r: ChatResponse; kibanaUrl?: string }) {
   const stat = (label: string, value: number) => (
     <div className="min-w-0">
       <dt className="text-xs text-on-ink-muted">{label}</dt>
@@ -21,6 +23,7 @@ export function CostPanel({ r }: { r: ChatResponse }) {
       </dl>
       <p className="num mt-4 break-all text-xs text-on-ink-muted">{r.model}</p>
       <p className="mt-1 text-xs text-on-ink-muted">{r.engine === "langchain" ? "LangChain engine" : "Direct SDK engine"}</p>
+      {kibanaUrl && <div className="mt-4"><ExtLink href={costDashboardUrl(kibanaUrl)}>Open cost dashboard</ExtLink></div>}
     </div>
   );
 }
