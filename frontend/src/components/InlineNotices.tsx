@@ -37,6 +37,7 @@ const ERROR_COPY: Record<string, string> = {
   timeout: "The request took too long. Try again.",
   pricing_unavailable: "This model is not priced yet.",
   invalid_request: "That question could not be sent.",
+  rate_limited: "Too many requests. Wait a moment and try again.",
 };
 
 export function errorMessage(code: string, status: number): string {

@@ -120,3 +120,8 @@ test("when no model is available the plain Try again is shown", () => {
   render(<AssistantMessage {...base} models={models.map((m) => ({ ...m, available: false }))} msg={msg({ model: "gemma", status: "error", response: undefined, error: { status: 503, code: "gemma_offline" } })} />);
   expect(screen.getByRole("button", { name: /^try again$/i })).toBeInTheDocument();
 });
+
+test("a rate limited request shows the rate limit copy", () => {
+  render(<AssistantMessage {...base} msg={msg({ status: "error", response: undefined, error: { status: 429, code: "rate_limited" } })} />);
+  expect(screen.getByText("Too many requests. Wait a moment and try again.")).toBeInTheDocument();
+});
