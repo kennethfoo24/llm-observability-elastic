@@ -38,7 +38,7 @@ export function Composer({ value, onChange, onSend, asking, pending, extra }: Pr
   return (
     <div className="px-4 pb-4 pt-3 md:px-6">
       <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-        <span className="text-muted">Asking as <span className="font-medium text-ink">{asking}</span></span>
+        <span className="min-w-0 text-muted">Asking as <span className="font-medium text-ink">{asking}</span></span>
         {extra}
       </div>
       <div className="flex items-end gap-2 rounded-card border border-field bg-surface p-2 focus-within:border-blue focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue">

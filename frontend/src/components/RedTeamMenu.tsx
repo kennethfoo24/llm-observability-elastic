@@ -12,7 +12,7 @@ export function RedTeamMenu({ onPick, disabled }: { onPick: (text: string) => vo
     <Popover.Root>
       <Popover.Trigger
         disabled={disabled}
-        className="flex items-center gap-2 rounded-control border border-field px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:opacity-50"
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-control border border-field px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:opacity-50"
       >
         <Crosshair size={16} weight="regular" aria-hidden /> Red team
       </Popover.Trigger>

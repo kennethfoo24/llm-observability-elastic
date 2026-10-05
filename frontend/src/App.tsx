@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useBootstrap } from "./hooks/useBootstrap";
 import { useChatSession } from "./hooks/useChatSession";
 import { PasswordGate } from "./components/PasswordGate";
 import { Header } from "./components/Header";
 import { AppShell } from "./components/AppShell";
+import { RailDisclosure } from "./components/RailDisclosure";
 import { PersonaRail, personaLabel } from "./components/PersonaRail";
 import { ModelControls } from "./components/ModelControls";
 import { ChatThread } from "./components/ChatThread";
@@ -30,37 +30,27 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
     <AppShell
       header={<Header spendUsd={state.spendUsd} canReset={hasMessages} onReset={() => { dispatch({ type: "reset" }); setDraft(""); setXrayOpen(false); }} />}
       rail={
-        <>
+        <RailDisclosure persona={personaObj?.name ?? ""} model={models.find((m) => m.key === state.model)?.label ?? state.model}>
           <PersonaRail personas={personas} selected={state.persona} onSelect={(id) => { const p = personas.find((x) => x.id === id); if (p) dispatch({ type: "setPersona", persona: id, label: personaLabel(p) }); }} />
           <div className="border-t border-line">
             <ModelControls models={models} selectedModel={state.model} onModel={(model) => dispatch({ type: "setModel", model })} engine={state.engine} onEngine={(engine) => dispatch({ type: "setEngine", engine })} />
           </div>
-        </>
+        </RailDisclosure>
       }
       thread={
         hasMessages ? (
           <ChatThread
             messages={state.messages} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
-            onSelect={(id) => dispatch({ type: "select", id })} onCitation={selectCitation} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
+            onSelect={(id) => { dispatch({ type: "select", id }); if (window.matchMedia("(max-width: 1023px)").matches) setXrayOpen(true); }} onCitation={selectCitation} onRetry={(id) => void retry(id)} onAskAgain={askAgain}
           />
         ) : (
           <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
         )
       }
-      composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={setDraft} disabled={pending} />} />}
+      composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}
       xray={<XRayDrawer msg={current} persona={personaObj} question={question} kibanaUrl={config?.kibana_url} highlightDocId={highlightDocId} />}
       xrayOpen={xrayOpen}
       onXrayClose={() => setXrayOpen(false)}
-      floating={
-        current ? (
-          <button
-            type="button" onClick={() => setXrayOpen(true)} aria-label="Inspect X-ray"
-            className="fixed bottom-24 right-4 z-30 flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-sm font-medium text-on-ink shadow-lg transition active:translate-y-px lg:hidden"
-          >
-            <MagnifyingGlass size={18} aria-hidden /> Inspect
-          </button>
-        ) : null
-      }
     />
   );
 }

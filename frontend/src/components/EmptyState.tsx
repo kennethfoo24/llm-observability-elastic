@@ -7,7 +7,7 @@ export function EmptyState({ personaName, suggestions, onPick }: { personaName: 
       <div>
         <h2 className="text-3xl font-semibold tracking-tight text-ink md:text-4xl">What would you like to know, {first}?</h2>
         <p className="mt-3 max-w-[56ch] text-muted">
-          Answers come only from documents you are allowed to read. Switch the person on the left to see the same question answered differently.
+          Answers come only from documents you are allowed to read. Switch the person to see the same question answered differently.
         </p>
       </div>
       {suggestions.length > 0 && (

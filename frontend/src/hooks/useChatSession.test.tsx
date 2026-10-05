@@ -128,3 +128,45 @@ test("an external draft control is used instead of the internal draft", async ()
   await act(async () => { await result.current.send("typed"); });
   expect(set).toHaveBeenCalledWith("");
 });
+
+test("a gemma_offline failure refreshes the model list immediately", async () => {
+  vi.spyOn(apiMod.api, "chat").mockRejectedValue(new ApiError(503, "gemma_offline"));
+  const refresh = vi.fn();
+  const { result } = renderHook(() => useChatSession(personas, models, refresh));
+  await act(async () => { await result.current.send("hi"); });
+  expect(refresh).toHaveBeenCalledTimes(1);
+});
+
+test("other failures do not trigger a model refresh", async () => {
+  vi.spyOn(apiMod.api, "chat").mockRejectedValue(new ApiError(502, "upstream_error"));
+  const refresh = vi.fn();
+  const { result } = renderHook(() => useChatSession(personas, models, refresh));
+  await act(async () => { await result.current.send("hi"); });
+  expect(refresh).not.toHaveBeenCalled();
+});
+
+test("personas arriving after mount select the first persona", () => {
+  const { result, rerender } = renderHook(({ p }) => useChatSession(p, models, vi.fn()), { initialProps: { p: [] as Persona[] } });
+  expect(result.current.state.persona).toBe("");
+  rerender({ p: personas });
+  expect(result.current.state.persona).toBe("employee");
+});
+
+test("selectedId follows the pending assistant message right after send", async () => {
+  let resolve!: (r: ChatResponse) => void;
+  vi.spyOn(apiMod.api, "chat").mockReturnValue(new Promise((r) => { resolve = r; }));
+  const { result } = setup();
+  act(() => { void result.current.send("q"); });
+  const a = result.current.state.messages.find((m) => m.kind === "assistant") as any;
+  expect(a.status).toBe("pending");
+  expect(result.current.state.selectedId).toBe(a.id);
+  await act(async () => { resolve(ok()); });
+});
+
+test("reset clears the draft held by the session", () => {
+  const { result } = setup();
+  act(() => result.current.setDraft("x"));
+  act(() => { result.current.dispatch({ type: "reset" }); result.current.setDraft(""); });
+  expect(result.current.draft).toBe("");
+  expect(result.current.state.messages).toEqual([]);
+});

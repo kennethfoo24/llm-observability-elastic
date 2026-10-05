@@ -19,7 +19,7 @@ export function ChatThread({ messages, selectedId, askAgainAs, personaName, onSe
   useEffect(() => { end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }); }, [messages.length, last?.id, lastStatus]);
 
   return (
-    <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto grid min-w-0 max-w-3xl gap-6 px-4 py-6 md:px-6">
+    <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto grid min-w-0 max-w-3xl gap-6 px-4 pb-8 pt-6 md:px-6">
       {messages.map((m, i) => {
         if (m.kind === "user") return <UserMessage key={m.id} text={m.text} />;
         if (m.kind === "assistant")

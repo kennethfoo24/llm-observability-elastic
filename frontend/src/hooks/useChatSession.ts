@@ -18,6 +18,8 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
   setDraftRef.current = setDraft;
   const [highlightDocId, setHighlight] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const refreshRef = useRef(refreshModels);
+  refreshRef.current = refreshModels;
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -48,6 +50,8 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
     } catch (e) {
       const err = e instanceof ApiError ? { status: e.status, code: e.code, hint: e.hint } : { status: 0, code: "network_error" };
       dispatch({ type: "fail", id, error: err });
+      // flip the Gemma control to Offline now instead of waiting for the poll
+      if (err.code === "gemma_offline" || err.status === 503) refreshRef.current();
       return false;
     }
   }, []);
