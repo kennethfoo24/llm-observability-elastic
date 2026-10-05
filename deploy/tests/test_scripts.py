@@ -1,5 +1,9 @@
+import os
 import re
+import shutil
 import subprocess
+
+import pytest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -81,3 +85,23 @@ def test_dockerignore_and_gcloudignore_exclude_secrets():
 def test_cloud_build_enables_buildkit_for_copy_chmod():
     text = (SCRIPTS[0].parent / "build_push.sh").read_text()
     assert 'DOCKER_BUILDKIT=1' in text
+
+
+def test_gemma_script_safe_and_dry_runnable():
+    p = ROOT / "deploy/scripts/gemma.sh"
+    t = p.read_text()
+    assert subprocess.run(["bash", "-n", str(p)]).returncode == 0
+    for pat in FORBIDDEN + [r"set-metadata", r"\bset -x\b", r"\bcurl\b[^\n]*-v"]:
+        assert not re.search(pat, t), pat
+    assert "asia-southeast1-c" in t and "kenneth-gemma-llm" in t and "guard_gcloud" in t
+    assert 'Bearer %s' in t and "-K -" in t  # key via stdin config, not argv
+    gc = shutil.which("gcloud")
+    if gc is None:
+        pytest.skip("gcloud not installed")
+    env = {**os.environ, "DRY_RUN": "1"}
+    for sub, needle in (("start", "[dry-run] gcloud compute instances start"),
+                        ("stop", "[dry-run] gcloud compute instances stop"), ("wait", "[dry-run] would poll")):
+        r = subprocess.run(["bash", str(p), sub], env=env, capture_output=True, text=True)
+        assert r.returncode == 0 and needle in r.stdout, (sub, r.stdout, r.stderr)
+    r = subprocess.run(["bash", str(p), "bogus"], env=env, capture_output=True, text=True)
+    assert r.returncode != 0
