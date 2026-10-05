@@ -57,6 +57,7 @@ def test_app_pod_is_hardened_and_wired():
     spec = dep["spec"]["template"]["spec"]
     c = spec["containers"][0]
     assert spec["serviceAccountName"] == "glassbox"
+    assert spec["automountServiceAccountToken"] is False
     sc = spec["securityContext"]
     assert sc["runAsNonRoot"] is True and sc["runAsUser"] == 10001 and sc["seccompProfile"]["type"] == "RuntimeDefault"
     csc = c["securityContext"]
@@ -109,6 +110,7 @@ def test_trafficgen_is_suspended_capped_and_hardened():
     job = cj["jobTemplate"]["spec"]
     assert job["activeDeadlineSeconds"] <= 600 and job["backoffLimit"] == 0
     pod = job["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
     c = pod["containers"][0]
     assert c["command"] == ["python", "-m", "trafficgen"]
     env = {e["name"]: e for e in c["env"]}

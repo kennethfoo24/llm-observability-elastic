@@ -56,3 +56,23 @@ def test_dry_run_modes_do_not_mutate():
     env = {"DRY_RUN": "1", "PATH": "/usr/bin:/bin"}
     r = subprocess.run(["bash", str(ROOT / "deploy/scripts/create_secrets.sh")], env={**env, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"}, capture_output=True, text=True)
     assert r.returncode == 0 and "glog_obs_key" in r.stdout and "namespace=genai-demo" in r.stdout
+
+
+def test_dry_run_value_is_validated():
+    r = subprocess.run(["bash", str(ROOT / "deploy/scripts/create_secrets.sh")], env={"DRY_RUN": "yes", "PATH": "/usr/bin:/bin"}, capture_output=True, text=True)
+    assert r.returncode != 0 and "DRY_RUN must be 0 or 1" in r.stderr
+
+
+def test_secrets_never_pass_through_argv_and_teardown_waits():
+    t = (ROOT / "deploy/scripts/create_secrets.sh").read_text()
+    assert "--from-literal" not in t and "--from-env-file" in t and "umask 077" in t and "trap" in t
+    td = (ROOT / "deploy/scripts/teardown.sh").read_text()
+    assert "|| true" not in td.split("--all")[0] and "wait --for=delete pod" in td
+
+
+def test_dockerignore_and_gcloudignore_exclude_secrets():
+    for name in (".dockerignore", ".gcloudignore"):
+        lines = {l.strip() for l in (ROOT / name).read_text().splitlines()}
+        assert "elasticsearch.txt" in lines, name
+        assert lines & {".env", "**/.env", "**/*.env", "*.env"}, name
+        assert lines & {"backend/secrets", "**/secrets"}, name

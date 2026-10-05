@@ -80,11 +80,20 @@ fi
 kubectl apply -f deploy/k8s/00-namespace.yaml >/dev/null
 kubectl -n "$NS" create secret generic glassbox-persona-keys --from-file=persona_keys.json=backend/secrets/persona_keys.json \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl -n "$NS" create secret generic glassbox-app \
-  --from-literal=obs_es_url="$S_OBS_ES_URL" --from-literal=kibana_url="$S_KIBANA_URL" \
-  --from-literal=guardrail_key="$S_GUARDRAIL_KEY" --from-literal=app_password="$APP_PASSWORD" \
-  --from-literal=gemma_api_key="$GEMMA_API_KEY" \
-  --from-literal=glog_obs_endpoint="$S_OBS_OTLP" --from-literal=glog_obs_key="$LOG_OBS_KEY" \
-  --from-literal=glog_sec_endpoint="$S_SEC_OTLP" --from-literal=glog_sec_key="$LOG_SEC_KEY" \
+# Values go through a mode-600 temp env file (never argv, so they cannot show up in ps).
+ENVF="$(umask 077; mktemp "${TMPDIR:-/tmp}/glassbox-secret.XXXXXX")"
+trap 'rm -f "$ENVF"' EXIT
+{
+  printf 'obs_es_url=%s\n' "$S_OBS_ES_URL"
+  printf 'kibana_url=%s\n' "$S_KIBANA_URL"
+  printf 'guardrail_key=%s\n' "$S_GUARDRAIL_KEY"
+  printf 'app_password=%s\n' "$APP_PASSWORD"
+  printf 'gemma_api_key=%s\n' "$GEMMA_API_KEY"
+  printf 'glog_obs_endpoint=%s\n' "$S_OBS_OTLP"
+  printf 'glog_obs_key=%s\n' "$LOG_OBS_KEY"
+  printf 'glog_sec_endpoint=%s\n' "$S_SEC_OTLP"
+  printf 'glog_sec_key=%s\n' "$LOG_SEC_KEY"
+} > "$ENVF"
+kubectl -n "$NS" create secret generic glassbox-app --from-env-file="$ENVF" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 echo "secrets applied in $NS: glassbox-persona-keys ($PERSONA_KEYS); glassbox-app ($APP_KEYS)"

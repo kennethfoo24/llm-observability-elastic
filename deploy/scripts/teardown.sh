@@ -13,8 +13,16 @@ run kubectl -n "$NS" delete ingress glassbox --ignore-not-found
 run kubectl -n "$NS" delete managedcertificate glassbox-cert --ignore-not-found
 run kubectl -n "$NS" delete backendconfig glassbox --ignore-not-found
 run kubectl -n "$NS" delete frontendconfig glassbox --ignore-not-found
-run kubectl -n "$NS" patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":true}}' || true
+# Suspend the CronJob; only "not found" (never deployed) is tolerated.
+if [ "$DRY_RUN" = "1" ]; then
+  run kubectl -n "$NS" patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":true}}'
+elif kubectl -n "$NS" get cronjob glassbox-trafficgen >/dev/null 2>&1; then
+  kubectl -n "$NS" patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":true}}'
+else
+  echo "cronjob glassbox-trafficgen not found, skipping"
+fi
 run kubectl -n "$NS" scale deployment/glassbox --replicas=0
+run kubectl -n "$NS" wait --for=delete pod -l app=glassbox --timeout=180s
 
 if [ "$ALL" = "1" ]; then
   echo "This will delete namespace $NS and everything in it:"
@@ -27,4 +35,5 @@ if [ "$ALL" = "1" ]; then
     kubectl delete namespace "$NS"
   fi
 fi
+echo "stopped: ingress removed, app scaled to 0 and pods gone (dry-run: DRY_RUN=$DRY_RUN)"
 echo "static IP $STATIC_IP_NAME is kept (small cost); release it manually if wanted"

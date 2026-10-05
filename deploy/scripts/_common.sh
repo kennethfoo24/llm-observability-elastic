@@ -14,6 +14,8 @@ DRY_RUN="${DRY_RUN:-0}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
+case "$DRY_RUN" in 0|1) ;; *) die "DRY_RUN must be 0 or 1, got '$DRY_RUN'" ;; esac
+
 # Print and (unless DRY_RUN=1) run a mutating command.
 run() {
   if [ "$DRY_RUN" = "1" ]; then
