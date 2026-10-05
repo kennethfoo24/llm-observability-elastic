@@ -56,15 +56,18 @@ class SdkEngine:
     def _genai_client(self):
         if self._genai is None:
             from google import genai
+            from google.genai import types
+            # HttpOptions.timeout is in milliseconds.
             self._genai = genai.Client(vertexai=True, project=self._s.vertex_project,
-                                       location=self._s.vertex_location)
+                                       location=self._s.vertex_location,
+                                       http_options=types.HttpOptions(timeout=int(self._s.llm_timeout_s * 1000)))
         return self._genai
 
     def _openai_client(self):
         if self._openai is None:
             from openai import OpenAI
             self._openai = OpenAI(base_url=self._s.gemma_base_url, api_key=self._s.gemma_api_key or "none",
-                                  timeout=120)
+                                  timeout=self._s.llm_timeout_s, max_retries=0)
         return self._openai
 
     def generate(self, spec: ModelSpec, system: str, user: str) -> LLMResult:

@@ -62,3 +62,15 @@ def test_content_block_list_is_flattened_to_text(s):
     _, _, res = eng.run(get_models(s)["flash-lite"], get_persona("employee"), "q",
                         _retrieve(RetrievalResult([Doc("pto", "PTO", "public", "18 days", 1.0)], [], 1)))
     assert res.text == "18 days [pto]"
+
+
+def test_langchain_default_factory_uses_the_configured_timeout(monkeypatch, s):
+    seen = {}
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", lambda **kw: seen.setdefault("openai", kw) or object())
+    monkeypatch.setattr("langchain_google_genai.ChatGoogleGenerativeAI",
+                        lambda **kw: seen.setdefault("google", kw) or object())
+    eng = LangChainEngine(s.model_copy(update={"llm_timeout_s": 42.0}), _gate())
+    eng._default_factory(get_models(s)["gemma"])
+    eng._default_factory(get_models(s)["flash-lite"])
+    assert seen["openai"]["timeout"] == 42.0 and seen["openai"]["max_retries"] == 0
+    assert seen["google"]["timeout"] == 42.0 and seen["google"]["max_retries"] == 0

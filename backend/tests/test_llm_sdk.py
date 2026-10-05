@@ -115,3 +115,23 @@ def test_gate_treats_any_exception_as_offline(exc):
     assert gate.is_up() is False
     with pytest.raises(GemmaOffline):
         gate.require()
+
+
+def test_sdk_clients_are_built_with_the_configured_timeout_and_no_hidden_retries(monkeypatch, s):
+    seen = {}
+
+    class FakeOpenAIClient:
+        def __init__(self, **kw):
+            seen["openai"] = kw
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen["genai"] = kw
+
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAIClient)
+    monkeypatch.setattr("google.genai.Client", FakeClient)
+    eng = SdkEngine(s.model_copy(update={"llm_timeout_s": 42.0}), GemmaGate("https://g/v1", "k"))
+    eng._openai_client()
+    eng._genai_client()
+    assert seen["openai"]["timeout"] == 42.0 and seen["openai"]["max_retries"] == 0
+    assert seen["genai"]["http_options"].timeout == 42_000  # google-genai HttpOptions.timeout is milliseconds

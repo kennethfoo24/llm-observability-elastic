@@ -20,10 +20,12 @@ class LangChainEngine:
         if spec.provider == "gemma":
             from langchain_openai import ChatOpenAI
             return ChatOpenAI(model=spec.model_id, base_url=self._s.gemma_base_url,
-                              api_key=self._s.gemma_api_key or "none", timeout=120)
+                              api_key=self._s.gemma_api_key or "none",
+                              timeout=self._s.llm_timeout_s, max_retries=0)
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(model=spec.model_id, vertexai=True,
-                                      project=self._s.vertex_project, location=self._s.vertex_location)
+                                      project=self._s.vertex_project, location=self._s.vertex_location,
+                                      timeout=self._s.llm_timeout_s, max_retries=0)
 
     def run(self, spec: ModelSpec, persona: Persona, question: str,
             retrieve: Callable[[str], RetrievalResult]) -> tuple[RetrievalResult, BuiltPrompt, LLMResult]:
