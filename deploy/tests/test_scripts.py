@@ -80,6 +80,8 @@ def test_dockerignore_and_gcloudignore_exclude_secrets():
         assert "elasticsearch.txt" in lines, name
         assert lines & {".env", "**/.env", "**/*.env", "*.env"}, name
         assert lines & {"backend/secrets", "**/secrets"}, name
+        assert {"*-sa-key.json", "frontend/.env.local"} <= lines, name
+    assert ".playwright-mcp" in {l.strip() for l in (ROOT / ".dockerignore").read_text().splitlines()}
 
 
 def test_cloud_build_enables_buildkit_for_copy_chmod():
@@ -129,3 +131,24 @@ def test_demo_scripts_safe_and_dry_runnable():
     assert '"suspend":true' in r.stdout.replace("\\", "") and "instances stop" in r.stdout and "delete ingress" in r.stdout
     for name in ("demo_up.sh", "demo_down.sh"):
         assert subprocess.run(["bash", str(ROOT / "deploy/scripts" / name), "--bogus"], env=env, capture_output=True).returncode != 0
+
+
+def test_gemma_stop_ssd_flag_follows_env():
+    if shutil.which("gcloud") is None:
+        pytest.skip("gcloud not installed")
+    p = str(ROOT / "deploy/scripts/gemma.sh")
+    base = {**os.environ, "DRY_RUN": "1"}
+    base.pop("GEMMA_DISCARD_SSD", None)
+    r = subprocess.run(["bash", p, "stop"], env=base, capture_output=True, text=True)
+    assert "--discard-local-ssd=false" in r.stdout
+    r = subprocess.run(["bash", p, "stop"], env={**base, "GEMMA_DISCARD_SSD": "1"}, capture_output=True, text=True)
+    assert "--discard-local-ssd=true" in r.stdout
+    r = subprocess.run(["bash", p, "stop"], env={**base, "GEMMA_DISCARD_SSD": "x"}, capture_output=True, text=True)
+    assert r.returncode != 0
+
+
+def test_create_secrets_checks_fleet_interpreter_before_secrets_and_teardown_offers_ip_release():
+    t = (ROOT / "deploy/scripts/create_secrets.sh").read_text()
+    assert t.index('import httpx') < t.index("kubectl apply -f deploy/k8s/00-namespace.yaml")
+    assert '"$FLEET_PY" -m elastic.fleet' in t
+    assert "addresses delete" in (ROOT / "deploy/scripts/teardown.sh").read_text()

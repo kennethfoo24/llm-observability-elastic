@@ -27,6 +27,12 @@ guard_kube
 guard_gcloud
 [ -f backend/secrets/persona_keys.json ] || die "missing backend/secrets/persona_keys.json"
 [ -f elasticsearch.txt ] || die "missing elasticsearch.txt"
+# WITH_AGENT=1 runs elastic.fleet, which needs httpx: check the repo venv BEFORE any Secret is rewritten.
+FLEET_PY=backend/.venv/bin/python
+if [ "${WITH_AGENT:-0}" = "1" ]; then
+  [ -x "$FLEET_PY" ] || die "WITH_AGENT=1 needs $FLEET_PY (create the backend venv first)"
+  "$FLEET_PY" -c "import httpx" 2>/dev/null || die "WITH_AGENT=1: httpx is not importable in $FLEET_PY"
+fi
 
 # Load values into the environment without printing them.
 eval "$(python3 - <<'PY'
@@ -103,7 +109,7 @@ if [ "${WITH_AGENT:-0}" = "1" ]; then
   # in Secret glassbox-fleet through a mode-600 env file; nothing is printed.
   FENV="$(umask 077; mktemp "${TMPDIR:-/tmp}/glassbox-fleet.XXXXXX")"
   trap 'rm -f "$ENVF" "$FENV"' EXIT
-  python3 -m elastic.fleet --env-file "$FENV" --gcp-project "$PROJECT_ID"
+  "$FLEET_PY" -m elastic.fleet --env-file "$FENV" --gcp-project "$PROJECT_ID"
   kubectl -n "$NS" create secret generic glassbox-fleet --from-env-file="$FENV" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   echo "secret glassbox-fleet applied in $NS (keys: fleet_url enrollment_token)"

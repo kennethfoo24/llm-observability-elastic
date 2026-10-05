@@ -13,3 +13,6 @@ backend/tests
 **/*.env
 elasticsearch.txt
 backend/secrets
+.playwright-mcp
+*-sa-key.json
+frontend/.env.local

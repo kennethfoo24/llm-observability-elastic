@@ -29,8 +29,15 @@ cmd_start() {
 }
 
 cmd_stop() {
-  # The VM has a Local SSD: gcloud refuses a stop without an explicit choice; keep its contents.
-  run gcloud compute instances stop "$VM" --zone="$VM_ZONE" --project="$PROJECT_ID" --discard-local-ssd=false
+  # The VM has a Local SSD: gcloud refuses a stop without an explicit choice. Default keeps its contents
+  # (fast next boot, but a stopped VM may still incur Local SSD charges). GEMMA_DISCARD_SSD=1 discards it.
+  local discard=false
+  case "${GEMMA_DISCARD_SSD:-0}" in
+    0) ;;
+    1) discard=true ;;
+    *) die "GEMMA_DISCARD_SSD must be 0 or 1, got '${GEMMA_DISCARD_SSD}'" ;;
+  esac
+  run gcloud compute instances stop "$VM" --zone="$VM_ZONE" --project="$PROJECT_ID" --discard-local-ssd="$discard"
 }
 
 cmd_wait() {

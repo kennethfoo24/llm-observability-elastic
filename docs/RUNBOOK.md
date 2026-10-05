@@ -42,7 +42,7 @@ deploy/scripts/demo_down.sh              # suspends the traffic generator, stops
 deploy/scripts/demo_down.sh --teardown   # also removes the Ingress and load balancer and scales the app to 0
 ```
 
-`demo_down.sh` fails loudly if the CronJob is not suspended or the Gemma VM is not TERMINATED. After `--teardown`, bring the site back with `IMAGE=<image@digest> deploy/scripts/deploy.sh` (the certificate wait applies again) and then `demo_up.sh`. `teardown.sh --all` additionally deletes the namespace after you type `delete genai-demo`; it is rarely needed.
+`demo_down.sh` fails loudly if the CronJob is not suspended or the Gemma VM is not TERMINATED. After `--teardown`, bring the site back with `IMAGE=<image@digest> deploy/scripts/deploy.sh` (the certificate wait applies again; get the full image reference of what is running with `kubectl -n genai-demo get deploy glassbox -o jsonpath='{.spec.template.spec.containers[0].image}'`, or use the output of `deploy/scripts/build_push.sh` for a new build) and then `demo_up.sh`. `teardown.sh --all` additionally deletes the namespace after you type `delete genai-demo`; it is rarely needed.
 Leave the CronJob suspended between demos. The traffic generator is the only part that spends money on its own.
 
 ## 5. Key lifecycle
@@ -60,9 +60,9 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 - Vertex AI metrics lag 3 to 6 minutes, so a dashboard that is empty right after traffic is expected.
 - On first deploy the managed certificate can take up to about 60 minutes to become Active. Until then HTTPS fails and HTTP redirects to it.
 - The first chat after a long idle period is slower because the ML models scale down after 24 hours without use.
-- Gemma first boot took 511 seconds in the measured run (a first boot after a long stop). A warm restart was not measured. Plan for 5 to 10 minutes.
+- Gemma first boot took 511 seconds in the measured run (a first boot after a long stop). A warm restart was not measured. Plan for 5 to 10 minutes. The Local SSD is kept on stop by default; a stopped VM may still incur Local SSD storage charges, see the cost table for how to check and for `GEMMA_DISCARD_SSD=1`.
 - The browser waits at most 90 seconds for an answer. The load balancer allows 100 seconds, the server stays below the browser limit.
-- Rate limits: 20 chats per minute per IP, 120 requests per minute overall. 10 wrong passwords in 5 minutes lock that IP out for a while.
+- Rate limits are per IP: 20 chats per minute and 120 API requests per minute. About 10 failed attempts in 5 minutes (each wrong password counts once) lock that IP out for wrong or missing passwords. Requests with the correct password bypass the lockout, because the lockout only exists to throttle guessing.
 - Traces show up about 1 minute after a request.
 - The Gemma VM exposes vLLM `/metrics` without a password. This is an accepted risk (counters only, no prompts) until the gated proposal is approved: `basic_auth` on `/metrics`, a Prometheus integration on the `glassbox-gcp` agent and a Gemma dashboard.
 
@@ -84,12 +84,18 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 |---|---|---|
 | HTTPS load balancer (while the Ingress exists) | about $18 per month | `demo_down.sh --teardown` |
 | Traffic generator (every 5 minutes, 07:00 to 22:00 SGT) | measured average $0.00057 per request, about $3 to $7 per month at the real mix | `demo_down.sh` (suspend) |
-| Gemma VM (A100) | about $5 to $6 per hour while running, about $2 for the 23 minute test | `demo_down.sh`, auto stop after 180 minutes. `stop` must use `--discard-local-ssd=false` (the script does) |
+| Gemma VM (A100) | about $5 to $6 per hour while running, about $2 for the 23 minute test. A stopped VM that keeps its Local SSD may still incur Local SSD storage charges (a Preview feature) | `demo_down.sh`, auto stop after 180 minutes. Check charges in Cloud Billing, filtering SKUs on Compute Engine for project `elastic-sa`, or run `gcloud compute instances describe kenneth-gemma-llm --zone=asia-southeast1-c --format='value(disks)'` to see the Local SSD. `GEMMA_DISCARD_SSD=1 deploy/scripts/gemma.sh stop` discards the SSD to avoid that charge, at the price of a slower next boot and loss of its data. Default is to keep it |
 | Pods, Vertex monitoring reads, Elastic ingest | negligible | `teardown.sh` scales the app and agent to 0 |
-| Static IP | small | keep it, or release manually |
+| Static IP `glassbox-ip` | free while attached to the load balancer; about $7 per month once unattached (after `--teardown`) | release with `gcloud compute addresses delete glassbox-ip --global --project=elastic-sa` only if you will not redeploy (a new IP changes the host name) |
 
 Safety net: the traffic generator has `concurrencyPolicy: Forbid`, a run deadline, a hard cap of 5 requests per run, and the cost alert fires above 0.25 USD per hour.
-Current state at the time of writing: the CronJob is suspended and the Gemma VM is stopped.
+Current state at the time of writing: the CronJob is suspended and the Gemma VM is stopped, but these still run and cost money:
+
+- the Ingress and load balancer (about $18 per month),
+- the `glassbox` app pod (no extra node cost),
+- the Elastic Agent `glassbox-elastic-agent` (its `gcp/metrics` component is failed, see open item 1).
+
+`demo_down.sh` suspends the generator and stops Gemma only; it leaves the app, the load balancer and the agent up. `demo_down.sh --teardown` also removes the Ingress and load balancer and scales the app and the agent to 0, so nothing but the static IP remains.
 
 ## 9. Open items
 
@@ -107,3 +113,4 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 3. Post-login UI visuals were checked by API calls and frontend tests only.
 4. Guardrail log export uses project admin keys (see section 5).
 5. Gemma `/metrics` is open (accepted risk) and the hardening proposal awaits approval.
+6. Decision for the project owner: keep the Gemma Local SSD on stop (fast boot, possible Local SSD storage charge) or set `GEMMA_DISCARD_SSD=1` (no charge, slower next boot, data lost). Check the actual charge in billing first.

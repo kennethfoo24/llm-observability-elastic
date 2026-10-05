@@ -40,4 +40,5 @@ if [ "$ALL" = "1" ]; then
   fi
 fi
 echo "stopped: ingress removed, app scaled to 0 and pods gone (dry-run: DRY_RUN=$DRY_RUN)"
-echo "static IP $STATIC_IP_NAME is kept (small cost); release it manually if wanted"
+echo "static IP $STATIC_IP_NAME is kept but an unattached global IP costs about \$7 per month."
+echo "release it (only if you will not redeploy): gcloud compute addresses delete $STATIC_IP_NAME --global --project=$PROJECT_ID"
