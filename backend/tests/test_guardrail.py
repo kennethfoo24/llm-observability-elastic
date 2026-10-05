@@ -186,3 +186,38 @@ def test_a_float_score_is_kept_when_the_model_answered():
 def test_low_confidence_injection_label_reports_its_own_probability_and_is_not_flagged():
     r = _guard(FakeMl(("INJECTION", 0.40), [])).check("disregard the earlier schedule")
     assert r.verdict.injection_score == pytest.approx(0.40) and r.verdict.verdict == "CLEAN"
+
+
+def _span_for(monkeypatch, prompt):
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    import app.guardrail as g
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(g, "tracer", provider.get_tracer("test"))
+    _guard(FakeMl(("SAFE", 0.99), [])).check(prompt)
+    return next(s for s in exporter.get_finished_spans() if s.name == "guardrail.check")
+
+
+CAPTURE = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
+
+
+@pytest.mark.parametrize("value", ["SPAN_ONLY", "SPAN_AND_EVENT", "true", "True", "span_only"])
+def test_prompt_text_on_span_when_capture_enabled(monkeypatch, value):
+    monkeypatch.setenv(CAPTURE, value)
+    assert _span_for(monkeypatch, "hello there").attributes["guardrail.prompt_text"] == "hello there"
+
+
+@pytest.mark.parametrize("value", [None, "", "NO_CONTENT", "EVENT_ONLY", "false"])
+def test_prompt_text_absent_when_capture_off(monkeypatch, value):
+    monkeypatch.delenv(CAPTURE, raising=False)
+    if value is not None:
+        monkeypatch.setenv(CAPTURE, value)
+    assert "guardrail.prompt_text" not in _span_for(monkeypatch, "hello there").attributes
+
+
+def test_prompt_text_truncated_to_4096(monkeypatch):
+    monkeypatch.setenv(CAPTURE, "SPAN_ONLY")
+    assert _span_for(monkeypatch, "a" * 5000).attributes["guardrail.prompt_text"] == "a" * 4096

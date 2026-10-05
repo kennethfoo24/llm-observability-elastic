@@ -1,5 +1,6 @@
 import contextvars
 import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
@@ -11,6 +12,14 @@ from .pii import find_pii
 tracer = trace.get_tracer("glassbox.guardrail")
 logger = logging.getLogger(__name__)
 POOL_WORKERS = 16
+PROMPT_ATTR_MAX_CHARS = 4096
+_CAPTURE_ENV = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
+_CAPTURE_ON = {"span_only", "span_and_event", "true"}
+
+
+def capture_content_enabled() -> bool:
+    """Same switch as the gen_ai content capture; default off."""
+    return os.environ.get(_CAPTURE_ENV, "").strip().lower() in _CAPTURE_ON
 
 
 @dataclass
@@ -73,6 +82,8 @@ class Guardrail:
     def check(self, text: str) -> GuardrailResult:
         start = time.perf_counter()
         with tracer.start_as_current_span("guardrail.check") as span:
+            if capture_content_enabled():
+                span.set_attribute("guardrail.prompt_text", text[:PROMPT_ATTR_MAX_CHARS])
             pii = find_pii(text)
             label, score, entities = "SAFE", 0.0, []
             p_inj: float | None = None

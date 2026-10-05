@@ -50,7 +50,10 @@ def test_config_returns_kibana_url_without_trailing_slash_and_requires_password(
     c = _client()
     assert c.get("/api/config").status_code == 401
     body = c.get("/api/config", headers=H).json()
-    assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Nimbus Corp"}
+    assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Nimbus Corp",
+                    "guardrail_models": {"injection": "protectai__deberta-v3-base-prompt-injection-v2",
+                                         "ner": "elastic__distilbert-base-cased-finetuned-conll03-english"},
+                    "guardrail_pipeline": "genai-guardrail"}
 
 
 def test_personas_include_clearance_counts_from_the_corpus_manifest():
