@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
+import { XRaySheet } from "./XRaySheet";
 
-type Slots = { header: ReactNode; rail: ReactNode; thread: ReactNode; composer: ReactNode; xray: ReactNode };
+type Slots = { header: ReactNode; rail: ReactNode; thread: ReactNode; composer: ReactNode; xray: ReactNode; xrayOpen: boolean; onXrayClose: () => void; floating?: ReactNode };
 
 /* Desktop (lg): rail 300px | chat | x-ray 420px. Below lg: one column; the x-ray is a bottom sheet owned by the caller. */
-export function AppShell({ header, rail, thread, composer, xray }: Slots) {
+export function AppShell({ header, rail, thread, composer, xray, xrayOpen, onXrayClose, floating }: Slots) {
   return (
     <div className="grid min-h-[100dvh] grid-rows-[auto_minmax(0,1fr)] lg:h-[100dvh]">
       {header}
@@ -13,8 +14,10 @@ export function AppShell({ header, rail, thread, composer, xray }: Slots) {
           <div className="min-h-0 overflow-y-auto">{thread}</div>
           <div className="border-t border-line bg-surface">{composer}</div>
         </main>
-        <section className="on-ink min-h-0 bg-ink text-on-ink lg:overflow-y-auto" aria-label="X-ray">{xray}</section>
+        <section className="on-ink hidden min-h-0 bg-ink text-on-ink lg:block lg:overflow-y-auto" aria-label="X-ray">{xray}</section>
       </div>
+      <XRaySheet open={xrayOpen} onClose={onXrayClose}>{xray}</XRaySheet>
+      {floating}
     </div>
   );
 }

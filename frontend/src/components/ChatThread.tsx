@@ -13,7 +13,10 @@ type Props = {
 
 export function ChatThread({ messages, selectedId, askAgainAs, personaName, onSelect, onCitation, onRetry, onAskAgain }: Props) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }); }, [messages.length, messages[messages.length - 1]?.id]);
+  const last = messages[messages.length - 1];
+  const lastStatus = last?.kind === "assistant" ? last.status : "";
+  // also when the pending answer lands: it grows the last message and would otherwise sit under the composer
+  useEffect(() => { end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }); }, [messages.length, last?.id, lastStatus]);
 
   return (
     <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto grid min-w-0 max-w-3xl gap-6 px-4 py-6 md:px-6">

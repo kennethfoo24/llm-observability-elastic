@@ -50,3 +50,17 @@ test("each answer shows the persona it was asked as, in a mixed-persona thread",
   expect(screen.getByText("Asked as Maya Lim")).toBeInTheDocument();
   expect(screen.getByText("Asked as Rachel Tan")).toBeInTheDocument();
 });
+
+test("scrolls to the end again when the pending answer lands", () => {
+  const spy = vi.fn();
+  Element.prototype.scrollIntoView = spy;
+  const pending: Message[] = [
+    { id: "m1", kind: "user", text: "q", persona: "employee" },
+    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "pending" },
+  ];
+  const { rerender } = render(<ChatThread {...base} messages={pending} askAgainAs="x" />);
+  const before = spy.mock.calls.length;
+  rerender(<ChatThread {...base} messages={[pending[0], { ...(pending[1] as any), status: "error", error: { status: 502, code: "upstream_error" } }]} askAgainAs="x" />);
+  expect(spy.mock.calls.length).toBeGreaterThan(before);
+  delete (Element.prototype as any).scrollIntoView;
+});
