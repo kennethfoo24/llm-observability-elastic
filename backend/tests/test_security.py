@@ -105,3 +105,34 @@ def test_static_ui_is_not_rate_limited_and_unknown_api_path_is_gated_not_leaked(
     c = _client(rate_limit_per_min=2)
     assert all(c.get("/healthz").status_code == 200 for _ in range(10))
     assert c.get("/api/nope").status_code == 401
+
+
+def test_client_ip_validates_the_trusted_element_and_falls_back_to_the_peer():
+    assert client_ip("10.0.0.5", "not-an-ip, 130.211.1.1", 1) == "10.0.0.5"  # non-IP in the trusted position
+    assert client_ip("10.0.0.5", "unknown, 1.2.3.4", 1) == "10.0.0.5"  # only one entry before the hop: idx -1
+    assert client_ip("10.0.0.5", "x, unknown, 1.2.3.4", 1) == "10.0.0.5"
+    assert client_ip("10.0.0.5", "6.6.6.6, 1.2.3.4", 1) == "6.6.6.6"  # the LB contract: trusted position accepted
+    assert client_ip("10.0.0.5", " 2001:db8::1 , 130.211.1.1", 1) == "2001:db8::1"  # IPv6 and whitespace
+    assert client_ip("10.0.0.5", "203.0.113.9, 130.211.1.1", 0) == "10.0.0.5"  # hops=0 never trusts the header
+
+
+def test_limiter_lookups_do_not_create_keys_and_expired_keys_disappear():
+    t = [0.0]
+    lim = SlidingWindowLimiter(2, 10, now=lambda: t[0])
+    assert not lim.blocked("ghost") and lim.retry_after("ghost") == 1
+    assert lim._hits == {}
+    lim.allow("a")
+    t[0] = 11.0
+    assert not lim.blocked("a") and "a" not in lim._hits
+
+
+def test_limiter_key_count_is_capped():
+    lim = SlidingWindowLimiter(5, 60, max_keys=100)
+    for i in range(20_000):
+        lim.allow(f"k{i}")
+    assert len(lim._hits) <= 100
+    from app.security import MAX_KEYS
+    big = SlidingWindowLimiter(5, 60)
+    for i in range(20_000):
+        big.allow(f"k{i}")
+    assert len(big._hits) <= MAX_KEYS

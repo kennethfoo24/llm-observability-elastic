@@ -1,3 +1,4 @@
+import ipaddress
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
@@ -20,29 +21,61 @@ SECURITY_HEADERS = {
 HSTS = "max-age=31536000"
 
 
-class SlidingWindowLimiter:
-    def __init__(self, limit: int, window_s: float, now: Callable[[], float] = time.monotonic):
-        self.limit, self.window, self._now = limit, window_s, now
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
+MAX_KEYS = 10_000
 
-    def _trim(self, key: str) -> deque[float]:
-        q, cutoff = self._hits[key], self._now() - self.window
+
+class SlidingWindowLimiter:
+    """Per-key sliding window. Memory is bounded: empty keys are deleted, lookups never create keys, and
+    above MAX_KEYS a sweep drops expired keys and then the oldest-inserted ones. Eviction can only help an
+    attacker who can mint unlimited distinct keys, i.e. spoof X-Forwarded-For on a path with no trusted
+    proxy hop; client_ip's validation and the TRUSTED_PROXY_HOPS deployment setting narrow that case."""
+
+    def __init__(self, limit: int, window_s: float, now: Callable[[], float] = time.monotonic,
+                 max_keys: int = MAX_KEYS):
+        self.limit, self.window, self._now, self.max_keys = limit, window_s, now, max_keys
+        self._hits: dict[str, deque[float]] = {}
+
+    def _trim(self, key: str) -> deque[float] | None:
+        q = self._hits.get(key)
+        if q is None:
+            return None
+        cutoff = self._now() - self.window
         while q and q[0] <= cutoff:
             q.popleft()
+        if not q:
+            del self._hits[key]
+            return None
         return q
+
+    def _enforce_cap(self) -> None:
+        if len(self._hits) <= self.max_keys:
+            return
+        for k in list(self._hits):
+            self._trim(k)
+        target = self.max_keys * 9 // 10  # evict below the cap so the O(n) sweep is amortised, not per request
+        while len(self._hits) > target:
+            del self._hits[next(iter(self._hits))]  # dicts keep insertion order: oldest first
+
+    def _append(self, key: str) -> None:
+        q = self._trim(key)
+        if q is None:
+            q = self._hits[key] = deque()
+        q.append(self._now())
+        self._enforce_cap()
 
     def allow(self, key: str) -> bool:
         q = self._trim(key)
-        if len(q) >= self.limit:
+        if q is not None and len(q) >= self.limit:
             return False
-        q.append(self._now())
+        self._append(key)
         return True
 
     def blocked(self, key: str) -> bool:
-        return len(self._trim(key)) >= self.limit
+        q = self._trim(key)
+        return q is not None and len(q) >= self.limit
 
     def record(self, key: str) -> None:
-        self._trim(key).append(self._now())
+        self._append(key)
 
     def retry_after(self, key: str) -> int:
         q = self._trim(key)
@@ -51,12 +84,17 @@ class SlidingWindowLimiter:
 
 def client_ip(scope_client: str | None, forwarded_for: str | None, trusted_hops: int = 1) -> str:
     """The Google load balancer appends `<client>, <lb>` to X-Forwarded-For; only entries added by OUR proxy
-    chain are trusted, so a client-supplied leftmost value cannot be used to evade limits."""
+    chain are trusted, so a client-supplied leftmost value cannot be used to evade limits. The chosen entry
+    must parse as an IP address, otherwise the socket peer is used. Behind the LB (TRUSTED_PROXY_HOPS=1) the
+    entry at that position is the LB contract and is accepted as is."""
     if forwarded_for and trusted_hops >= 1:
         parts = [p.strip() for p in forwarded_for.split(",") if p.strip()]
         idx = len(parts) - 1 - trusted_hops
         if 0 <= idx < len(parts):
-            return parts[idx]
+            try:
+                return str(ipaddress.ip_address(parts[idx]))
+            except ValueError:
+                pass
     return scope_client or "unknown"
 
 
