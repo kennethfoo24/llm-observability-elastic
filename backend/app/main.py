@@ -1,5 +1,6 @@
 import hmac
 import logging
+from pathlib import Path
 from typing import Literal
 
 from elasticsearch import Elasticsearch
@@ -7,10 +8,12 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
 from .chat_service import ChatRequest, Deps, run_chat
 from .config import Settings, get_settings
+from .corpus_data import DOCS
 from .cost import UnknownModel, load_prices
 from .dls import load_keys
 from .guardrail import Guardrail
@@ -51,7 +54,8 @@ def _default_deps(s: Settings, gate: GemmaGate) -> Deps:
         sdk=SdkEngine(s, gate), langchain=LangChainEngine(s, gate), models=get_models(s), gate=gate)
 
 
-def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=None) -> FastAPI:
+def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=None,
+               static_dir: Path | None = None) -> FastAPI:
     s = settings or get_settings()
     gate = gate or GemmaGate(s.gemma_base_url, s.gemma_api_key)
     deps = deps or _default_deps(s, gate)
@@ -85,9 +89,16 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
     def healthz():
         return {"ok": True}
 
+    @app.get("/api/config")
+    def config():
+        return {"kibana_url": s.obs_kibana_url.rstrip("/"), "company": "Nimbus Corp"}
+
     @app.get("/api/personas")
     def personas():
-        return [{"id": p.id, "name": p.name, "title": p.title} for p in PERSONAS]
+        total = len(DOCS)
+        return [{"id": p.id, "name": p.name, "title": p.title, "total_docs": total,
+                 "can_read_docs": sum(1 for d in DOCS if p.role in d["allowed_roles"])}
+                for p in PERSONAS]
 
     @app.get("/api/models")
     def models():
@@ -117,6 +128,11 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
             # Never echo the exception message: it can carry request content.
             logger.exception("upstream LLM error")
             return JSONResponse({"error": "upstream_error", "detail": type(e).__name__}, status_code=502)
+
+    default_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    dist = static_dir if static_dir is not None else default_dist
+    if dist.is_dir() and (dist / "index.html").exists():
+        app.mount("/", StaticFiles(directory=dist, html=True), name="ui")
 
     return app
 
