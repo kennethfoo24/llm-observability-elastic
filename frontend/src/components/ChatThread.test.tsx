@@ -38,3 +38,15 @@ test("an answer keeps the persona it was asked as, even after a switch", () => {
   ]} askAgainAs="Rachel Tan" />);
   expect(screen.getByText(/maya lim/i)).toBeInTheDocument();
 });
+
+test("each answer shows the persona it was asked as, in a mixed-persona thread", () => {
+  render(<ChatThread {...base} askAgainAs="Rachel Tan" messages={[
+    { id: "m1", kind: "user", text: "q1", persona: "employee" },
+    { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "flash-lite", engine: "sdk", status: "pending" },
+    { id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" },
+    { id: "m4", kind: "user", text: "q1", persona: "exec" },
+    { id: "m5", kind: "assistant", replyTo: "m4", persona: "exec", model: "flash-lite", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
+  ]} />);
+  expect(screen.getByText("Asked as Maya Lim")).toBeInTheDocument();
+  expect(screen.getByText("Asked as Rachel Tan")).toBeInTheDocument();
+});

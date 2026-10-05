@@ -30,14 +30,14 @@ export function AssistantMessage({ msg, selected, personaName, onSelect, onCitat
         </div>
       )}
 
-      {msg.status === "error" && msg.error && <ErrorCard error={msg.error} onRetry={() => onRetry(msg.id)} />}
+      {msg.status === "error" && <ErrorCard error={msg.error ?? { status: 0, code: "unknown" }} onRetry={() => onRetry(msg.id)} />}
 
       {msg.status === "done" && r && (
         <>
           {r.blocked ? (
             <BlockCard reasons={r.block_reason} />
           ) : r.answer.trim() ? (
-            <AnswerText text={r.answer} onCitation={(docId) => onCitation(docId, msg.id)} />
+            <AnswerText text={r.answer} knownIds={new Set(r.docs.map((d) => d.id))} onCitation={(docId) => onCitation(docId, msg.id)} />
           ) : (
             <p className="text-muted">No answer was returned. Try rephrasing the question.</p>
           )}

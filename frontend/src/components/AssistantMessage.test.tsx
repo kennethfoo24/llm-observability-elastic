@@ -68,3 +68,18 @@ test("an empty answer string is shown as a neutral message, not blank", () => {
   render(<AssistantMessage {...base} msg={msg({ response: response({ answer: "" }) })} />);
   expect(screen.getByText(/no answer was returned/i)).toBeInTheDocument();
 });
+
+test("citations in a done answer only chip documents that were retrieved", () => {
+  render(<AssistantMessage {...base} msg={msg({ response: response({ answer: "See [pto-policy] and [ghost]." }) })} />);
+  expect(screen.getByRole("button", { name: "pto-policy" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ghost" })).toBeNull();
+  expect(screen.getByText(/\[ghost\]/)).toBeInTheDocument();
+});
+
+test("an error status with no error object still shows a generic recoverable error", async () => {
+  const onRetry = vi.fn();
+  render(<AssistantMessage {...base} onRetry={onRetry} msg={msg({ status: "error", response: undefined })} />);
+  expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+  expect(onRetry).toHaveBeenCalledWith("a1");
+});
