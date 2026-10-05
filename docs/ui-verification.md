@@ -56,19 +56,26 @@ Console (all viewports): no app JS errors or warnings. Only expected network lin
 | 4 | should fix | reduced motion | Skeleton `animate-pulse` loops kept running under `prefers-reduced-motion`. | `motion-reduce:animate-none` on the four skeletons; test added. Commit dc4a957. |
 | 5 | should fix | Dockerfile (carry-over) | `pip show A B` succeeds when any one package exists, so the build check was weak. | One `pip show` per package, chained, plus the negative check. Proven to abort the build with a bogus name. Commit 6c871fc. |
 
+## Fixed in the final-review wave
+
+| Item | Fix |
+|---|---|
+| Open mobile disclosure pushed Send off screen at 640x360 | Panel capped at `min(55dvh, 100dvh - 18rem)` and scrolls inside; Send stays visible (verified at 640x360, Send bottom at 335 of 360). |
+| No cue for model controls below the fold | A 24px bottom fade shows while there is more to scroll and disappears at the end; the panel also closes after a model pick (click only, not arrowing) and returns focus to the Change button. Verified at 390x844 and 640x360. |
+| Blocked wording differed between thread and X-ray | The X-ray guardrail panel now says Blocked (pink, shield icon). |
+| Waterfall LLM bar was yellow | Now blue; the guardrail bar is teal or pink by verdict, neutral when only patterns ran. |
+| Retry after a Gemma failure retried the offline model | The error card shows "Try with <first available model>" when the failed model is offline, and rebinds the message to it. |
+| Guardrail read "Clean 0.00" when the injection model never answered | Backend returns a null score; the panel says "Patterns only", "n/a" and explains it. |
+| X-ray breakpoint defined twice; citations did nothing below xl | One `useMediaQuery("(min-width: 80rem)")` drives it; citations and Inspect open the sheet below xl; the sheet closes when the viewport grows past xl. Verified at 1100x800 and 1440x900. |
+
 ## Remaining polish (not fixed)
 
 | Severity | Item | Where |
 |---|---|---|
-| should fix | With the mobile disclosure open on a very short viewport (640x360), the open panel (55dvh) pushes the composer and Send off screen until it is closed again. | `final-640x360-disclosure.png` |
-| should fix | The mobile disclosure panel scrolls internally and the model and engine controls sit below the fold with no scroll cue; a user may not realise the model can be changed there. | `final-390-disclosure-expanded.png`, `final-390-disclosure-expanded-scrolled.png` |
 | polish | At 640x360 the chat thread gets only about 116px of height (header, summary row and a two-line composer take the rest). | `final-640x360-answer.png` |
 | polish | At 1440x900 the engine toggle ("How it calls the model") is below the fold in the person and model rail and needs a scroll. | `final-1440-empty.png` |
 | polish | Mobile shows "Asking as <person>" twice (disclosure summary and above the composer) and the summary truncates the model name ("Gemini Flash-L..."). | `final-390-redteam-flagged.png` |
 | polish | Empty X-ray shows both the placeholder sentence and skeleton bars. | `final-1440-empty.png` |
-| polish | A blocked prompt reads "Blocked by the guardrail" in the thread but the X-ray verdict word is "Flagged" (stub verdict for blocked prompts); wording differs between the two views. | `final-1440-redteam-blocked.png` |
-| polish | The waterfall uses yellow (reserved for cost) for the LLM call bar. | `final-1440-pto.png` |
-| polish | After a Gemma failure, Try again retries the same offline model; offering "use Gemini Flash-Lite instead" would save a step. | `final-1440-gemma-offline-error.png` |
 | polish | An unauthenticated load issues three 401 requests (config, personas, models) that show as console errors. | console |
 | polish | New conversation keeps the selected person (only thread, cost and X-ray reset). | `final-1440-new-conversation.png` |
 | polish | Below 320px wide (195px tested) the page still scrolls horizontally; outside WCAG reflow scope. | `final-195x422.png` |
