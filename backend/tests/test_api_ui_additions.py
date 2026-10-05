@@ -72,3 +72,17 @@ def test_missing_static_dir_is_ignored(tmp_path):
     c = _client(tmp_path / "does-not-exist")
     assert c.get("/healthz").status_code == 200
     assert c.get("/").status_code == 404
+
+
+def test_default_dist_resolves_for_checkout_and_image_layouts(tmp_path):
+    from app.main import default_dist
+    # checkout layout: <root>/backend/app/main.py -> <root>/frontend/dist
+    (tmp_path / "co/backend/app").mkdir(parents=True)
+    (tmp_path / "co/frontend/dist").mkdir(parents=True)
+    (tmp_path / "co/frontend/dist/index.html").write_text("x")
+    assert default_dist(tmp_path / "co/backend/app/main.py") == tmp_path / "co/frontend/dist"
+    # image layout: /srv/app/main.py -> /srv/frontend/dist
+    (tmp_path / "img/app").mkdir(parents=True)
+    (tmp_path / "img/frontend/dist").mkdir(parents=True)
+    (tmp_path / "img/frontend/dist/index.html").write_text("x")
+    assert default_dist(tmp_path / "img/app/main.py") == tmp_path / "img/frontend/dist"

@@ -1,0 +1,11 @@
+**/.env
+**/secrets
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.egg-info
+frontend/dist
+.git
+.superpowers
+docs
+backend/tests

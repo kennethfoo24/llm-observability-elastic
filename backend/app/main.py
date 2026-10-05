@@ -54,6 +54,13 @@ def _default_deps(s: Settings, gate: GemmaGate) -> Deps:
         sdk=SdkEngine(s, gate), langchain=LangChainEngine(s, gate), models=get_models(s), gate=gate)
 
 
+def default_dist(app_file: Path | None = None) -> Path:
+    """Built UI location: <repo>/frontend/dist in the checkout (backend/app/main.py), /srv/frontend/dist in the image (app/main.py)."""
+    app_dir = (app_file or Path(__file__)).resolve().parent
+    candidates = [app_dir.parent.parent / "frontend" / "dist", app_dir.parent / "frontend" / "dist"]
+    return next((c for c in candidates if (c / "index.html").exists()), candidates[0])
+
+
 def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=None,
                static_dir: Path | None = None) -> FastAPI:
     s = settings or get_settings()
@@ -129,8 +136,7 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
             logger.exception("upstream LLM error")
             return JSONResponse({"error": "upstream_error", "detail": type(e).__name__}, status_code=502)
 
-    default_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-    dist = static_dir if static_dir is not None else default_dist
+    dist = static_dir if static_dir is not None else default_dist()
     if dist.is_dir() and (dist / "index.html").exists():
         app.mount("/", StaticFiles(directory=dist, html=True), name="ui")
 
