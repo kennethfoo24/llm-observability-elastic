@@ -202,3 +202,7 @@ Image `docker.io/kennethfoo24/glassbox@sha256:26eb7d9a9d5ce3da4d418181182abe62ef
 | Alert rule proof | pass | low faithfulness rule fired with a temporary threshold, restored to 2 |
 | Dashboards | API only | `Glass Box: Conversation quality` and `Glass Box: OWASP LLM Top 10 coverage` import and every panel query returns data or zero rows; Lens rendering not seen (no Kibana browser session) |
 | New UI section and red-team prompts | tests and stub only | not clicked through on the live site |
+
+## Review fixes deployed (2026-10-07)
+
+Image `docker.io/kennethfoo24/glassbox@sha256:a9bd8b4ac48115ebb8b1a84580c34ffdc202424a275e3e51065cf122fa6e6bd9` (commit e9d9258): multi-reason panels, restricted-topic attempts rule, full judge context (`quality_context` in the chat response), hardened judge delimiters, refreshed demo hints and RUNBOOK section 10. CronJob suspended. Elastic-side changes were applied live earlier the same day. Lens rendering of the new dashboards and the live click-through of the new UI links remain unverified without a Kibana browser session.
