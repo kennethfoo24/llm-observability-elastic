@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { decompressFromEncodedURIComponent } from "lz-string";
 import { axe } from "vitest-axe";
 import { XRayDrawer } from "./XRayDrawer";
 import type { AssistantMsg } from "../../state/chatState";
@@ -292,12 +293,12 @@ const gr = { models: { injection: "inj__model", ner: "ner__model" }, pipeline: "
 
 test("Dev Tools link shows for clean and flagged verdicts, built from this message prompt", () => {
   const { unmount } = render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response())} />);
-  const link = screen.getByRole("link", { name: /try it in dev tools/i });
+  const link = within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: /try it in dev tools/i });
   expect(link.getAttribute("href")).toMatch(/^https:\/\/kb\.example\/app\/dev_tools#\/console\?load_from=data:text\/plain,/);
-  expect(screen.getByText(/needs a kibana login/i)).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "Guardrail" })).getByText(/needs a kibana login/i)).toBeInTheDocument();
   unmount();
   render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response({ guardrail: { verdict: "FLAGGED", reasons: ["pii_email"], status: "ok", latency_ms: 3, injection_score: 0.1 } }))} />);
-  expect(screen.getByRole("link", { name: /try it in dev tools/i })).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: /try it in dev tools/i })).toBeInTheDocument();
 });
 
 test("Dev Tools link is hidden without kibana url, guardrail config or prompt", () => {
@@ -309,4 +310,33 @@ test("Dev Tools link is hidden without kibana url, guardrail config or prompt", 
   u2.unmount();
   render(<XRayDrawer {...props} question={undefined} guardrailConfig={gr} msg={msg(response())} />);
   expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+});
+
+test("an answered response shows the Output guardrail and quality section with links and OWASP chips", () => {
+  render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response())} />);
+  const q = screen.getByRole("region", { name: "Output guardrail and quality" });
+  expect(within(q).getByText(/5 to 10 seconds/)).toBeInTheDocument();
+  const dev = within(q).getByRole("link", { name: /try it in dev tools/i });
+  const text = decompressFromEncodedURIComponent(dev.getAttribute("href")!.split("load_from=data:text/plain,")[1])!;
+  expect(text).toContain("POST _ingest/pipeline/genai-quality/_simulate");
+  expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
+  expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-quality");
+  expect(within(q).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-owasp");
+  for (const t of ["Sensitive information disclosure", "Improper output handling", "System prompt leakage", "Misinformation (LLM judge)", "Quality: sentiment, language, topic, answered"]) expect(within(q).getByText(t)).toBeInTheDocument();
+  for (const id of ["LLM02", "LLM05", "LLM07", "LLM09"]) expect(within(q).getByText(id)).toBeInTheDocument();
+  expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
+});
+
+test("a blocked response has no quality section", () => {
+  render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response({ blocked: true, docs: [], hidden: [] }))} />);
+  expect(screen.queryByRole("region", { name: "Output guardrail and quality" })).toBeNull();
+});
+
+test("without a Kibana url the quality links are hidden; without the pipeline only Dev Tools is", () => {
+  const { rerender } = render(<XRayDrawer {...props} kibanaUrl={undefined} qualityPipeline="genai-quality" msg={msg(response())} />);
+  const q = () => screen.getByRole("region", { name: "Output guardrail and quality" });
+  expect(within(q()).queryAllByRole("link")).toHaveLength(0);
+  rerender(<XRayDrawer {...props} msg={msg(response())} />);
+  expect(within(q()).queryByRole("link", { name: /dev tools/i })).toBeNull();
+  expect(within(q()).getAllByRole("link")).toHaveLength(3);
 });

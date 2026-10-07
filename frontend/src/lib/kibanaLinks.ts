@@ -76,3 +76,66 @@ export function devToolsUrl(base: string, prompt: string, g: GuardrailConfig): s
   }
   return url;
 }
+
+export const QUALITY_DASHBOARD_ID = "glassbox-quality";
+export const OWASP_DASHBOARD_ID = "glassbox-owasp";
+
+export function qualityDashboardUrl(base: string): string {
+  return `${base}/app/dashboards#/view/${QUALITY_DASHBOARD_ID}`;
+}
+
+export function owaspDashboardUrl(base: string): string {
+  return `${base}/app/dashboards#/view/${OWASP_DASHBOARD_ID}`;
+}
+
+/** Discover (ES|QL) on the Observability project: the genai_response log written for one trace. */
+export function responseLogUrl(base: string, traceId: string): string {
+  const quoted = `"${traceId.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  const esql = `FROM logs-genai_response* | WHERE trace_id == ${quoted}`;
+  const a = `(dataSource:(type:esql),query:(esql:${rison(esql)}))`;
+  return `${base}/app/discover#/?_a=${encodeURIComponent(a)}`;
+}
+
+/** The flat attributes the app logs for one answered response (the genai_response log). */
+export type QualityInput = {
+  prompt: string; response: string; context: string;
+  citedIds: string[]; retrievedIds: string[]; topScore: number; hiddenCount: number;
+  answered: boolean; persona: string;
+};
+
+export function qualityConsoleText(q: QualityInput, pipeline: string, note?: string): string {
+  const doc = {
+    docs: [{ _source: {
+      attributes: {
+        "genai.prompt_text": q.prompt, "genai.response_text": q.response, "genai.context_text": q.context,
+        "genai.cited_ids": q.citedIds, "genai.retrieved_ids": q.retrievedIds, "genai.top_score": q.topScore,
+        "genai.hidden_count": q.hiddenCount, "genai.answered": q.answered, "app.persona": q.persona,
+      },
+      data_stream: { dataset: "genai_response" },
+    } }],
+  };
+  return [
+    ...(note ? [`# ${note}`, ""] : []),
+    "# The quality ingest pipeline: sentiment, language, topic, OWASP checks, LLM judge",
+    `POST _ingest/pipeline/${pipeline}/_simulate`,
+    body(doc),
+    "",
+  ].join("\n");
+}
+
+const cut = (s: string, n: number) => Array.from(s.slice(0, n)).join("");
+
+/** Dev Tools Console deep link that simulates the quality pipeline on this answer; long texts are truncated to fit. */
+export function qualityDevToolsUrl(base: string, q: QualityInput, pipeline: string): string {
+  const build = (x: QualityInput, note?: string) => `${base}${CONSOLE_PREFIX}${compressToEncodedURIComponent(qualityConsoleText(x, pipeline, note))}`;
+  let url = build(q);
+  if (url.length <= MAX_DEVTOOLS_URL_CHARS) return url;
+  let keep = Math.max(q.prompt.length, q.response.length, q.context.length);
+  while (keep > 0) {
+    keep = Math.floor(keep * 0.8);
+    const t = { ...q, prompt: cut(q.prompt, keep), response: cut(q.response, keep), context: cut(q.context, keep) };
+    url = build(t, `Texts truncated to ${keep} characters each to fit the link. Paste the full text to try it in full.`);
+    if (url.length <= MAX_DEVTOOLS_URL_CHARS) break;
+  }
+  return url;
+}

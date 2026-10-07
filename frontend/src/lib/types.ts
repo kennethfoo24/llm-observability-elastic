@@ -5,7 +5,9 @@ export type Persona = { id: string; name: string; title: string; can_read_docs: 
 export type ModelInfo = { key: string; label: string; provider: "eis" | "gemma"; model_id: string; available: boolean };
 export type AppConfig = { kibana_url: string; security_kibana_url?: string | null; company: string;
   /** Elastic hosted model ids and ingest pipeline id the guardrail uses (single source: the backend). */
-  guardrail_models?: { injection: string; ner: string }; guardrail_pipeline?: string };
+  guardrail_models?: { injection: string; ner: string }; guardrail_pipeline?: string;
+  /** Ingest pipeline that scores each answer (OWASP and quality checks). */
+  quality_pipeline?: string };
 
 export type Guardrail = {
   verdict: Verdict;

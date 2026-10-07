@@ -79,3 +79,61 @@ test("very long prompts are truncated to fit the URL and say so in the console t
 test("short prompts have no truncation note", () => {
   expect(payload(devToolsUrl("https://kb", "short", GR))).not.toContain("truncated");
 });
+
+import { owaspDashboardUrl, qualityConsoleText, qualityDashboardUrl, qualityDevToolsUrl, responseLogUrl, type QualityInput } from "./kibanaLinks";
+
+const QI: QualityInput = { prompt: "How many PTO days?", response: "25 days [pto-policy]", context: "[pto-policy] Paid Time Off Policy",
+  citedIds: ["pto-policy"], retrievedIds: ["pto-policy"], topScore: 3.2, hiddenCount: 1, answered: true, persona: "employee" };
+const jsonBody = (t: string) => JSON.parse(t.split("\n").filter((l) => !l.startsWith("#") && !/^POST /.test(l)).join("\n"));
+
+test("dashboard links open the quality and OWASP dashboards", () => {
+  expect(qualityDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/glassbox-quality");
+  expect(owaspDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/glassbox-owasp");
+});
+
+test("responseLogUrl builds an ES|QL Discover link on the genai_response logs by trace id", () => {
+  const u = responseLogUrl("https://kb", "abc123");
+  expect(u.startsWith("https://kb/app/discover#/?_a=")).toBe(true);
+  expect(decodeURIComponent(u.split("_a=")[1])).toBe(`(dataSource:(type:esql),query:(esql:'FROM logs-genai_response* | WHERE trace_id == "abc123"'))`);
+});
+
+test("responseLogUrl escapes quotes and url-special characters in the trace id", () => {
+  const u = responseLogUrl("https://kb", `a"b'c&d#e`);
+  expect(u).not.toMatch(/[&#].*[&#]/);
+  expect(decodeURIComponent(u.split("_a=")[1])).toContain(`WHERE trace_id == "a\\"b!'c&d#e"`);
+});
+
+test("quality console text simulates the pipeline with the flat attributes the app logs", () => {
+  const t = qualityConsoleText(QI, "genai-quality");
+  expect(t).toContain("POST _ingest/pipeline/genai-quality/_simulate");
+  expect(jsonBody(t)).toEqual({ docs: [{ _source: { attributes: {
+    "genai.prompt_text": "How many PTO days?", "genai.response_text": "25 days [pto-policy]", "genai.context_text": "[pto-policy] Paid Time Off Policy",
+    "genai.cited_ids": ["pto-policy"], "genai.retrieved_ids": ["pto-policy"], "genai.top_score": 3.2, "genai.hidden_count": 1,
+    "genai.answered": true, "app.persona": "employee" }, data_stream: { dataset: "genai_response" } } }] });
+});
+
+test("qualityDevToolsUrl uses the Console share format and round-trips", () => {
+  const url = qualityDevToolsUrl("https://kb", QI, "genai-quality");
+  expect(url.startsWith("https://kb/app/dev_tools#/console?load_from=data:text/plain,")).toBe(true);
+  expect(decompressFromEncodedURIComponent(url.split("load_from=data:text/plain,")[1])).toBe(qualityConsoleText(QI, "genai-quality"));
+});
+
+test("quotes, newlines and unicode in the answer keep the body valid JSON", () => {
+  const q = { ...QI, response: 'say "hi"\nline \\ café 你好 😀' };
+  const t = decompressFromEncodedURIComponent(qualityDevToolsUrl("https://kb", q, "p").split("load_from=data:text/plain,")[1])!;
+  expect(jsonBody(t).docs[0]._source.attributes["genai.response_text"]).toBe(q.response);
+});
+
+test("very long texts are truncated to fit the URL and say so", () => {
+  let seed = 11;
+  const long = () => Array.from({ length: 15000 }, () => { seed = (seed * 1103515245 + 12345) % 2147483648; return String.fromCharCode(33 + (seed >> 8) % 90); }).join("");
+  const url = qualityDevToolsUrl("https://kb", { ...QI, prompt: long(), response: long(), context: long() }, "genai-quality");
+  expect(url.length).toBeLessThanOrEqual(MAX_DEVTOOLS_URL_CHARS);
+  const t = decompressFromEncodedURIComponent(url.split("load_from=data:text/plain,")[1])!;
+  expect(t).toMatch(/^# Texts truncated/);
+  expect(jsonBody(t).docs[0]._source.attributes["genai.cited_ids"]).toEqual(["pto-policy"]);
+});
+
+test("short texts have no truncation note", () => {
+  expect(decompressFromEncodedURIComponent(qualityDevToolsUrl("https://kb", QI, "p").split("load_from=data:text/plain,")[1])).not.toContain("truncated");
+});
