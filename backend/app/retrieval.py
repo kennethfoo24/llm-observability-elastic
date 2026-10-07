@@ -24,6 +24,7 @@ class Ghost:
     id: str
     title: str
     classification: str
+    score: float = 0.0  # catalog (RRF) score; 0.0 when unavailable
 
 
 @dataclass
@@ -56,7 +57,8 @@ def build_query(text: str, size: int = 4, window: int = 20) -> dict:
 
 def split_hidden(catalog_hits: list[dict], role: str) -> list[Ghost]:
     return [
-        Ghost(h["_id"], h["_source"]["title"], h["_source"]["classification"])
+        Ghost(h["_id"], h["_source"]["title"], h["_source"]["classification"],
+              h.get("_score") or 0.0)
         for h in catalog_hits
         if role not in h["_source"].get("allowed_roles", [])
     ]

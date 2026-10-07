@@ -246,3 +246,43 @@ def test_root_span_marks_blocked_requests():
     attrs = _root_attrs(lambda: run_chat(REQ, d))
     assert attrs["app.blocked"] is True and attrs["app.genai.cost_usd"] == 0.0
     assert attrs["app.persona"] == "employee" and attrs["app.genai.engine"] == "sdk"
+
+
+def _with_resp(d):
+    d.emit_response_log = LogSink()
+    return d
+
+
+def test_successful_answer_emits_one_response_log_with_computed_fields():
+    d = _with_resp(_deps())
+    run_chat(REQ, d)
+    assert len(d.emit_response_log.calls) == 1
+    c = d.emit_response_log.calls[0]
+    assert c["response"] == "18 days [pto]" and c["retrieved_ids"] == ["pto"] and c["cited_ids"] == ["pto"]
+    assert c["top_score"] == 2.0 and c["hidden_count"] == 1 and c["top_hidden_score"] == 0.0
+    assert c["answered"] is True and c["persona"] == "employee" and "[pto] PTO: 18 days" in c["context"]
+
+
+def test_response_log_not_emitted_when_blocked_or_no_context():
+    d = _with_resp(_deps(guard=FakeGuardrail("FLAGGED", reasons=["prompt_injection"])))
+    run_chat(REQ, d)
+    assert d.emit_response_log.calls == []
+    d = _with_resp(_deps(result=RetrievalResult([], [Ghost("aurora", "Aurora", "restricted", 0.4)], 5)))
+    run_chat(REQ, d)
+    assert d.emit_response_log.calls == []
+
+
+def test_hidden_scores_flow_into_response_log():
+    docs = [Doc("pto", "PTO", "public", "18 days", 2.0)]
+    d = _with_resp(_deps(result=RetrievalResult(docs, [Ghost("a", "A", "restricted", 0.2), Ghost("b", "B", "restricted", 0.7)], 5)))
+    run_chat(REQ, d)
+    c = d.emit_response_log.calls[0]
+    assert c["hidden_count"] == 2 and c["top_hidden_score"] == 0.7
+
+
+def test_response_log_failure_never_breaks_chat():
+    d = _deps()
+
+    def boom(**kw): raise RuntimeError("exporter down")
+    d.emit_response_log = boom
+    assert run_chat(REQ, d)["answer"] == "18 days [pto]"

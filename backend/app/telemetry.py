@@ -28,6 +28,31 @@ def emit_prompt_log(*, prompt: str, persona: str, model: str, engine: str, statu
     })
 
 
+PROMPT_MAX_CHARS = 4000
+RESPONSE_MAX_CHARS = 4000
+CONTEXT_MAX_CHARS = 6000
+
+
+def emit_response_log(*, prompt: str, response: str, context: str, retrieved_ids: list[str],
+                      cited_ids: list[str], top_score: float, hidden_count: int, top_hidden_score: float,
+                      answered: bool, persona: str, model: str, engine: str) -> None:
+    _log.info("genai response", extra={
+        "data_stream.dataset": "genai_response",
+        "genai.prompt_text": prompt[:PROMPT_MAX_CHARS],
+        "genai.response_text": response[:RESPONSE_MAX_CHARS],
+        "genai.context_text": context[:CONTEXT_MAX_CHARS],
+        "genai.retrieved_ids": [str(i) for i in retrieved_ids],
+        "genai.cited_ids": [str(i) for i in cited_ids],
+        "genai.top_score": float(top_score),
+        "genai.hidden_count": int(hidden_count),
+        "genai.top_hidden_score": float(top_hidden_score or 0.0),
+        "genai.answered": bool(answered),
+        "app.persona": persona,
+        "app.genai.model": model,
+        "app.genai.engine": engine,
+    })
+
+
 _HANDLERS: list[logging.Handler] = []
 _PROVIDERS: list = []
 

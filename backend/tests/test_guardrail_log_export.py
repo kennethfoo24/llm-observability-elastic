@@ -125,3 +125,29 @@ def test_prompt_record_inside_a_span_carries_its_trace_and_span_ids():
         ctx = span.get_span_context()
     rec = exp.get_finished_logs()[0].log_record
     assert rec.trace_id == ctx.trace_id and rec.span_id == ctx.span_id
+
+
+def test_response_record_goes_to_both_exporters_with_typed_attributes():
+    from app.telemetry import emit_response_log
+    exporters = {}
+
+    def factory(endpoint, key):
+        exporters[endpoint] = InMemoryLogRecordExporter()
+        return exporters[endpoint]
+
+    s = _settings(guardrail_log_obs_endpoint="https://obs.example", guardrail_log_obs_key="k1",
+                  guardrail_log_sec_endpoint="https://sec.example", guardrail_log_sec_key="k2")
+    setup_guardrail_log_export(s, exporter_factory=factory, simple=True)
+    assert LOG.propagate is False  # records never reach the shared collector path
+    emit_response_log(prompt="q", response="a [x]", context="[x] T: body", retrieved_ids=["x"], cited_ids=["x"],
+                      top_score=1.5, hidden_count=2, top_hidden_score=0.3, answered=True,
+                      persona="employee", model="m", engine="sdk")
+    assert set(exporters) == {"https://obs.example", "https://sec.example"}
+    for exp in exporters.values():
+        recs = exp.get_finished_logs()
+        assert len(recs) == 1
+        a = dict(recs[0].log_record.attributes)
+        assert a["data_stream.dataset"] == "genai_response"
+        assert list(a["genai.retrieved_ids"]) == ["x"] and list(a["genai.cited_ids"]) == ["x"]
+        assert a["genai.top_score"] == 1.5 and a["genai.hidden_count"] == 2 and a["genai.answered"] is True
+        assert a["genai.top_hidden_score"] == 0.3 and a["genai.response_text"] == "a [x]"

@@ -44,9 +44,9 @@ class StubRetriever:
         scored = sorted(((d, _score(q, d)) for d in DOCS), key=lambda pair: -pair[1])
         scored = [(d, s) for d, s in scored if s > 0]
         visible = [(d, s) for d, s in scored if role in d["allowed_roles"]][:4]
-        hidden = [d for d, _ in scored if role not in d["allowed_roles"]][:8]
+        hidden = [(d, s) for d, s in scored if role not in d["allowed_roles"]][:8]
         docs = [Doc(d["slug"], d["title"], d["classification"], d["content"], round(s * 1.7 + 0.3, 3)) for d, s in visible]
-        return RetrievalResult(docs, [Ghost(d["slug"], d["title"], d["classification"]) for d in hidden], 118)
+        return RetrievalResult(docs, [Ghost(d["slug"], d["title"], d["classification"], round(s * 1.7 + 0.3, 3)) for d, s in hidden], 118)
 
 
 class StubGuardrail:
@@ -114,5 +114,5 @@ def build_stub_app(gemma_up: bool = True, latency_scale: float = 1.0, password: 
     gate = StubGate(gemma_up)
     sdk = StubSdk(gate, latency_scale)
     deps = Deps(retriever=StubRetriever(latency_scale), guardrail=StubGuardrail(latency_scale), sdk=sdk,
-                langchain=StubLangChain(sdk), models=get_models(s), emit_log=lambda **kw: None, gate=gate)
+                langchain=StubLangChain(sdk), models=get_models(s), emit_log=lambda **kw: None, emit_response_log=lambda **kw: None, gate=gate)
     return create_app(deps, s, gate=gate)

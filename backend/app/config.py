@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     guardrail_timeout_s: float = 1.5
     max_message_chars: int = 4000
     app_password: str = ""
+    system_prompt_canary: str = ""  # optional deploy-time secret appended to the system prompt (leak detection)
 
     llm_timeout_s: float = 60.0
     rate_limit_per_min: int = 120

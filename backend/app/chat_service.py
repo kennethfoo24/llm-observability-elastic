@@ -10,8 +10,9 @@ from .models import ModelSpec
 from .personas import get_persona
 from .pii import find_pii
 from .prompt import NO_CONTEXT_ANSWER, build_prompt
+from .quality import cited_ids as _cited_ids, context_text, is_answered
 from .retrieval import RetrievalResult
-from .telemetry import emit_prompt_log, set_root_attrs, trace_id_hex
+from .telemetry import emit_prompt_log, emit_response_log, set_root_attrs, trace_id_hex
 
 logger = logging.getLogger("app.chat_service")
 
@@ -39,6 +40,7 @@ class Deps:
     models: dict[str, ModelSpec]
     prices: dict | None = None
     emit_log: Callable = emit_prompt_log
+    emit_response_log: Callable = emit_response_log
     gate: object | None = None  # GemmaGate-like; consulted first so an offline VM answers 503 fast
 
 
@@ -113,11 +115,25 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
                    app__genai__output_tokens=res.output_tokens + res.thinking_tokens,
                    app__genai__thinking_tokens=res.thinking_tokens,
                    app__genai__cost_basis=cost.basis)
+    _emit_response(deps, req, persona.id, spec.model_id, res.text, ret)
     return {**base, "answer": res.text, "blocked": False, "block_reason": [], "docs": _docs(ret),
             "hidden": _hidden(ret),
             "usage": {"input_tokens": res.input_tokens, "output_tokens": res.output_tokens,
                       "thinking_tokens": res.thinking_tokens},
             "cost_usd": cost.total_usd}
+
+
+def _emit_response(deps: Deps, req: ChatRequest, persona_id: str, model_id: str, answer: str,
+                   ret: RetrievalResult) -> None:
+    try:
+        retrieved = [d.id for d in ret.docs]
+        deps.emit_response_log(
+            prompt=req.message, response=answer, context=context_text(ret.docs), retrieved_ids=retrieved,
+            cited_ids=_cited_ids(answer, retrieved), top_score=max((d.score for d in ret.docs), default=0.0),
+            hidden_count=len(ret.hidden), top_hidden_score=max((g.score for g in ret.hidden), default=0.0),
+            answered=is_answered(answer), persona=persona_id, model=model_id, engine=req.engine)
+    except Exception:  # noqa: BLE001 - the response log must never break the chat
+        logger.warning("response log emit failed", exc_info=True)
 
 
 def _no_context(base: dict, ret: RetrievalResult) -> dict:
