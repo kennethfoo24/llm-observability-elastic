@@ -2,7 +2,7 @@
 
 Story: an HR assistant for a company called Foo Corp. The same question gets different answers for different people, and every step is visible, traceable and costed.
 
-People in the app: Maya Lim (Software Engineer, role employee) and Rachel Tan (Chief People Officer, role exec). Daniel Ong (manager) and Priya Nair (HR) are also in the rail.
+People in the app: Maya Lim (Software Engineer, role employee) and Daniel Ong (Engineering Manager, role manager). Maya reads 6 of the 20 documents and Daniel reads 11. The documents only HR or executives can read are hidden from both of them.
 
 ## Before you start (5 minutes ahead)
 
@@ -16,10 +16,10 @@ People in the app: Maya Lim (Software Engineer, role employee) and Rachel Tan (C
 
 | Do | Say | Expect |
 |---|---|---|
-| Select Maya Lim in the rail. Type `What is the Project Aurora severance budget?` and send. | "Maya is an ordinary employee. She asks about a restricted project." | An answer saying the documents do not contain it. No citation. |
-| Click Inspect on the answer to open the X-ray drawer. Scroll to "Hidden by DLS". | "The search ran as Maya. Elasticsearch itself removed the restricted document before the model ever saw it. Here is the ghost card of what she cannot see." | A ghost card for `project-aurora` with a lock icon. |
-| Close the drawer. Click "Ask again as Rachel Tan" under the answer. | "Same question, same model, now as the Chief People Officer." | A real answer that cites `[project-aurora]`. |
-| Inspect again. | "Rachel's document list includes Aurora and nothing is hidden." | "Nothing was hidden for this person." |
+| Select Maya Lim in the rail. Type `What are the salary bands for L3 to L5?` and send. | "Maya is a software engineer. She asks about pay bands, which only managers can read." | An answer saying the documents do not contain it. No citation. |
+| Click Inspect on the answer to open the LLM Observability drawer. Scroll to "Hidden by DLS". | "The search ran as Maya. Elasticsearch itself removed the restricted document before the model ever saw it. Here is the ghost card of what she cannot see." | A ghost card for `salary-bands` (Salary Bands L3 to L5, Confidential) with a lock icon. The restricted HR and executive documents show as ghost cards too. |
+| Close the drawer. Select Daniel Ong in the rail, then click "Ask again as Daniel Ong" under the answer. | "Same question, same model, now as the Engineering Manager." | A real answer with the L3, L4 and L5 bands that cites `[salary-bands]`. |
+| Inspect again. | "Daniel's document list includes the salary bands. The HR and executive documents are still hidden from him." | `salary-bands` in the document list, and fewer ghost cards than for Maya. |
 
 Key point: the control is document level security in the data layer, not a prompt instruction.
 
@@ -27,7 +27,7 @@ Key point: the control is document level security in the data layer, not a promp
 
 | Do | Say | Expect |
 |---|---|---|
-| In the X-ray drawer click "Open trace in Kibana". | "Every answer links to its trace." | Kibana APM opens a new tab on the trace. |
+| In the LLM Observability drawer click "Open trace in Kibana". | "Every answer links to its trace." | Kibana APM opens a new tab on the trace. |
 | Walk the waterfall from the top. | "The request enters the API, then the guardrail check, then hybrid search in Elasticsearch, then prompt build, then the LLM call through the Elastic Inference Service." | Spans `POST /api/chat`, `guardrail.check`, `retrieval.hybrid`, `prompt.build`, `chat gpt-5.4-mini`. |
 | Click the `chat` span and open its attributes. | "Prompt and response are captured on the span, plus token counts and the cost." | `gen_ai.input.messages`, `gen_ai.output.messages`, token counts, and `app.genai.cost_usd` on the root span. |
 | Back in the app switch the engine to LangChain and ask `How many PTO days do I get?` as Maya. Open its trace. | "Same product, a different framework. The instrumentation still shows each step nested under the chain." | Stages `guardrail.check`, `retrieval.hybrid`, `llm.generate`, plus an `invoke_workflow RunnableSequence` span. The trace arrives about 1 minute after the request. |
@@ -74,7 +74,7 @@ If Gemma is not running and someone selects it, the app shows an inline error wi
 
 Run `deploy/scripts/demo_down.sh` (add `--teardown` to remove the load balancer too). Confirm the threshold was restored to 0.25.
 
-## X-ray deep links
+## LLM Observability deep links
 
 - Flagged or blocked prompt: in the Guardrail section click "See where it was blocked" (APM trace, span `guardrail.check`) and "View detection in Elastic Security" (Alerts filtered to rule `glassbox-flagged-prompts`). The alert can take a few minutes to appear.
 - Retrieval: click a document title to open it in Kibana Discover (Kibana login needed; your Kibana role applies, not the persona). Hidden cards have no link.

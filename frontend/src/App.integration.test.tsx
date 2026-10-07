@@ -7,7 +7,7 @@ import type { ChatResponse } from "./lib/types";
 
 const personas = [
   { id: "employee", name: "Maya Lim", title: "Software Engineer", can_read_docs: 6, total_docs: 20 },
-  { id: "exec", name: "Rachel Tan", title: "Chief People Officer", can_read_docs: 20, total_docs: 20 },
+  { id: "manager", name: "Daniel Ong", title: "Engineering Manager", can_read_docs: 11, total_docs: 20 },
 ];
 const models = [
   { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis" as const, model_id: "g1", available: true },
@@ -16,7 +16,7 @@ const models = [
 const answer = (over: Partial<ChatResponse>): ChatResponse => ({
   answer: "Employees get 18 days [pto-policy].", blocked: false, block_reason: [], trace_id: "abc123", persona: "employee", model: "g1", engine: "sdk",
   docs: [{ id: "pto-policy", title: "Paid Time Off Policy", classification: "public", score: 3.1 }],
-  hidden: [{ id: "project-aurora", title: "Project Aurora", classification: "restricted" }],
+  hidden: [{ id: "salary-bands", title: "Salary Bands L3 to L5", classification: "confidential" }],
   usage: { input_tokens: 100, output_tokens: 20, thinking_tokens: 0 }, cost_usd: 0.0004,
   guardrail: { verdict: "CLEAN", reasons: [], status: "ok", latency_ms: 30, injection_score: 0.01 },
   stages: [{ name: "guardrail.check", ms: 30 }, { name: "retrieval.hybrid", ms: 100 }, { name: "prompt.build", ms: 2 }, { name: "llm.generate", ms: 500 }], ...over,
@@ -29,12 +29,12 @@ beforeEach(() => {
   vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "https://kb", company: "Foo Corp" });
 });
 
-test("ask a suggested question, see the answer, the cost and the x-ray", async () => {
+test("ask a suggested question, see the answer, the cost and the LLM Observability", async () => {
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
   await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
   expect(await screen.findByText(/employees get 18 days/i)).toBeInTheDocument();
-  const xray = screen.getByRole("region", { name: "X-ray" });
+  const xray = screen.getByRole("region", { name: "LLM Observability" });
   expect(await within(xray).findByText("Paid Time Off Policy")).toBeInTheDocument();
   expect(within(xray).getByText(/hidden from maya lim/i)).toBeInTheDocument();
   expect(screen.getAllByText("$0.0004").length).toBeGreaterThan(0);
@@ -43,17 +43,17 @@ test("ask a suggested question, see the answer, the cost and the x-ray", async (
 test("switching persona offers to ask the same question again and the new answer differs", async () => {
   const chat = vi.spyOn(apiMod.api, "chat")
     .mockResolvedValueOnce(answer({ answer: "I could not find that.", docs: [], persona: "employee" }))
-    .mockResolvedValueOnce(answer({ answer: "The Aurora severance budget is 2.1 million dollars [project-aurora].", docs: [{ id: "project-aurora", title: "Project Aurora", classification: "restricted", score: 4 }], hidden: [], persona: "exec" }));
+    .mockResolvedValueOnce(answer({ answer: "The L4 band is 98,000 to 125,000 dollars [salary-bands].", docs: [{ id: "salary-bands", title: "Salary Bands L3 to L5", classification: "confidential", score: 4 }], hidden: [], persona: "manager" }));
   render(<App />);
-  await userEvent.type(await screen.findByRole("textbox", { name: /your question/i }), "What is the Project Aurora severance budget?{Enter}");
+  await userEvent.type(await screen.findByRole("textbox", { name: /your question/i }), "What are the salary bands for L3 to L5?{Enter}");
   expect(await screen.findByText(/could not find that/i)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
-  await userEvent.click(await screen.findByRole("button", { name: /ask again as rachel tan/i }));
-  expect(await screen.findByText(/2\.1 million/i)).toBeInTheDocument();
-  expect(chat).toHaveBeenLastCalledWith({ message: "What is the Project Aurora severance budget?", persona: "exec", model: "eis-gpt-mini", engine: "sdk" });
+  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
+  await userEvent.click(await screen.findByRole("button", { name: /ask again as daniel ong/i }));
+  expect(await screen.findByText(/98,000 to 125,000/i)).toBeInTheDocument();
+  expect(chat).toHaveBeenLastCalledWith({ message: "What are the salary bands for L3 to L5?", persona: "manager", model: "eis-gpt-mini", engine: "sdk" });
 });
 
-test("a blocked red-team prompt shows the block card and the x-ray says nothing was billed", async () => {
+test("a blocked red-team prompt shows the block card and the LLM Observability says nothing was billed", async () => {
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({ blocked: true, answer: "", block_reason: ["prompt_injection"], docs: [], hidden: [], cost_usd: 0, guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 25, injection_score: 0.99 }, stages: [{ name: "guardrail.check", ms: 25 }] }));
   render(<App />);
   await userEvent.click(await screen.findByRole("button", { name: /red team/i }));
@@ -126,19 +126,19 @@ async function askPto() {
   await screen.findByText(/employees get 18 days/i);
 }
 
-test("on a small screen the message Inspect button opens the x-ray sheet, Escape closes it and focus returns", async () => {
+test("on a small screen the message Inspect button opens the LLM Observability sheet, Escape closes it and focus returns", async () => {
   mockSmall(true);
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
   await askPto();
-  expect(screen.queryByRole("button", { name: /inspect x-ray/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: /inspect LLM Observability/i })).toBeNull();
   const inspect = screen.getByRole("button", { name: /^inspect$/i });
   await userEvent.click(inspect);
-  const dialog = await screen.findByRole("dialog", { name: "X-ray" });
+  const dialog = await screen.findByRole("dialog", { name: "LLM Observability" });
   expect(dialog).toHaveAttribute("aria-modal", "true");
-  expect(screen.getByRole("button", { name: /close x-ray/i })).toHaveFocus();
+  expect(screen.getByRole("button", { name: /close LLM Observability/i })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
   await waitFor(() => expect(screen.getByRole("button", { name: /^inspect$/i })).toHaveFocus());
 });
 
@@ -148,18 +148,18 @@ test("on desktop the message Inspect button only selects, it does not open the s
   render(<App />);
   await askPto();
   await userEvent.click(screen.getByRole("button", { name: /^inspect$/i }));
-  expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull();
 });
 
-test("clicking the scrim closes the x-ray sheet", async () => {
+test("clicking the scrim closes the LLM Observability sheet", async () => {
   mockSmall(true);
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
   await askPto();
   await userEvent.click(screen.getByRole("button", { name: /^inspect$/i }));
-  await screen.findByRole("dialog", { name: "X-ray" });
+  await screen.findByRole("dialog", { name: "LLM Observability" });
   await userEvent.click(screen.getByTestId("xray-scrim"));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
 });
 
 test("the rail disclosure is collapsed by default, toggles aria-expanded and keeps the summary current after a persona change", async () => {
@@ -169,10 +169,10 @@ test("the rail disclosure is collapsed by default, toggles aria-expanded and kee
   expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Maya Lim, GPT-5.4 mini");
   await userEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toContainElement(screen.getByRole("radio", { name: /rachel tan/i }));
-  await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
+  expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toContainElement(screen.getByRole("radio", { name: /daniel ong/i }));
+  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Rachel Tan, GPT-5.4 mini");
+  expect(screen.getByText(/asking as/i, { selector: "p" })).toHaveTextContent("Asking as Daniel Ong, GPT-5.4 mini");
   await userEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
@@ -181,7 +181,7 @@ test("picking a model by click closes the open disclosure and returns focus to i
   render(<App />);
   const toggle = await screen.findByRole("button", { name: /change person or model/i });
   await userEvent.click(toggle);
-  await userEvent.click(screen.getByRole("radio", { name: /rachel tan/i }));
+  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   await userEvent.click(screen.getByRole("radio", { name: /gpt-5\.4 mini/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -227,7 +227,7 @@ test("below xl a citation click opens the sheet and highlights the cited documen
   render(<App />);
   await askPto();
   await userEvent.click(screen.getByRole("button", { name: "pto-policy" }));
-  const dialog = await screen.findByRole("dialog", { name: "X-ray" });
+  const dialog = await screen.findByRole("dialog", { name: "LLM Observability" });
   expect(within(dialog).getByText("Paid Time Off Policy").closest("[data-highlighted]")).toHaveAttribute("data-highlighted", "true");
 });
 
@@ -237,7 +237,7 @@ test("on desktop a citation click does not open the sheet", async () => {
   render(<App />);
   await askPto();
   await userEvent.click(screen.getByRole("button", { name: "pto-policy" }));
-  expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull();
 });
 
 test("growing past xl closes the open sheet and releases the scroll lock", async () => {
@@ -247,9 +247,9 @@ test("growing past xl closes the open sheet and releases the scroll lock", async
   await askPto();
   document.body.style.overflow = "";
   await userEvent.click(screen.getByRole("button", { name: /^inspect$/i }));
-  await screen.findByRole("dialog", { name: "X-ray" });
+  await screen.findByRole("dialog", { name: "LLM Observability" });
   expect(document.body.style.overflow).toBe("hidden");
   vp.set(true);
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "X-ray" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
   expect(document.body.style.overflow).toBe("");
 });

@@ -3,31 +3,31 @@ import userEvent from "@testing-library/user-event";
 import { ChatThread } from "./ChatThread";
 import type { Message } from "../state/chatState";
 
-const base = { models: [], pending: false, selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", exec: "Rachel Tan" } as Record<string, string>)[id] ?? id };
+const base = { models: [], pending: false, selectedId: null, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), onAskAgain: vi.fn(), personaName: (id: string) => ({ employee: "Maya Lim", manager: "Daniel Ong" } as Record<string, string>)[id] ?? id };
 
 const thread: Message[] = [
-  { id: "m1", kind: "user", text: "What is the Project Aurora severance budget?", persona: "employee" },
+  { id: "m1", kind: "user", text: "What are the salary bands for L3 to L5?", persona: "employee" },
   { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "pending" },
-  { id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" },
+  { id: "m3", kind: "divider", text: "Now asking as Daniel Ong, Engineering Manager" },
 ];
 
 test("renders user messages, pending answers and persona dividers in a polite live log", () => {
-  render(<ChatThread {...base} messages={thread} askAgainAs="Rachel Tan" />);
+  render(<ChatThread {...base} messages={thread} askAgainAs="Daniel Ong" />);
   expect(screen.getByRole("log")).toHaveAttribute("aria-live", "polite");
-  expect(screen.getByText(/project aurora severance/i)).toBeInTheDocument();
+  expect(screen.getByText(/salary bands for L3 to L5/i)).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
-  expect(screen.getByText("Now asking as Rachel Tan, Chief People Officer")).toBeInTheDocument();
+  expect(screen.getByText("Now asking as Daniel Ong, Engineering Manager")).toBeInTheDocument();
 });
 
 test("after a persona switch it offers to ask the same question again as the new persona", async () => {
   const onAskAgain = vi.fn();
-  render(<ChatThread {...base} onAskAgain={onAskAgain} messages={thread} askAgainAs="Rachel Tan" />);
-  await userEvent.click(screen.getByRole("button", { name: /ask again as rachel tan/i }));
-  expect(onAskAgain).toHaveBeenCalledWith("What is the Project Aurora severance budget?");
+  render(<ChatThread {...base} onAskAgain={onAskAgain} messages={thread} askAgainAs="Daniel Ong" />);
+  await userEvent.click(screen.getByRole("button", { name: /ask again as daniel ong/i }));
+  expect(onAskAgain).toHaveBeenCalledWith("What are the salary bands for L3 to L5?");
 });
 
 test("no ask-again offer without a previous question", () => {
-  render(<ChatThread {...base} messages={[{ id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" }]} askAgainAs="Rachel Tan" />);
+  render(<ChatThread {...base} messages={[{ id: "m3", kind: "divider", text: "Now asking as Daniel Ong, Engineering Manager" }]} askAgainAs="Daniel Ong" />);
   expect(screen.queryByRole("button", { name: /ask again/i })).toBeNull();
 });
 
@@ -35,20 +35,20 @@ test("an answer keeps the persona it was asked as, even after a switch", () => {
   render(<ChatThread {...base} messages={[
     { id: "m1", kind: "user", text: "q", persona: "employee" },
     { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
-  ]} askAgainAs="Rachel Tan" />);
+  ]} askAgainAs="Daniel Ong" />);
   expect(screen.getByText(/maya lim/i)).toBeInTheDocument();
 });
 
 test("each answer shows the persona it was asked as, in a mixed-persona thread", () => {
-  render(<ChatThread {...base} askAgainAs="Rachel Tan" messages={[
+  render(<ChatThread {...base} askAgainAs="Daniel Ong" messages={[
     { id: "m1", kind: "user", text: "q1", persona: "employee" },
     { id: "m2", kind: "assistant", replyTo: "m1", persona: "employee", model: "eis-gpt-mini", engine: "sdk", status: "pending" },
-    { id: "m3", kind: "divider", text: "Now asking as Rachel Tan, Chief People Officer" },
-    { id: "m4", kind: "user", text: "q1", persona: "exec" },
-    { id: "m5", kind: "assistant", replyTo: "m4", persona: "exec", model: "eis-gpt-mini", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
+    { id: "m3", kind: "divider", text: "Now asking as Daniel Ong, Engineering Manager" },
+    { id: "m4", kind: "user", text: "q1", persona: "manager" },
+    { id: "m5", kind: "assistant", replyTo: "m4", persona: "manager", model: "eis-gpt-mini", engine: "sdk", status: "error", error: { status: 502, code: "upstream_error" } },
   ]} />);
   expect(screen.getByText("Asked as Maya Lim")).toBeInTheDocument();
-  expect(screen.getByText("Asked as Rachel Tan")).toBeInTheDocument();
+  expect(screen.getByText("Asked as Daniel Ong")).toBeInTheDocument();
 });
 
 test("scrolls to the end again when the pending answer lands", () => {
@@ -66,6 +66,6 @@ test("scrolls to the end again when the pending answer lands", () => {
 });
 
 test("ask again is disabled while a request is pending", () => {
-  render(<ChatThread {...base} pending messages={thread} askAgainAs="Rachel Tan" />);
-  expect(screen.getByRole("button", { name: /ask again as rachel tan/i })).toBeDisabled();
+  render(<ChatThread {...base} pending messages={thread} askAgainAs="Daniel Ong" />);
+  expect(screen.getByRole("button", { name: /ask again as daniel ong/i })).toBeDisabled();
 });

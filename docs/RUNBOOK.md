@@ -49,7 +49,7 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 
 | Key | Facts | What to do |
 |---|---|---|
-| Persona keys (employee, manager, hr, exec, catalog, guardrail) | Minted 2026-10-05 with a 90 day expiry, so they expire on 2027-01-03 | Before that date: re-mint with `docs/dev-tools-mint-keys.md`, save to `backend/secrets/persona_keys.json`, run `deploy/scripts/create_secrets.sh`, then `kubectl -n genai-demo rollout restart deployment/glassbox`. An expired key makes every chat fail with 502 |
+| Persona keys (employee, manager, catalog, guardrail; any extra hr or exec keys in the file are unused and harmless) | Minted 2026-10-05 with a 90 day expiry, so they expire on 2027-01-03 | Before that date: re-mint with `docs/dev-tools-mint-keys.md`, save to `backend/secrets/persona_keys.json`, run `deploy/scripts/create_secrets.sh`, then `kubectl -n genai-demo rollout restart deployment/glassbox`. An expired key makes every chat fail with 502 |
 | Demo password | Rotated once after it appeared in a tool output during the first smoke run. The old password is invalid | Replace the contents of `backend/secrets/app_password.txt`, run `create_secrets.sh`, restart the deployment |
 | Guardrail log export keys | By the project owner's decision these are the project admin keys (`ALLOW_ADMIN_LOG_KEYS=1`). A compromised pod would expose admin access to both projects | Open item: replace with ingest-only keys from `docs/dev-tools-mint-ingest-keys.md`, then re-run `create_secrets.sh` without the override and restart |
 | Plaintext OTLP key on `o11y-metrics/chatbot-rag-app` | Intentionally untouched, by the project owner's decision. Only note: its value appeared in this project's working notes | No action here |
@@ -110,6 +110,6 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 5. Gemma `/metrics` is open (accepted risk) and the hardening proposal awaits approval.
 6. Decision for the project owner: keep the Gemma Local SSD on stop (fast boot, possible Local SSD storage charge) or set `GEMMA_DISCARD_SSD=1` (no charge, slower next boot, data lost). Check the actual charge in billing first.
 
-## X-ray deep links config
+## LLM Observability deep links config
 
-The X-ray links use `OBS_KIBANA_URL` (trace, Discover, cost dashboard) and `SEC_KIBANA_URL` (Security alerts link). Both come from Secret `glassbox-app` (keys `kibana_url`, `sec_kibana_url`), which `deploy/scripts/create_secrets.sh` fills from `OBSERVABILITY_KIBANA` and `SECURITY_KIBANA` in `elasticsearch.txt`. Re-run it before deploying this version. If `sec_kibana_url` is empty the Security links are hidden. The Discover and alerts URL states use Kibana rison format; open each once in a logged-in browser.
+The LLM Observability links use `OBS_KIBANA_URL` (trace, Discover, cost dashboard) and `SEC_KIBANA_URL` (Security alerts link). Both come from Secret `glassbox-app` (keys `kibana_url`, `sec_kibana_url`), which `deploy/scripts/create_secrets.sh` fills from `OBSERVABILITY_KIBANA` and `SECURITY_KIBANA` in `elasticsearch.txt`. Re-run it before deploying this version. If `sec_kibana_url` is empty the Security links are hidden. The Discover and alerts URL states use Kibana rison format; open each once in a logged-in browser.

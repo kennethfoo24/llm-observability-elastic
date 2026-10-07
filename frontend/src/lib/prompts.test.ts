@@ -2,8 +2,8 @@ import { RED_TEAM, SUGGESTIONS } from "./prompts";
 
 const DASH = /[—–]/;
 
-test("suggestions cover the four personas with at least three each", () => {
-  expect(Object.keys(SUGGESTIONS).sort()).toEqual(["employee", "exec", "hr", "manager"]);
+test("suggestions cover the two personas with at least three each", () => {
+  expect(Object.keys(SUGGESTIONS).sort()).toEqual(["employee", "manager"]);
   for (const list of Object.values(SUGGESTIONS)) expect(list.length).toBeGreaterThanOrEqual(3);
 });
 

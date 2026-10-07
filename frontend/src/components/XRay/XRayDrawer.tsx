@@ -37,7 +37,7 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
   return (
     <div className="min-w-0 pb-8">
       <div className="px-5 pb-4 pt-5">
-        <h2 className="text-lg font-semibold">X-ray</h2>
+        <h2 className="text-lg font-semibold">LLM Observability</h2>
         <p className="mt-1 text-sm text-on-ink-muted">What Elastic recorded for this answer.</p>
         {question && <p className="mt-3 line-clamp-2 break-words rounded-control bg-ink-2 px-3 py-2 text-sm text-on-ink-muted">{question}</p>}
       </div>

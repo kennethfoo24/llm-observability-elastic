@@ -6,7 +6,7 @@ import type { ChatResponse, ModelInfo, Persona } from "../lib/types";
 
 const personas: Persona[] = [
   { id: "employee", name: "Maya Lim", title: "Software Engineer", can_read_docs: 6, total_docs: 20 },
-  { id: "exec", name: "Rachel Tan", title: "Chief People Officer", can_read_docs: 20, total_docs: 20 },
+  { id: "manager", name: "Daniel Ong", title: "Engineering Manager", can_read_docs: 11, total_docs: 20 },
 ];
 const models: ModelInfo[] = [
   { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis", model_id: "g1", available: true },
@@ -56,12 +56,12 @@ test("switching persona while pending attaches the answer to the original person
   vi.spyOn(apiMod.api, "chat").mockReturnValue(new Promise((r) => { resolve = r; }));
   const { result } = setup();
   act(() => { void result.current.send("q"); });
-  act(() => result.current.dispatch({ type: "setPersona", persona: "exec", label: "Rachel Tan, Chief People Officer" }));
+  act(() => result.current.dispatch({ type: "setPersona", persona: "manager", label: "Daniel Ong, Engineering Manager" }));
   await act(async () => { resolve(ok()); });
   const a = result.current.state.messages.find((m) => m.kind === "assistant") as any;
   expect(a.persona).toBe("employee");
   expect(a.status).toBe("done");
-  expect(result.current.state.persona).toBe("exec");
+  expect(result.current.state.persona).toBe("manager");
 });
 
 test("failure keeps the draft intact for 401 and marks the message as an error", async () => {
@@ -77,7 +77,7 @@ test("retry re-sends the original question with the original persona", async () 
   const chat = vi.spyOn(apiMod.api, "chat").mockRejectedValueOnce(new ApiError(503, "gemma_offline")).mockResolvedValue(ok());
   const { result } = setup();
   await act(async () => { await result.current.send("hello"); });
-  act(() => result.current.dispatch({ type: "setPersona", persona: "exec", label: "x" }));
+  act(() => result.current.dispatch({ type: "setPersona", persona: "manager", label: "x" }));
   const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
   await act(async () => { await result.current.retry(id); });
   expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });

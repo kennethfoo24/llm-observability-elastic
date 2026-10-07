@@ -15,7 +15,7 @@ from .telemetry import emit_prompt_log, set_root_attrs, trace_id_hex
 
 logger = logging.getLogger("app.chat_service")
 
-# Inline blocking policy. The async pipeline flags every reason below (and the X-ray shows the
+# Inline blocking policy. The async pipeline flags every reason below (and the LLM Observability shows the
 # FLAGGED verdict), but only a security-relevant subset stops the request. Ordinary HR questions
 # that merely mention a salary or several colleagues are flagged-but-allowed; everything in
 # BLOCKING_REASONS (prompt injection and direct identifiers) is blocked before retrieval or the LLM.

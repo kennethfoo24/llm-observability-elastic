@@ -32,8 +32,8 @@ test("receive completes the right message and accumulates spend", () => {
 test("a persona switch while a request is pending does not change that pending message", () => {
   let s = reducer(start(), sendAction("Show salary bands"));
   const pendingId = s.messages[1].id;
-  s = reducer(s, { type: "setPersona", persona: "exec", label: "Rachel Tan, Chief People Officer" });
-  expect(s.persona).toBe("exec");
+  s = reducer(s, { type: "setPersona", persona: "manager", label: "Daniel Ong, Engineering Manager" });
+  expect(s.persona).toBe("manager");
   s = reducer(s, { type: "receive", id: pendingId, response: resp({ persona: "employee" }) });
   const a = s.messages.find((m) => m.id === pendingId) as AssistantMsg;
   expect(a.persona).toBe("employee");
@@ -41,12 +41,12 @@ test("a persona switch while a request is pending does not change that pending m
 });
 
 test("switching persona inserts one divider only when the conversation has messages", () => {
-  const empty = reducer(start(), { type: "setPersona", persona: "hr", label: "Priya Nair, HR Business Partner" });
+  const empty = reducer(start(), { type: "setPersona", persona: "manager", label: "Daniel Ong, Engineering Manager" });
   expect(empty.messages).toEqual([]);
   let s = reducer(start(), sendAction("hi"));
-  s = reducer(s, { type: "setPersona", persona: "hr", label: "Priya Nair, HR Business Partner" });
-  expect(s.messages[s.messages.length - 1]).toMatchObject({ kind: "divider", text: "Now asking as Priya Nair, HR Business Partner" });
-  const same = reducer(s, { type: "setPersona", persona: "hr", label: "x" });
+  s = reducer(s, { type: "setPersona", persona: "manager", label: "Daniel Ong, Engineering Manager" });
+  expect(s.messages[s.messages.length - 1]).toMatchObject({ kind: "divider", text: "Now asking as Daniel Ong, Engineering Manager" });
+  const same = reducer(s, { type: "setPersona", persona: "manager", label: "x" });
   expect(same.messages.length).toBe(s.messages.length);
 });
 
@@ -146,8 +146,8 @@ test("retry on an error message re-opens it and the following receive adds cost 
 
 test("arrowing through personas keeps one divider that names the latest persona", () => {
   let s = reducer(start(), sendAction("hi"));
-  s = reducer(s, { type: "setPersona", persona: "hr", label: "B" });
-  s = reducer(s, { type: "setPersona", persona: "exec", label: "C" });
+  s = reducer(s, { type: "setPersona", persona: "manager", label: "B" });
+  s = reducer(s, { type: "setPersona", persona: "guest", label: "C" });
   const dividers = s.messages.filter((m) => m.kind === "divider");
   expect(dividers).toHaveLength(1);
   expect(dividers[0]).toMatchObject({ text: "Now asking as C" });
@@ -155,7 +155,7 @@ test("arrowing through personas keeps one divider that names the latest persona"
 
 test("switching back to the persona before the divider removes the divider", () => {
   let s = reducer(start(), sendAction("hi"));
-  s = reducer(s, { type: "setPersona", persona: "hr", label: "B" });
+  s = reducer(s, { type: "setPersona", persona: "manager", label: "B" });
   s = reducer(s, { type: "setPersona", persona: "employee", label: "A" });
   expect(s.messages.filter((m) => m.kind === "divider")).toHaveLength(0);
   expect(s.persona).toBe("employee");
@@ -163,7 +163,7 @@ test("switching back to the persona before the divider removes the divider", () 
 
 test("switching A to B to C to A leaves no divider", () => {
   let s = reducer(start(), sendAction("hi"));
-  for (const [p, l] of [["hr", "B"], ["exec", "C"], ["employee", "A"]]) s = reducer(s, { type: "setPersona", persona: p, label: l });
+  for (const [p, l] of [["manager", "B"], ["guest", "C"], ["employee", "A"]]) s = reducer(s, { type: "setPersona", persona: p, label: l });
   expect(s.messages.filter((m) => m.kind === "divider")).toHaveLength(0);
 });
 

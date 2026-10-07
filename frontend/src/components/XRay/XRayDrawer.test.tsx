@@ -20,7 +20,7 @@ const props = { persona: maya, question: "How many PTO days?", kibanaUrl: "https
 
 test("empty state explains what will appear", () => {
   render(<XRayDrawer {...props} msg={null} />);
-  expect(screen.getByRole("heading", { name: "X-ray" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "LLM Observability" })).toBeInTheDocument();
   expect(screen.getByText(/send a question to see/i)).toBeInTheDocument();
 });
 

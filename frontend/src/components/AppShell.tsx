@@ -3,7 +3,7 @@ import { XRaySheet } from "./XRaySheet";
 
 type Slots = { header: ReactNode; rail: ReactNode; thread: ReactNode; composer: ReactNode; xray: ReactNode; xrayOpen: boolean; onXrayClose: () => void };
 
-/* xl (1280+): rail 300px | chat | x-ray 420px. lg (1024-1279): rail | chat, x-ray in the sheet (three columns left the chat 304px wide at 1024 and the x-ray covered the composer). Below lg: one full-height column (rail summary row, chat, composer); the x-ray is a bottom sheet. */
+/* xl (1280+): rail 300px | chat | LLM Observability 420px. lg (1024-1279): rail | chat, LLM Observability in the sheet (three columns left the chat 304px wide at 1024 and the LLM Observability covered the composer). Below lg: one full-height column (rail summary row, chat, composer); the LLM Observability is a bottom sheet. */
 export function AppShell({ header, rail, thread, composer, xray, xrayOpen, onXrayClose }: Slots) {
   return (
     <div className="grid h-[100dvh] grid-rows-[auto_minmax(0,1fr)]">
@@ -14,7 +14,7 @@ export function AppShell({ header, rail, thread, composer, xray, xrayOpen, onXra
           <div className="min-h-0 overflow-y-auto">{thread}</div>
           <div className="border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">{composer}</div>
         </main>
-        <section className="on-ink hidden min-h-0 bg-ink text-on-ink xl:block xl:overflow-y-auto" aria-label="X-ray">{xray}</section>
+        <section className="on-ink hidden min-h-0 bg-ink text-on-ink xl:block xl:overflow-y-auto" aria-label="LLM Observability">{xray}</section>
       </div>
       <XRaySheet open={xrayOpen} onClose={onXrayClose}>{xray}</XRaySheet>
     </div>

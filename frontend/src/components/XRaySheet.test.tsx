@@ -20,13 +20,13 @@ function Host({ onClose = () => {} }: { onClose?: () => void }) {
 
 async function openSheet() {
   await userEvent.click(screen.getByRole("button", { name: "opener" }));
-  await screen.findByRole("dialog", { name: "X-ray" });
+  await screen.findByRole("dialog", { name: "LLM Observability" });
 }
 
 test("opens with focus on the close button and Escape closes and restores focus to the opener", async () => {
   render(<Host />);
   await openSheet();
-  expect(screen.getByRole("button", { name: /close x-ray/i })).toHaveFocus();
+  expect(screen.getByRole("button", { name: /close LLM Observability/i })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(screen.getByRole("button", { name: "opener" })).toHaveFocus();
@@ -37,7 +37,7 @@ test("Tab from the last focusable element wraps to the first, Shift+Tab from the
   await openSheet();
   screen.getByRole("link", { name: "last link" }).focus();
   await userEvent.tab();
-  expect(screen.getByRole("button", { name: /close x-ray/i })).toHaveFocus();
+  expect(screen.getByRole("button", { name: /close LLM Observability/i })).toHaveFocus();
   await userEvent.tab({ shift: true });
   expect(screen.getByRole("link", { name: "last link" })).toHaveFocus();
 });

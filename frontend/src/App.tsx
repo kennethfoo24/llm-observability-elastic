@@ -24,7 +24,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
   const session = useChatSession(personas, models, refreshModels, draftControl);
   const { state, dispatch, send, retry, askAgain, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj, personaName } = session;
   const [xrayOpen, setXrayOpen] = useState(false);
-  // the one source of truth for "is the x-ray a column or a sheet"; 80rem matches Tailwind's xl, so it follows the user's font size like the layout does
+  // the one source of truth for "is the LLM Observability a column or a sheet"; 80rem matches Tailwind's xl, so it follows the user's font size like the layout does
   const xrayInline = useMediaQuery("(min-width: 80rem)");
   const closeXray = () => setXrayOpen(false);
   useEffect(() => { if (xrayInline) setXrayOpen(false); }, [xrayInline]);
