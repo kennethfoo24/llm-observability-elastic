@@ -27,7 +27,7 @@ let counter = 0;
 export const newId = (): string => `m${++counter}`;
 
 export function initialState(persona: string, model: string): ChatState {
-  return { persona, model, engine: "sdk", messages: [], selectedId: null, spendUsd: 0 };
+  return { persona, model, engine: "langchain", messages: [], selectedId: null, spendUsd: 0 };
 }
 
 function mapAssistant(

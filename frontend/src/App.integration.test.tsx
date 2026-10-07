@@ -50,7 +50,7 @@ test("switching persona offers to ask the same question again and the new answer
   await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
   await userEvent.click(await screen.findByRole("button", { name: /ask again as daniel ong/i }));
   expect(await screen.findByText(/98,000 to 125,000/i)).toBeInTheDocument();
-  expect(chat).toHaveBeenLastCalledWith({ message: "What are the salary bands for L3 to L5?", persona: "manager", model: "eis-gpt-mini", engine: "sdk" });
+  expect(chat).toHaveBeenLastCalledWith({ message: "What are the salary bands for L3 to L5?", persona: "manager", model: "eis-gpt-mini", engine: "langchain" });
 });
 
 test("a blocked red-team prompt shows the block card and the LLM Observability says nothing was billed", async () => {

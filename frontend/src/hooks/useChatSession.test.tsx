@@ -28,7 +28,7 @@ test("send posts with the persona, model and engine at send time, then stores th
   const { result } = setup();
   act(() => result.current.setDraft("How many PTO days?"));
   await act(async () => { await result.current.send("How many PTO days?"); });
-  expect(chat).toHaveBeenCalledWith({ message: "How many PTO days?", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
+  expect(chat).toHaveBeenCalledWith({ message: "How many PTO days?", persona: "employee", model: "eis-gpt-mini", engine: "langchain" });
   expect(result.current.draft).toBe("");
   expect(result.current.state.spendUsd).toBeCloseTo(0.001);
   expect(result.current.current?.status).toBe("done");
@@ -80,7 +80,7 @@ test("retry re-sends the original question with the original persona", async () 
   act(() => result.current.dispatch({ type: "setPersona", persona: "manager", label: "x" }));
   const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
   await act(async () => { await result.current.retry(id); });
-  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
+  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "langchain" });
   expect((result.current.state.messages.find((m) => m.kind === "assistant") as any).status).toBe("done");
 });
 
@@ -91,7 +91,7 @@ test("retry with a model override sends that model and rebinds the message", asy
   await act(async () => { await result.current.send("hello"); });
   const id = (result.current.state.messages.find((m) => m.kind === "assistant") as any).id;
   await act(async () => { await result.current.retry(id, "eis-gpt-mini"); });
-  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "sdk" });
+  expect(chat).toHaveBeenLastCalledWith({ message: "hello", persona: "employee", model: "eis-gpt-mini", engine: "langchain" });
   const a = result.current.state.messages.find((m) => m.kind === "assistant") as any;
   expect(a).toMatchObject({ status: "done", model: "eis-gpt-mini" });
 });

@@ -36,7 +36,7 @@ class ChatBody(BaseModel):
     message: str
     persona: str
     model: str
-    engine: Literal["sdk", "langchain"] = "sdk"
+    engine: Literal["sdk", "langchain"] = "langchain"
 
     @field_validator("message")
     @classmethod
