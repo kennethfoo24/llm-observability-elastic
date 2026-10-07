@@ -33,8 +33,8 @@ def test_flagged_response_with_fake_canary_param(project):
 
 @pytest.mark.parametrize("project", ["observability", "security"])
 def test_language_mismatch_and_clean_answer(project):
-    clean, fr = _sim(project, [_doc("How many days of annual leave do I get?", "You get 18 days per year [hr-001]."),
-                               _doc("Combien de jours de congé ai-je par an ?", "You get 18 days per year [hr-001].")])
+    clean, fr = _sim(project, [_doc("How many days of annual leave do I get?", "You get 18 days of paid annual leave per year, per the leave policy [hr-001]."),
+                               _doc("Combien de jours de congé ai-je par an ?", "You get 18 days of paid annual leave per year, per the leave policy [hr-001].")])
     assert clean["output_verdict"] == "CLEAN" and clean["quality"]["lang_mismatch"] is False
     assert fr["quality"]["prompt_lang"] == "fr" and fr["quality"]["lang_mismatch"] is True
 
@@ -62,3 +62,16 @@ def test_judge_user_sentiment_neutral_negative_positive():
             _doc("Thank you so much, that was really helpful!", "You are welcome!")]
     got = [d["quality"].get("user_sentiment") for d in _sim("observability", docs)]
     assert got == ["neutral", "negative", "positive"], got
+
+
+def test_false_positive_fixes_language_gate_and_judge_topic():
+    en_resp = "You get 18 days of paid annual leave per year [hr-001]."
+    docs = [_doc("How many PTO days do I get?", en_resp),
+            _doc("Combien de jours de congé payé ai-je par an dans l'entreprise ?", "Vous avez 18 jours de congé payé par an [hr-001]."),
+            _doc("How many days of annual leave do I get per year?", "Vous avez 18 jours de congé payé par an selon la politique [hr-001]."),
+            _doc("What is a good recipe for laksa?", "I can only help with HR questions.", context="")]
+    pto, fr, mix, laksa = (d["quality"] for d in _sim("observability", docs))
+    assert pto.get("lang_mismatch") is not True and pto["on_topic"] is True and pto["off_topic"] is False
+    assert fr["lang_mismatch"] is False and fr["on_topic"] is True and fr["off_topic"] is False
+    assert mix["lang_mismatch"] is True
+    assert laksa["on_topic"] is False and laksa["off_topic"] is True

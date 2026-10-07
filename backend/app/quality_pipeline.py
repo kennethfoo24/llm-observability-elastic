@@ -15,6 +15,8 @@ PROMPT_FIELD = f"{ATTR}.genai.prompt_text"
 RESPONSE_FIELD = f"{ATTR}.genai.response_text"
 QUALITY_HOOK_CONDITION = ("ctx.data_stream?.dataset == 'genai_response.otel' "
                           "|| ctx.data_stream?.dataset == 'genai_response'")
+EN_WORDS = ["how", "many", "much", "what", "when", "where", "who", "which", "why", "do", "does", "i", "my", "me", "we",
+            "you", "the", "a", "an", "is", "are", "can", "get", "of", "to", "for", "and", "in", "on", "it", "this", "that"]
 TOPIC_LABELS = ["hr policy", "benefits and leave", "payroll and compensation", "career and performance",
                 "workplace conduct", "off topic"]
 OFF_TOPIC_LABEL = "off topic"
@@ -42,6 +44,8 @@ FIELD_MAPPINGS: dict = {
         "user_sentiment": _KW,   # judge verdict on the user's prompt: positive | neutral | negative
         "topic": _KW, "topic_score": {"type": "double"}, "off_topic": {"type": "boolean"},
         "prompt_lang": _KW, "response_lang": _KW, "lang_mismatch": {"type": "boolean"},
+        "prompt_lang_prob": {"type": "double"}, "response_lang_prob": {"type": "double"},
+        "on_topic": {"type": "boolean"},   # judge: is the question about workplace or HR matters, any language
         "person_count": {"type": "long"}, "pii_types": _KW, "canary_checked": {"type": "boolean"},
         "faithfulness": {"type": "integer"}, "relevance": {"type": "integer"},
         "judge_answered": {"type": "boolean"}, "judge_reason": {"type": "keyword", "ignore_above": 1024},
@@ -73,10 +77,11 @@ t.canary_leak = checked && low.contains(c.toLowerCase());
 JUDGE_INSTRUCTIONS = (
     "You are a strict evaluator of an HR assistant. Grade the ANSWER against the CONTEXT and the QUESTION. "
     'Reply with STRICT JSON only, no prose and no code fences, exactly this shape: '
-    '{"faithfulness":1-5,"relevance":1-5,"answered":true|false,"sentiment":"positive|neutral|negative","reason":"<=20 words"}. '
+    '{"faithfulness":1-5,"relevance":1-5,"answered":true|false,"sentiment":"positive|neutral|negative","on_topic":true|false,"reason":"<=20 words"}. '
     "faithfulness: 5 means every claim in the answer is supported by the context, 1 means mostly unsupported or invented. "
     "relevance: 5 means the answer directly addresses the question. "
     "answered: false if the answer declines or says it cannot help. "
+    "on_topic: true if the QUESTION is about workplace or HR matters (leave, pay, benefits, conduct, careers, policies), in any language, false otherwise. "
     "sentiment: the tone of the QUESTION author only. positive for thanks or praise, negative for rude, hostile or "
     "frustrated wording, neutral for an ordinary factual question. "
     "If the CONTEXT is empty, a polite refusal that invents nothing scores faithfulness 5. "
@@ -155,10 +160,28 @@ if (app != null) {
 }
 // language
 String pl = t.prompt_lang != null ? t.prompt_lang.predicted_value : null;
+// lang_ident confuses short English with pt/es/gl ("How many PTO days do I get?" is pt at 0.95): an English function
+// word check overrides it. French and other prompts contain none of these words.
+if (pl != null && !pl.equals('en') && g != null && g.prompt_text != null) {
+  int hits = 0;
+  Set seen = new HashSet();
+  for (String w : /[^a-z']+/.split(g.prompt_text.toString().toLowerCase())) {
+    if (params.en_words.contains(w) && seen.add(w)) { hits++; }
+  }
+  if (hits >= 3) { pl = 'en'; }
+}
 String rl = t.response_lang != null ? t.response_lang.predicted_value : null;
 if (pl != null) { q.prompt_lang = pl; }
 if (rl != null) { q.response_lang = rl; }
-if (pl != null && rl != null) { q.lang_mismatch = !pl.equals(rl); }
+double plp = t.prompt_lang != null ? toD(t.prompt_lang.prediction_probability) : 0.0;
+double rlp = t.response_lang != null ? toD(t.response_lang.prediction_probability) : 0.0;
+if (pl != null) { q.prompt_lang_prob = plp; }
+if (rl != null) { q.response_lang_prob = rlp; }
+// only trust the comparison when both detections are confident and the prompt is long enough to identify
+int plen = g != null && g.prompt_text != null ? g.prompt_text.toString().length() : 0;
+if (pl != null && rl != null && plp >= params.lang_min_prob && rlp >= params.lang_min_prob && plen >= params.lang_min_chars) {
+  q.lang_mismatch = !pl.equals(rl);
+}
 // sentiment: probability of the predicted label
 if (t.sentiment != null && t.sentiment.predicted_value != null) {
   q.sentiment_label = t.sentiment.predicted_value.toString().toUpperCase();
@@ -176,7 +199,8 @@ if (t.topic != null && t.topic.predicted_value != null) {
   }
   q.topic = top;
   q.topic_score = topP;
-  q.off_topic = top.equals(params.off_topic_label) || bestHr < params.hr_floor;
+  // zero-shot is English only: it is the fallback verdict only when the prompt is English (the judge overrides below)
+  if ('en'.equals(pl)) { q.off_topic = top.equals(params.off_topic_label) || bestHr < params.hr_floor; }
 }
 // judge
 Map j = t.judge instanceof Map ? (Map) t.judge : null;
@@ -188,6 +212,10 @@ if (j != null) {
   }
   if (j.relevance instanceof Number) {
     q.relevance = (int) Math.max(1, Math.min(5, Math.round(((Number) j.relevance).doubleValue())));
+  }
+  if (j.on_topic != null) {
+    q.on_topic = toB(j.on_topic);
+    q.off_topic = !q.on_topic;
   }
   if (j.answered != null) { q.judge_answered = toB(j.answered); }
   if (j.sentiment != null) {
@@ -265,7 +293,7 @@ def build_quality_pipeline(project: str, canary: str = "") -> dict:
         ]
     processors.append({"script": {"lang": "painless", "source": VERDICT_SCRIPT,
                                   "params": {"ner_threshold": 0.8, "hr_floor": 0.35, "low_faithfulness": 2,
-                                             "off_topic_label": OFF_TOPIC_LABEL}}})
+                                             "off_topic_label": OFF_TOPIC_LABEL, "lang_min_prob": 0.8, "lang_min_chars": 25, "en_words": EN_WORDS}}})
     return {
         "description": "Output guardrail, conversation quality and LLM judge for GenAI response logs",
         "processors": processors,

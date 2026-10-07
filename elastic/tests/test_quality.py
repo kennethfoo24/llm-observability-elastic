@@ -139,3 +139,16 @@ def test_judge_returns_user_sentiment_and_it_is_mapped_as_keyword():
     assert props["user_sentiment"] == {"type": "keyword"}
     assert "sentiment_label" in props and "sentiment_score" in props   # raw binary eland signal stays
     assert "user_sentiment" in build_component()["template"]["mappings"]["properties"]["quality"]["properties"]
+
+
+def test_language_gate_and_judge_on_topic_are_built_in():
+    from app.quality_pipeline import JUDGE_INSTRUCTIONS, VERDICT_SCRIPT
+    pl = build_quality_pipeline("observability")
+    verdict = next(p["script"] for p in pl["processors"] if "q.lang_mismatch" in p.get("script", {}).get("source", ""))
+    assert verdict["params"]["lang_min_prob"] == 0.8 and verdict["params"]["lang_min_chars"] == 25
+    assert "plp >= params.lang_min_prob" in VERDICT_SCRIPT and "plen >= params.lang_min_chars" in VERDICT_SCRIPT
+    assert '"on_topic":true|false' in JUDGE_INSTRUCTIONS and "q.off_topic = !q.on_topic" in VERDICT_SCRIPT
+    assert "'en'.equals(pl)" in VERDICT_SCRIPT
+    props = FIELD_MAPPINGS["quality"]["properties"]
+    for k, t in (("prompt_lang_prob", "double"), ("response_lang_prob", "double"), ("on_topic", "boolean")):
+        assert props[k]["type"] == t
