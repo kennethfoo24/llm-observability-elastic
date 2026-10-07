@@ -6,7 +6,19 @@ from elastic.apply import apply_project
 from elastic.client import Project
 
 
+DEFAULT_TEMPLATE = {"index_templates": [{"name": "logs-otel@template", "index_template": {
+    "index_patterns": ["logs-*.otel-*"], "composed_of": ["logs@mappings", "otel@mappings", "ecs@mappings"],
+    "priority": 120, "ignore_missing_component_templates": ["logs@custom"]}}]}
+
+
 def _project(handler, name="observability"):
+    inner = handler
+
+    def handler(req):  # noqa: F811 - every fake cluster serves the (read-only) default otel template
+        if req.method == "GET" and req.url.path == "/_index_template/logs-otel@template":
+            return httpx.Response(200, json=DEFAULT_TEMPLATE)
+        return inner(req)
+
     p = name.upper()
     return Project(name, env={
         f"{p}_ELASTICSEARCH": "http://es", f"{p}_KIBANA": "http://kb",
@@ -123,12 +135,13 @@ def test_hook_404_means_absent_and_creates_it():
         return httpx.Response(200, json={"acknowledged": True, "success": True})
 
     apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
-    assert [list(p) for p in sent["body"]["processors"]] == [["pipeline"]]
+    assert [list(p) for p in sent["body"]["processors"]] == [["pipeline"], ["pipeline"]]
 
 
 def test_rerun_with_hook_already_present_makes_no_hook_put_and_no_duplicate():
     from app.guardrail_pipeline import build_hook
-    existing = build_hook({"processors": [{"set": {"field": "x", "value": 1}}]})
+    from app.quality_pipeline import build_quality_hook
+    existing = build_quality_hook(build_hook({"processors": [{"set": {"field": "x", "value": 1}}]}))
     puts = []
 
     def handler(req):
@@ -140,7 +153,7 @@ def test_rerun_with_hook_already_present_makes_no_hook_put_and_no_duplicate():
 
     apply_project(_project(handler), cost_threshold=0.25, dry_run=False)
     assert puts == []
-    assert len(build_hook(existing)["processors"]) == 2
+    assert len(build_quality_hook(build_hook(existing))["processors"]) == 3
 
 
 def test_dashboard_import_failure_is_detected_from_parsed_json():
