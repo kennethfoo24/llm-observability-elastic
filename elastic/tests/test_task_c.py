@@ -31,7 +31,9 @@ def test_alert_thresholds_and_override():
     assert 'quality.user_sentiment == "negative"' in q["glassbox-negative-sentiment"] and "hits >= 3" in q["glassbox-negative-sentiment"]
     assert "quality.low_faithfulness == true" in q["glassbox-low-faithfulness"] and "hits >= 2" in q["glassbox-low-faithfulness"]
     p = q["glassbox-restricted-probing"]
-    assert "quality.hidden_count >= 3" in p and "quality.top_hidden_score > 0" in p and "BY persona = quality.persona" in p and "probes >= 3" in p
+    assert "quality.answered == false AND quality.hidden_count > 0" in p and "top_hidden_score" not in p
+    assert "BY persona = quality.persona" in p and "probes >= 3" in p
+    assert quality_alerts.BY_ID["glassbox-restricted-probing"].name == "Glass Box: Restricted topic attempts"
     assert "quality.off_topic == true" in q["glassbox-off-topic"] and "hits >= 3" in q["glassbox-off-topic"]
     assert "quality.lang_mismatch == true" in q["glassbox-language-mismatch"] and "hits >= 2" in q["glassbox-language-mismatch"]
     low = quality_alerts.all_rules({"glassbox-off-topic": 1})["glassbox-off-topic"]["params"]["esqlQuery"]["esql"]
@@ -98,3 +100,14 @@ def test_owasp_dashboard_covers_each_risk_and_marks_visibility_only():
     tp = json.loads(obj["attributes"]["panelsJSON"])[-1]["embeddableConfig"]["attributes"]
     assert tp["visualizationType"] == "lnsDatatable"
     assert [c["columnId"] for c in tp["state"]["visualization"]["columns"]] == list(table.cols)
+
+
+def test_owasp_reason_panels_are_multivalue_safe_and_scope_column_is_not_constant():
+    by = {p.title: p.esql for p in OWASP_DASHBOARD.panels}
+    for t, r in (("LLM02 PII in responses", "pii_in_response"), ("LLM05 unsafe markup in responses", "unsafe_markup"),
+                 ("LLM07 system prompt leaks", "system_prompt_leak")):
+        assert f'MV_CONTAINS(output_reasons, "{r}")' in by[t] and "output_reasons ==" not in by[t]
+    assert any("restricted topic attempts" in t for t in by)
+    table = by["OWASP risk to Elastic control"]
+    assert "visibility only" in table and "covered" not in table
+    assert "LLM03|Supply chain|Visibility only" in table and "LLM06|Excessive agency|Visibility only" in table

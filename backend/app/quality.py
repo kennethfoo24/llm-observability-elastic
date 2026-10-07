@@ -1,10 +1,10 @@
-"""Helpers for the genai_response log: answered detection, citations and the context snippet text."""
+"""Helpers for the genai_response log: answered detection, citations and the context text the judge grades against."""
 import re
 
 from .prompt import NO_CONTEXT_ANSWER
 
-CONTEXT_MAX_CHARS = 6000
-SNIPPET_CHARS = 600
+CONTEXT_MAX_CHARS = 12000   # also the genai.context_text log cap (telemetry.py)
+SNIPPET_CHARS = 3000        # per document, the text the answering model saw (prompt.py passes full content)
 
 # One place for refusal / "not in the documents" phrasings (lower-cased match).
 _REFUSAL_PATTERNS = [re.compile(p) for p in (

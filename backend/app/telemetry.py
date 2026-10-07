@@ -30,7 +30,7 @@ def emit_prompt_log(*, prompt: str, persona: str, model: str, engine: str, statu
 
 PROMPT_MAX_CHARS = 4000
 RESPONSE_MAX_CHARS = 4000
-CONTEXT_MAX_CHARS = 6000
+CONTEXT_MAX_CHARS = 12000
 
 
 def emit_response_log(*, prompt: str, response: str, context: str, retrieved_ids: list[str],

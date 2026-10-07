@@ -34,10 +34,12 @@ def test_cited_ids_only_retrieved_deduped_and_lists_split():
     assert cited_ids("", ["a"]) == [] and cited_ids("no cites", ["a"]) == []
 
 
-def test_context_text_titles_snippets_and_cap():
+def test_context_text_keeps_up_to_3000_chars_per_doc_and_caps_the_whole():
     docs = [Doc("a", "Title A", "public", "x" * 5000, 1.0), Doc("b", "Title B", "public", "body b", 0.5)]
     t = context_text(docs)
-    assert t.startswith("[a] Title A: xxx") and len(t) <= 6000
+    assert t.startswith("[a] Title A: xxx") and t.count("x") == 3000 and "[b] Title B: body b" in t
+    many = [Doc(f"d{i}", "T", "public", "y" * 3000, 1.0) for i in range(8)]
+    assert len(context_text(many)) == 12000
     assert "[b] Title B: body b" in context_text(docs[1:])
 
 

@@ -22,14 +22,14 @@ export function isAnswered(answer: string): boolean {
   return !REFUSAL.some((p) => p.test(low));
 }
 
-/** Best effort copy of what the app logged for this answer. The client has titles, not snippets, so context is short. */
+/** What the app logged for this answer. Context is the server-built `quality_context`; titles only if an older backend omits it. */
 export function qualityInput(r: ChatResponse, prompt: string): QualityInput {
   const retrievedIds = r.docs.map((d) => d.id);
   const cited = new Set<string>();
   for (const m of r.answer.matchAll(/\[([^[\]\n]{1,200})\]/g)) for (const tok of m[1].split(/[,;]/)) cited.add(tok.trim());
   return {
     prompt, response: r.answer,
-    context: r.docs.map((d) => `[${d.id}] ${d.title}`).join("\n"),
+    context: r.quality_context ?? r.docs.map((d) => `[${d.id}] ${d.title}`).join("\n"),
     citedIds: retrievedIds.filter((id) => cited.has(id)),
     retrievedIds,
     topScore: r.docs.reduce((m, d) => (Number.isFinite(d.score) ? Math.max(m, d.score) : m), 0),

@@ -38,3 +38,15 @@ Out of scope by decision: LLM03 supply chain and LLM06 excessive agency (visibil
 ## Constraints (inherit)
 
 No secrets in the repo (the public GitHub repo kennethfoo24/llm-observability-elastic); no hostnames of Elastic projects in source; no em or en dashes in user-visible text; every commit ends with the Co-Authored-By trailer; do not touch other namespaces, `o11y-metrics`, or the shared collector; no service-account keys; the CronJob stays suspended; Gemma stays stopped; Docker Hub image built by GitHub Actions, deployed with `deploy/scripts/deploy.sh`.
+
+## As built (final review, 2026-10-07)
+
+- Judge: Claude Haiku through EIS. Different vendor than the default answerer only; when Claude Haiku is the selected answerer the same vendor judges. Judge JSON: faithfulness, relevance, answered, `sentiment` (positive, neutral, negative; typed `quality.user_sentiment`) and `on_topic` (typed `quality.on_topic`, drives `quality.off_topic`). The eland sentiment model is binary and kept only as the raw signal (`quality.sentiment_label`, `quality.sentiment_score`). The zero-shot topic remains the raw `quality.topic` and the off topic fallback only when the judge failed AND the prompt is English.
+- Language mismatch is set only when both detections have probability of at least 0.8 and the prompt has at least 25 characters; an English function word check overrides lang_ident confusions on short English prompts (a heuristic with known errors in both directions).
+- Judge context fidelity: the judge sees the same document text the answering model saw (3000 characters per document, 12000 for the whole context, logged as `genai.context_text`). The same string is returned in the chat response as `quality_context` and used by the Dev Tools simulate link.
+- Judge hardening: per-document random delimiters, instructions to ignore anything inside them, strict single-object parsing. Residual risk: the judge is an LLM and can be manipulated; PII, markup and canary checks are deterministic and unaffected; judge scores are advisory.
+- Verdict degradation: a failed markup or canary check gives `UNKNOWN`, not `CLEAN`.
+- LLM08: an attempt is `quality.answered == false` with `quality.hidden_count > 0`, 3 or more per persona per hour. `hidden_count` counts catalog matches (RRF top 8), not relevance.
+- Canary visibility: readable in the pipeline definition and in captured system messages; accepted for a demo canary (it detects leakage in the response). Rotation: delete the secret file, re-run create_secrets.sh, redeploy and re-run `elastic.apply`.
+- Data path: context copies restricted-persona content into `logs-genai_response*` without document level security; restrict access and consider short retention.
+- Out of scope remains LLM03 and LLM06 (visibility only: `gen_ai.response.model` in traces).

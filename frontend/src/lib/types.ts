@@ -37,4 +37,6 @@ export type ChatResponse = {
   cost_usd: number;
   guardrail: Guardrail;
   stages: Stage[];
+  /** Server-built context the response log carries (only documents the persona may see). */
+  quality_context?: string;
 };

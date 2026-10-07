@@ -29,3 +29,8 @@ test("qualityInput mirrors what the app logs", () => {
 test("qualityInput uses a zero top score when nothing was retrieved", () => {
   expect(qualityInput({ ...r, docs: [] }, "q").topScore).toBe(0);
 });
+
+test("qualityInput prefers the server-built quality_context over titles", () => {
+  const ctx = "[pto-policy] Paid Time Off Policy: Employees receive 25 days of paid time off.";
+  expect(qualityInput({ ...r, quality_context: ctx }, "q").context).toBe(ctx);
+});

@@ -50,7 +50,7 @@ def test_on_failure_sets_unknown_and_temp_is_removed():
 
 
 def test_pattern_script_covers_the_required_phrases():
-    for needle in ("ignore_previous", "disregard_above", "system_prompt", "you_must_now", "reveal", "script_tag",
+    for needle in ("ignore_previous", "disregard_above", "system_prompt", "you_must_now", "script_tag",
                    "hidden_unicode", "0xDB40", "0x200B", "credential_exfiltration"):
         assert needle in PATTERN_SCRIPT, needle
 

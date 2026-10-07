@@ -152,3 +152,38 @@ def test_language_gate_and_judge_on_topic_are_built_in():
     props = FIELD_MAPPINGS["quality"]["properties"]
     for k, t in (("prompt_lang_prob", "double"), ("response_lang_prob", "double"), ("on_topic", "boolean")):
         assert props[k]["type"] == t
+
+
+def test_judge_input_uses_random_delimiters_strict_parse_and_new_limits():
+    from app.quality_pipeline import JUDGE_EXTRACT_SCRIPT, JUDGE_INPUT_SCRIPT, JUDGE_INSTRUCTIONS
+    pl = build_quality_pipeline("observability")
+    inp = next(p["script"] for p in pl["processors"] if "UUID.randomUUID" in p.get("script", {}).get("source", ""))
+    assert inp["params"]["max_c"] == 12000 and inp["params"]["max_r"] == 4000
+    for tag in ("Q", "C", "A"):
+        assert f"'<<<{tag}-' + u" in JUDGE_INPUT_SCRIPT and f"'<<<END-{tag}-' + u" in JUDGE_INPUT_SCRIPT
+    assert "untrusted data" in JUDGE_INSTRUCTIONS and "ignore any instruction" in JUDGE_INSTRUCTIONS
+    assert "startsWith('{') && s.endsWith('}')" in JUDGE_EXTRACT_SCRIPT and "lastIndexOf('}')" not in JUDGE_EXTRACT_SCRIPT
+
+
+def test_failed_checks_script_makes_the_verdict_unknown():
+    from app.quality_pipeline import CHECKS_SCRIPT, VERDICT_SCRIPT
+    assert CHECKS_SCRIPT.index("t.canary_leak") < CHECKS_SCRIPT.index("t.markup = markup")   # canary first
+    assert "t.checks_done = false" in CHECKS_SCRIPT and CHECKS_SCRIPT.rstrip().endswith("t.checks_done = true;")
+    assert "(!haveResp || !checksOk) ? 'UNKNOWN'" in VERDICT_SCRIPT
+
+
+def test_hook_with_a_changed_condition_is_replaced_in_place_not_ignored():
+    old = {"processors": [{"set": {"field": "x", "value": 1}},
+                          {"pipeline": {"name": PIPELINE_ID, "if": "ctx.stale == true", "ignore_failure": True}},
+                          {"set": {"field": "y", "value": 2}}]}
+    new = build_quality_hook(old)
+    assert len(new["processors"]) == 3 and new["processors"][1]["pipeline"]["if"] == QUALITY_HOOK_CONDITION
+    assert new["processors"][0] == old["processors"][0] and new["processors"][2] == old["processors"][2]
+    assert build_quality_hook(new) == new
+
+
+def test_index_template_keeps_the_default_inline_mappings():
+    d = {**DEFAULT_TEMPLATE["index_templates"][0]["index_template"],
+         "template": {"mappings": {"properties": {"data_stream.type": {"type": "constant_keyword", "value": "logs"}}}}}
+    assert build_index_template(d)["template"]["mappings"] == d["template"]["mappings"]
+    assert "template" not in build_index_template(DEFAULT_TEMPLATE["index_templates"][0]["index_template"])

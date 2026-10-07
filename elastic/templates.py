@@ -20,6 +20,9 @@ def build_index_template(default_template: dict) -> dict:
     body = {"index_patterns": [INDEX_PATTERN], "priority": PRIORITY, "data_stream": {}, "composed_of": composed,
             "allow_auto_create": True,
             "_meta": {"description": "Glass Box: genai_response logs with typed quality fields"}}
+    inline = (default_template.get("template") or {}).get("mappings")
+    if inline:   # keep the default template's own mappings (data_stream.type constant_keyword)
+        body["template"] = {"mappings": inline}
     if default_template.get("ignore_missing_component_templates"):
         body["ignore_missing_component_templates"] = list(default_template["ignore_missing_component_templates"])
     return body

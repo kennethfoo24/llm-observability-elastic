@@ -66,7 +66,6 @@ if (/(?:ignore|forget|override)\s+(?:all\s+|any\s+|your\s+)?(?:the\s+)?(?:previo
 if (/disregard\s+(?:all\s+)?(?:of\s+)?the\s+(?:above|previous|prior)/.matcher(s).find()) { p.add('disregard_above'); }
 if (/system\s+prompt/.matcher(s).find()) { p.add('system_prompt'); }
 if (/you\s+must\s+now/.matcher(s).find()) { p.add('you_must_now'); }
-if (/\breveal\b/.matcher(s).find()) { p.add('reveal'); }
 if (s.contains('<script')) { p.add('script_tag'); }
 if (/(?:email|send|forward|post)\b.{0,60}\b(?:password|credentials|api\s*key|secret)/.matcher(s).find()) { p.add('credential_exfiltration'); }
 boolean hidden = false;

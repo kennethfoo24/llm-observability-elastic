@@ -16,11 +16,11 @@ prompts score NEGATIVE), so alerts use `user_sentiment`.
 | glassbox-unanswered-rate | Glass Box: Unanswered rate above 40 percent | at least 5 responses and over 40 percent with `quality.answered == false` | knowledge gaps | quality |
 | glassbox-negative-sentiment | Glass Box: Negative user sentiment | 3 or more `quality.user_sentiment == "negative"` | unhappy users | quality |
 | glassbox-low-faithfulness | Glass Box: Low faithfulness answers | 2 or more `quality.low_faithfulness == true` | judge sees unsupported answers | LLM09 |
-| glassbox-restricted-probing | Glass Box: Restricted topic probing | 3 or more queries with `hidden_count >= 3` and `top_hidden_score > 0` for one persona | probing of document-level-security content | LLM08 |
+| glassbox-restricted-probing | Glass Box: Restricted topic attempts | 3 or more responses for one persona with `quality.answered == false` and `quality.hidden_count > 0` | users asking about content their role cannot see and getting nothing | LLM08 |
 | glassbox-off-topic | Glass Box: Off topic prompts | 3 or more `quality.off_topic == true` | scope drift | quality |
 | glassbox-language-mismatch | Glass Box: Language mismatch | 2 or more `quality.lang_mismatch == true` | answer language differs from prompt | quality |
 
-Limit: `top_hidden_score` is an RRF rank score (small, rank based), so `hidden_count` is the real signal for probing.
+Limit: `hidden_count` counts catalog matches (RRF top 8), not relevance, so it only means something together with `answered == false`.
 Rules have no actions (they fire silently and show in Kibana).
 
 ## Security detection rules (KQL on `logs-genai_response*`, every 1m)

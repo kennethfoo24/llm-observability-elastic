@@ -11,7 +11,7 @@ PRICES = {"models": {"gemini-3.5-flash": {"input_per_mtok": 0.25, "output_per_mt
 SPEC = ModelSpec("eis-gemini-flash", "Gemini 3.5 Flash", "eis", "gemini-3.5-flash")
 GEMMA = ModelSpec("gemma", "Gemma", "gemma", "google/gemma-4-31B-it")
 CONTRACT_KEYS = {"answer", "blocked", "block_reason", "trace_id", "persona", "model", "engine", "docs",
-                 "hidden", "usage", "cost_usd", "guardrail", "stages"}
+                 "hidden", "usage", "cost_usd", "guardrail", "stages", "quality_context"}
 
 
 class LogSink:
@@ -294,3 +294,14 @@ def test_response_log_failure_never_breaks_chat():
     def boom(**kw): raise RuntimeError("exporter down")
     d.emit_response_log = boom
     assert run_chat(REQ, d)["answer"] == "18 days [pto]"
+
+
+def test_quality_context_is_the_logged_context_and_empty_when_blocked():
+    logged = {}
+    d = _deps()
+    d.emit_response_log = lambda **kw: logged.update(kw)
+    out = run_chat(ChatRequest("pto?", "employee", "eis-gemini-flash", "sdk"), d)
+    assert out["quality_context"] == logged["context"] and out["quality_context"].startswith("[")
+    blocked = run_chat(ChatRequest("pto?", "employee", "eis-gemini-flash", "sdk"),
+                       _deps(guard=FakeGuardrail("FLAGGED", reasons=["prompt_injection"])))
+    assert blocked["quality_context"] == ""

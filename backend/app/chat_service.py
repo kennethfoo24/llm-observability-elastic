@@ -89,7 +89,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
     if g.verdict.verdict == "FLAGGED" and set(g.verdict.reasons) & BLOCKING_REASONS:
         set_root_attrs(app__genai__cost_usd=0.0, app__blocked=True)
         return {**base, "answer": "", "blocked": True, "block_reason": g.verdict.reasons,
-                "docs": [], "hidden": [],
+                "docs": [], "hidden": [], "quality_context": "",
                 "usage": {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}, "cost_usd": 0.0}
 
     if req.engine == "langchain":
@@ -115,31 +115,34 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
                    app__genai__output_tokens=res.output_tokens + res.thinking_tokens,
                    app__genai__thinking_tokens=res.thinking_tokens,
                    app__genai__cost_basis=cost.basis)
-    _emit_response(deps, req, persona.id, spec.model_id, res.text, ret)
+    qctx = _emit_response(deps, req, persona.id, spec.model_id, res.text, ret)
     return {**base, "answer": res.text, "blocked": False, "block_reason": [], "docs": _docs(ret),
-            "hidden": _hidden(ret),
+            "hidden": _hidden(ret), "quality_context": qctx,
             "usage": {"input_tokens": res.input_tokens, "output_tokens": res.output_tokens,
                       "thinking_tokens": res.thinking_tokens},
             "cost_usd": cost.total_usd}
 
 
 def _emit_response(deps: Deps, req: ChatRequest, persona_id: str, model_id: str, answer: str,
-                   ret: RetrievalResult) -> None:
+                   ret: RetrievalResult) -> str:
+    """Emit the response log; returns the exact context string logged (only documents the persona may see)."""
+    qctx = context_text(ret.docs)
     try:
         retrieved = [d.id for d in ret.docs]
         deps.emit_response_log(
-            prompt=req.message, response=answer, context=context_text(ret.docs), retrieved_ids=retrieved,
+            prompt=req.message, response=answer, context=qctx, retrieved_ids=retrieved,
             cited_ids=_cited_ids(answer, retrieved), top_score=max((d.score for d in ret.docs), default=0.0),
             hidden_count=len(ret.hidden), top_hidden_score=max((g.score for g in ret.hidden), default=0.0),
             answered=is_answered(answer), persona=persona_id, model=model_id, engine=req.engine)
     except Exception:  # noqa: BLE001 - the response log must never break the chat
         logger.warning("response log emit failed", exc_info=True)
+    return qctx
 
 
 def _no_context(base: dict, ret: RetrievalResult, deps: Deps, req: ChatRequest, persona_id: str,
                 model_id: str) -> dict:
     set_root_attrs(app__genai__cost_usd=0.0)
-    _emit_response(deps, req, persona_id, model_id, NO_CONTEXT_ANSWER, ret)
+    qctx = _emit_response(deps, req, persona_id, model_id, NO_CONTEXT_ANSWER, ret)
     return {**base, "answer": NO_CONTEXT_ANSWER, "blocked": False, "block_reason": [], "docs": [],
-            "hidden": _hidden(ret),
+            "hidden": _hidden(ret), "quality_context": qctx,
             "usage": {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}, "cost_usd": 0.0}

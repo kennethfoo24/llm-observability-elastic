@@ -65,7 +65,7 @@ def _columns(p: Panel, index: str) -> list[dict]:
     if p.chart == "metric":
         return [_column(p.y, "number", index)]
     if p.chart == "table":
-        return [_column(c, "number" if c == p.y else "string", index) for c in p.cols]
+        return [_column(c, "number" if c in p.extra_y else "string", index) for c in p.cols]
     cols = [_column(p.y, "number", index), *[_column(y, "number", index) for y in p.extra_y]]
     cols.append(_column(p.x, "date" if p.chart == "line" else "string", index))
     if p.split:

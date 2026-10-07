@@ -110,6 +110,28 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 5. Gemma `/metrics` is open (accepted risk) and the hardening proposal awaits approval.
 6. Decision for the project owner: keep the Gemma Local SSD on stop (fast boot, possible Local SSD storage charge) or set `GEMMA_DISCARD_SSD=1` (no charge, slower next boot, data lost). Check the actual charge in billing first.
 
+## 10. OWASP and conversation quality (as built)
+
+**Setup order (per project, once, then after any change).**
+1. `bash scripts/import_quality_models.sh` imports the sentiment and zero-shot models into Observability only (the API key is passed by environment variable, never on a command line).
+2. `deploy/scripts/create_secrets.sh` creates `backend/secrets/system_prompt_canary.txt` the first time (gitignored, never printed).
+3. `python -m elastic.apply --project observability` and `--project security` (use `--dry-run` first). This installs the typed template, the `genai-quality` pipeline (with the canary as a pipeline parameter), the `logs@custom` hook, the six quality alert rules, the three Security detection rules and the three dashboards. Mapping changes reach NEW backing indices only: after changing the typed fields run `POST logs-genai_response.otel-default/_rollover` once.
+4. Doc scan demo: `python scripts/poison_demo.py` and, when done, `python scripts/poison_demo.py --cleanup` (the document integrity alert stays active until the poisoned staging documents are removed).
+
+**Personas.** Two: Maya (employee) and Priya (manager). Restricted documents are hidden from Maya by document level security; hidden matches only show up as `quality.hidden_count`.
+
+**What runs where.** The app emits one `genai_response` log per answered request. Ingest pipeline `genai-quality` scores it: language (`lang_ident_model_1`), eland sentiment (raw, binary) and zero-shot topic (raw), NER and regex PII, markup and canary checks, and an LLM judge (faithfulness, relevance, answered, 3 class user sentiment, `on_topic`). Security gets the deterministic subset only. Rules: `elastic/README.md` lists every alert, detection rule and dashboard with its OWASP id.
+
+**Judge.** The judge is Claude Haiku through the Elastic Inference Service (`.anthropic-claude-4.5-haiku-completion`). The default answering model is a GPT mini model, so by default a different vendor judges the answer, but Claude Haiku can also be selected as the answerer in the UI, and then the same vendor judges its own answer. Cost: about 2 to 4 thousand input tokens and under 100 output tokens per answered response, ingest side only (the chat is not delayed). If EIS is down or slow, each document waits for the inference timeout, judge fields (`faithfulness`, `relevance`, `user_sentiment`, `on_topic`) are absent, `off_topic` falls back to the zero-shot model for English prompts only, and the verdict still comes from the deterministic checks. Nothing alerts on "judge missing"; check `quality.faithfulness IS NULL` in Discover.
+
+**Residual risk: the judge is an LLM.** The prompt and answer are wrapped in per-document random delimiters and the judge is told to ignore instructions inside them, and its reply is parsed strictly, but a crafted prompt or answer can still manipulate it. The deterministic checks (PII, markup, canary) are not affected. Treat judge scores and the alerts built on them (low faithfulness, negative sentiment, off topic) as advisory signals, not controls.
+
+**Canary.** `quality` verdict `system_prompt_leak` matches a canary placed in the system prompt. The canary is visible to anyone with read access to the `genai-quality` pipeline definition and to span captured system messages in the Observability project (the app records `gen_ai.system_instructions`). Ruling: acceptable for a demo canary, because its job is to detect leakage in the RESPONSE, not to hide it from Elastic admins. Rotate by deleting `backend/secrets/system_prompt_canary.txt`, re-running `create_secrets.sh`, redeploying, then `python -m elastic.apply --project observability` and `--project security`. The synthetic flagged log script (`scripts/emit_synthetic_response_log.py --flagged`) writes the real canary into the logs; use it only for proofs.
+
+**Data and retention.** `genai.context_text` copies the documents the persona was allowed to see into `logs-genai_response*`, which has NO document level security, and responses with PII are flagged but stored verbatim (also duplicated in `quality.prompt_text` and `quality.response_text`). Restrict read access to `logs-genai_response*` to admins and consider a short retention (the default data stream lifecycle applies).
+
+**Troubleshooting.** No quality fields: check the hook (`GET _ingest/pipeline/logs@custom` must contain `genai-quality`) and that the typed fields are mapped in the CURRENT backing index (otherwise roll over). Quality alert never fires: run its ES|QL from elastic/rules/quality_alerts.py in Discover; lower a threshold with `python -m elastic.apply --project observability --alert-override RULE_ID=VALUE` and re-run without the flag to restore.
+
 ## LLM Observability deep links config
 
 The LLM Observability links use `OBS_KIBANA_URL` (trace, Discover, cost dashboard) and `SEC_KIBANA_URL` (Security alerts link). Both come from Secret `glassbox-app` (keys `kibana_url`, `sec_kibana_url`), which `deploy/scripts/create_secrets.sh` fills from `OBSERVABILITY_KIBANA` and `SECURITY_KIBANA` in `elasticsearch.txt`. Re-run it before deploying this version. If `sec_kibana_url` is empty the Security links are hidden. The Discover and alerts URL states use Kibana rison format; open each once in a logged-in browser.

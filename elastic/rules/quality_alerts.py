@@ -1,7 +1,7 @@
-"""Observability alert rules over the typed `genai_response` fields (see docs/elastic-rules.md).
+"""Observability alert rules over the typed `genai_response` fields (see elastic/README.md).
 
 All are ES|QL `.es-query` rules built with cost_alert.esql_rule_body: interval 5m, look-back 1h. Thresholds are
-function parameters so a proof run can lower one temporarily (python -m elastic.apply --alert-proof ID)."""
+function parameters so a proof run can lower one temporarily (python -m elastic.apply --alert-override RULE_ID=VALUE)."""
 from dataclasses import dataclass
 
 from .cost_alert import esql_rule_body
@@ -31,9 +31,9 @@ def _unanswered(rate_pct: float) -> str:
 
 
 def _probing(n: float) -> str:
-    # top_hidden_score is an RRF rank score (small, rank based), so hidden_count is the real signal;
-    # the score > 0 clause only proves the hidden hits were actually ranked.
-    return (f"{BASE} AND quality.hidden_count >= 3 AND quality.top_hidden_score > 0 | "
+    # An attempt: the user got no usable answer (quality.answered == false) while restricted documents matched.
+    # hidden_count counts catalog matches (RRF top 8), not relevance, so it is only meaningful together with answered == false.
+    return (f"{BASE} AND quality.answered == false AND quality.hidden_count > 0 | "
             f"STATS probes = COUNT(*) BY persona = quality.persona | WHERE probes >= {int(n)} | LIMIT 10")
 
 
@@ -44,7 +44,7 @@ SPECS: list[AlertSpec] = [
               ("quality", "sentiment"), _count_rule('quality.user_sentiment == "negative"')),
     AlertSpec("glassbox-low-faithfulness", "Glass Box: Low faithfulness answers", "OWASP LLM09", 2,
               ("owasp", "llm09", "faithfulness"), _count_rule("quality.low_faithfulness == true")),
-    AlertSpec("glassbox-restricted-probing", "Glass Box: Restricted topic probing", "OWASP LLM08", 3,
+    AlertSpec("glassbox-restricted-probing", "Glass Box: Restricted topic attempts", "OWASP LLM08", 3,
               ("owasp", "llm08", "probing"), _probing),
     AlertSpec("glassbox-off-topic", "Glass Box: Off topic prompts", "Quality", 3,
               ("quality", "off-topic"), _count_rule("quality.off_topic == true")),
