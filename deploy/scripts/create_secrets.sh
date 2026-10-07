@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Create/update the app Secrets in namespace genai-demo from gitignored local files ONLY:
 #   backend/secrets/persona_keys.json, backend/secrets/guardrail_log_keys.json (keys obs, sec),
-#   elasticsearch.txt, backend/secrets/app_password.txt (generated if missing).
+#   elasticsearch.txt, backend/secrets/app_password.txt and backend/secrets/system_prompt_canary.txt (both generated if missing).
 # Env overrides: APP_PASSWORD, GEMMA_API_KEY, GLOG_OBS_KEY, GLOG_SEC_KEY.
 # Values are never printed, only key NAMES. DRY_RUN=1 prints key names and target only.
 # The guardrail log keys must be ingest-only keys (docs/dev-tools-mint-ingest-keys.md); the script
@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ "${NAMESPACE:-$NS}" = "$NS" ] || die "namespace must be $NS"
 
-APP_KEYS="obs_es_url kibana_url sec_kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key"
+APP_KEYS="obs_es_url kibana_url sec_kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key system_prompt_canary"
 PERSONA_KEYS="persona_keys.json"
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -71,6 +71,12 @@ if [ -z "${APP_PASSWORD:-}" ]; then
   fi
   APP_PASSWORD="$(cat "$PW_FILE")"
 fi
+CANARY_FILE=backend/secrets/system_prompt_canary.txt
+if [ ! -s "$CANARY_FILE" ]; then
+  (umask 077; python3 -c "import secrets; print('GBX-' + secrets.token_hex(8))" > "$CANARY_FILE")
+  echo "generated a system prompt canary in $CANARY_FILE (never printed here)"
+fi
+SYSTEM_PROMPT_CANARY="$(cat "$CANARY_FILE")"
 if [ -z "${GEMMA_API_KEY:-}" ]; then
   # Read-only describe of the existing VM metadata; the value is captured, never printed.
   GEMMA_API_KEY="$(gcloud compute instances describe kenneth-gemma-llm --zone asia-southeast1-c --project "$PROJECT_ID" --format=json \
@@ -94,6 +100,7 @@ trap 'rm -f "$ENVF"' EXIT
   printf 'glog_obs_key=%s\n' "$LOG_OBS_KEY"
   printf 'glog_sec_endpoint=%s\n' "$S_SEC_OTLP"
   printf 'glog_sec_key=%s\n' "$LOG_SEC_KEY"
+  printf 'system_prompt_canary=%s\n' "$SYSTEM_PROMPT_CANARY"
 } > "$ENVF"
 kubectl -n "$NS" create secret generic glassbox-app --from-env-file="$ENVF" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null

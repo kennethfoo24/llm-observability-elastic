@@ -50,11 +50,18 @@ def test_create_secrets_has_guards_and_reads_only_local_sources():
     assert "guardrail_log_keys.json" in t and "GLOG_OBS_KEY" in t and "GLOG_SEC_KEY" in t
     assert "--dry-run=client -o yaml | kubectl apply" in t
     assert "sec_kibana_url" in t and "SECURITY_KIBANA" in t
+    assert "backend/secrets/system_prompt_canary.txt" in t and "token_hex(8)" in t and "'GBX-'" in t
+    assert "printf 'system_prompt_canary=%s" in t and not re.search(r"echo[^\n]*\$SYSTEM_PROMPT_CANARY", t)
 
 
 def test_app_manifest_wires_optional_security_kibana_url():
     m = (ROOT / "deploy" / "k8s" / "30-app.yaml").read_text()
     assert "SEC_KIBANA_URL" in m and "key: sec_kibana_url, optional: true" in m
+
+
+def test_app_manifest_wires_optional_canary_secret():
+    m = (ROOT / "deploy" / "k8s" / "30-app.yaml").read_text()
+    assert "SYSTEM_PROMPT_CANARY" in m and "key: system_prompt_canary, optional: true" in m
 
 
 def test_bash_syntax_ok():
@@ -65,7 +72,7 @@ def test_bash_syntax_ok():
 def test_dry_run_modes_do_not_mutate():
     env = {"DRY_RUN": "1", "PATH": "/usr/bin:/bin"}
     r = subprocess.run(["bash", str(ROOT / "deploy/scripts/create_secrets.sh")], env={**env, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"}, capture_output=True, text=True)
-    assert r.returncode == 0 and "glog_obs_key" in r.stdout and "namespace=genai-demo" in r.stdout
+    assert r.returncode == 0 and "glog_obs_key" in r.stdout and "system_prompt_canary" in r.stdout and "namespace=genai-demo" in r.stdout
 
 
 def test_dry_run_value_is_validated():

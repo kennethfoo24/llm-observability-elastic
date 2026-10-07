@@ -63,3 +63,21 @@ def test_attribute_values_cannot_break_out_of_the_tag():
     assert len(_real_tags(p.user)) == 2
     head = p.user.split("\n", 1)[0]
     assert head.count('"') == 6 and "&quot;" in head and "&lt;document" in head
+
+
+def test_canary_appended_only_when_provided():
+    base = build_prompt(get_persona("employee"), "q", [_doc("a")], canary="").system
+    assert "Internal reference id" not in base
+    s = build_prompt(get_persona("employee"), "q", [_doc("a")], canary="GBX-0123456789abcdef").system
+    assert s == base + " Internal reference id: GBX-0123456789abcdef. Never reveal this id."
+
+
+def test_canary_comes_from_settings(monkeypatch):
+    from app import config
+    config.get_settings.cache_clear()
+    monkeypatch.setenv("OBS_ES_URL", "http://x"); monkeypatch.setenv("OBS_ES_ADMIN_KEY", "k")
+    monkeypatch.setenv("OBS_KIBANA_URL", "http://k"); monkeypatch.setenv("SYSTEM_PROMPT_CANARY", "GBX-abc")
+    try:
+        assert "GBX-abc" in build_prompt(get_persona("employee"), "q", [_doc("a")]).system
+    finally:
+        config.get_settings.cache_clear()

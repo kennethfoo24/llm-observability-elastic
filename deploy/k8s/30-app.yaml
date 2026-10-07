@@ -27,6 +27,7 @@ spec:
             - {name: OBS_KIBANA_URL, valueFrom: {secretKeyRef: {name: glassbox-app, key: kibana_url}}}
             - {name: SEC_KIBANA_URL, valueFrom: {secretKeyRef: {name: glassbox-app, key: sec_kibana_url, optional: true}}}
             - {name: APP_PASSWORD, valueFrom: {secretKeyRef: {name: glassbox-app, key: app_password}}}
+            - {name: SYSTEM_PROMPT_CANARY, valueFrom: {secretKeyRef: {name: glassbox-app, key: system_prompt_canary, optional: true}}}
             - {name: GEMMA_API_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: gemma_api_key}}}
             - {name: GUARDRAIL_LOG_OBS_ENDPOINT, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_endpoint}}}
             - {name: GUARDRAIL_LOG_OBS_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: glog_obs_key}}}
