@@ -53,7 +53,8 @@ def test_config_returns_kibana_url_without_trailing_slash_and_requires_password(
     assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Foo Corp",
                     "guardrail_models": {"injection": "protectai__deberta-v3-base-prompt-injection-v2",
                                          "ner": "elastic__distilbert-base-cased-finetuned-conll03-english"},
-                    "guardrail_pipeline": "genai-guardrail"}
+                    "guardrail_pipeline": "genai-guardrail",
+                    "quality_pipeline": "genai-quality"}
 
 
 def test_personas_include_clearance_counts_from_the_corpus_manifest():

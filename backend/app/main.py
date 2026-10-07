@@ -18,6 +18,7 @@ from .cost import UnknownModel, load_prices
 from .dls import load_keys
 from .guardrail import Guardrail
 from .guardrail_pipeline import PIPELINE_ID
+from .quality_pipeline import PIPELINE_ID as QUALITY_PIPELINE_ID
 from .llm_langchain import LangChainEngine
 from .llm_sdk import GemmaGate, GemmaOffline, SdkEngine
 from .models import get_models
@@ -111,7 +112,8 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
         return {"kibana_url": s.obs_kibana_url.rstrip("/"),
                 "security_kibana_url": s.sec_kibana_url.rstrip("/") or None, "company": "Foo Corp",
                 "guardrail_models": {"injection": s.injection_model_id, "ner": s.ner_model_id},
-                "guardrail_pipeline": PIPELINE_ID}
+                "guardrail_pipeline": PIPELINE_ID,
+                "quality_pipeline": QUALITY_PIPELINE_ID}
 
     @app.get("/api/personas")
     def personas():
