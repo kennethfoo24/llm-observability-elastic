@@ -96,7 +96,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
         with _timed(stages, "retrieval.hybrid"):
             ret = deps.retriever.search(persona.id, req.message)
         if not ret.docs:
-            return _no_context(base, ret)
+            return _no_context(base, ret, deps, req, persona.id, spec.model_id)
         with _timed(stages, "llm.generate"):  # prompt.build runs inside the chain
             *_, res = deps.langchain.run(spec, persona, req.message, lambda _q: ret)
     else:
@@ -105,7 +105,7 @@ def run_chat(req: ChatRequest, deps: Deps) -> dict:
         with _timed(stages, "prompt.build"):
             built = build_prompt(persona, req.message, ret.docs)
         if built.no_context:
-            return _no_context(base, ret)
+            return _no_context(base, ret, deps, req, persona.id, spec.model_id)
         with _timed(stages, "llm.generate"):
             res = deps.sdk.generate(spec, built.system, built.user)
 
@@ -136,8 +136,10 @@ def _emit_response(deps: Deps, req: ChatRequest, persona_id: str, model_id: str,
         logger.warning("response log emit failed", exc_info=True)
 
 
-def _no_context(base: dict, ret: RetrievalResult) -> dict:
+def _no_context(base: dict, ret: RetrievalResult, deps: Deps, req: ChatRequest, persona_id: str,
+                model_id: str) -> dict:
     set_root_attrs(app__genai__cost_usd=0.0)
+    _emit_response(deps, req, persona_id, model_id, NO_CONTEXT_ANSWER, ret)
     return {**base, "answer": NO_CONTEXT_ANSWER, "blocked": False, "block_reason": [], "docs": [],
             "hidden": _hidden(ret),
             "usage": {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}, "cost_usd": 0.0}

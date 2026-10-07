@@ -267,9 +267,17 @@ def test_response_log_not_emitted_when_blocked_or_no_context():
     d = _with_resp(_deps(guard=FakeGuardrail("FLAGGED", reasons=["prompt_injection"])))
     run_chat(REQ, d)
     assert d.emit_response_log.calls == []
+
+
+def test_no_context_answer_emits_response_log_with_hidden_fields():
     d = _with_resp(_deps(result=RetrievalResult([], [Ghost("aurora", "Aurora", "restricted", 0.4)], 5)))
-    run_chat(REQ, d)
-    assert d.emit_response_log.calls == []
+    out = run_chat(REQ, d)
+    assert out["answer"] == NO_CONTEXT_ANSWER and d.sdk.calls == 0
+    assert len(d.emit_response_log.calls) == 1
+    c = d.emit_response_log.calls[0]
+    assert c["answered"] is False and c["retrieved_ids"] == [] and c["cited_ids"] == []
+    assert c["top_score"] == 0.0 and c["hidden_count"] == 1 and c["top_hidden_score"] == 0.4
+    assert c["response"] == NO_CONTEXT_ANSWER and c["context"] == ""
 
 
 def test_hidden_scores_flow_into_response_log():
