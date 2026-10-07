@@ -14,9 +14,9 @@ from app.quality_pipeline import PIPELINE_ID as QUALITY_PIPELINE_ID  # noqa: E40
 from app.quality_pipeline import build_quality_hook, build_quality_pipeline  # noqa: E402
 
 from elastic.client import Project  # noqa: E402
-from elastic.dashboards.build import DASHBOARD_ID, build_ndjson  # noqa: E402
-from elastic.dashboards.panels import PANELS  # noqa: E402
-from elastic.rules import cost_alert, guardrail_detection  # noqa: E402
+from elastic.dashboards.build import build_ndjson  # noqa: E402
+from elastic.dashboards.panels import DASHBOARDS  # noqa: E402
+from elastic.rules import cost_alert, guardrail_detection, owasp_detections, quality_alerts  # noqa: E402
 from elastic.templates import (  # noqa: E402
     COMPONENT_NAME, DEFAULT_TEMPLATE, INDEX_TEMPLATE_NAME, build_component, build_index_template)
 
@@ -103,35 +103,40 @@ def _upsert_rule(p: Project, rule_id: str, body: dict, dry: bool) -> None:
 
 
 def _upsert_detection(p: Project, dry: bool) -> None:
-    body = guardrail_detection.rule_body()
-    status, _ = p.kb("GET", f"/api/detection_engine/rules?rule_id={body['rule_id']}")
-    exists = status == 200
-    _say(f"[{p.name}] detection rule {body['rule_id']}: {'update' if exists else 'create'}", dry)
-    if not dry:
-        status, resp = p.kb("PUT" if exists else "POST", "/api/detection_engine/rules", body)
-        if status not in (200, 201):
-            _fail("detection rule upsert", status, resp)
+    for body in [guardrail_detection.rule_body(), *owasp_detections.rule_bodies()]:
+        status, _ = p.kb("GET", f"/api/detection_engine/rules?rule_id={body['rule_id']}")
+        exists = status == 200
+        _say(f"[{p.name}] detection rule {body['rule_id']}: {'update' if exists else 'create'}", dry)
+        if not dry:
+            status, resp = p.kb("PUT" if exists else "POST", "/api/detection_engine/rules", body)
+            if status not in (200, 201):
+                _fail("detection rule upsert", status, resp)
 
 
-def _import_dashboard(p: Project, dry: bool) -> None:
-    ndjson = build_ndjson(PANELS, json.loads((DASH_DIR / "template.lens-esql.json").read_text()),
-                          json.loads((DASH_DIR / "template.meta.json").read_text()))
-    _say(f"[{p.name}] dashboard {DASHBOARD_ID}: import overwrite, {len(PANELS)} panels", dry)
-    if not dry:
-        status, result = p.kb_import(ndjson)
-        if status != 200 or not isinstance(result, dict) or result.get("success") is not True:
-            errors = result.get("errors") if isinstance(result, dict) else result
-            _fail("dashboard import", status, errors)
+def _import_dashboards(p: Project, dry: bool) -> None:
+    template = json.loads((DASH_DIR / "template.lens-esql.json").read_text())
+    meta = json.loads((DASH_DIR / "template.meta.json").read_text())
+    for d in DASHBOARDS:
+        ndjson = build_ndjson(list(d.panels), template, meta, d)
+        _say(f"[{p.name}] dashboard {d.id}: import overwrite, {len(d.panels)} panels", dry)
+        if not dry:
+            status, result = p.kb_import(ndjson)
+            if status != 200 or not isinstance(result, dict) or result.get("success") is not True:
+                errors = result.get("errors") if isinstance(result, dict) else result
+                _fail("dashboard import", status, errors)
 
 
-def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality: bool = False) -> None:
+def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality: bool = False,
+                  alert_overrides: dict[str, float] | None = None) -> None:
     _put_templates(p, dry_run)
     _put_pipelines(p, dry_run, only_quality)
     if only_quality:
         return
     if p.name == "observability":
         _upsert_rule(p, cost_alert.RULE_ID, cost_alert.rule_body(cost_threshold), dry_run)
-        _import_dashboard(p, dry_run)
+        for rid, body in quality_alerts.all_rules(alert_overrides).items():
+            _upsert_rule(p, rid, body, dry_run)
+        _import_dashboards(p, dry_run)
     if p.name == "security":
         _upsert_detection(p, dry_run)
 
@@ -143,9 +148,15 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only-quality", action="store_true",
                     help="only the genai-quality templates, pipeline and logs@custom hook (no rules or dashboards)")
+    ap.add_argument("--alert-override", action="append", default=[], metavar="RULE_ID=VALUE",
+                    help="proof only: temporarily set one quality alert threshold (re-run without it to restore)")
     a = ap.parse_args()
+    overrides = {k: float(v) for k, v in (x.split("=", 1) for x in a.alert_override)}
+    unknown = set(overrides) - set(quality_alerts.BY_ID)
+    if unknown:
+        raise SystemExit(f"unknown alert id: {sorted(unknown)}")
     for name in (["observability", "security"] if a.project == "all" else [a.project]):
-        apply_project(Project(name), a.cost_threshold, a.dry_run, a.only_quality)
+        apply_project(Project(name), a.cost_threshold, a.dry_run, a.only_quality, overrides)
 
 
 if __name__ == "__main__":

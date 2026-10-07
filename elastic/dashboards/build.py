@@ -10,7 +10,7 @@ import json
 import re
 import uuid
 
-from .panels import Panel
+from .panels import Dashboard, Panel
 
 DASHBOARD_ID = "glassbox-overview"
 DASHBOARD_TITLE = "Glass Box: LLM observability"
@@ -37,7 +37,9 @@ def _set(obj: dict, pointer: str, value) -> None:
         parent[last] = value
 
 
-def adhoc_index(esql: str) -> str:
+def adhoc_index(esql: str, override: str | None = None) -> str:
+    if override:
+        return override
     m = _FROM.match(esql)
     if not m:
         raise ValueError(f"cannot find the FROM index in: {esql[:60]}")
@@ -62,6 +64,8 @@ def _column(name: str, kind: str, index: str) -> dict:
 def _columns(p: Panel, index: str) -> list[dict]:
     if p.chart == "metric":
         return [_column(p.y, "number", index)]
+    if p.chart == "table":
+        return [_column(c, "number" if c == p.y else "string", index) for c in p.cols]
     cols = [_column(p.y, "number", index), *[_column(y, "number", index) for y in p.extra_y]]
     cols.append(_column(p.x, "date" if p.chart == "line" else "string", index))
     if p.split:
@@ -72,7 +76,7 @@ def _columns(p: Panel, index: str) -> list[dict]:
 def _panel(i: int, p: Panel, template: dict, meta: dict) -> dict:
     ptr = meta["pointers"] if "pointers" in meta else meta
     obj = copy.deepcopy(template)
-    index = adhoc_index(p.esql)
+    index = adhoc_index(p.esql, p.index)
     dv_id = _data_view_id(index)
     _set(obj, ptr["panel_title"], p.title)
     _set(obj, ptr["esql_string"], p.esql)
@@ -96,6 +100,10 @@ def _panel(i: int, p: Panel, template: dict, meta: dict) -> dict:
     if p.chart == "metric":
         attrs["visualizationType"] = "lnsMetric"
         state["visualization"] = {"layerId": layer_id, "layerType": "data", "metricAccessor": p.y}
+    elif p.chart == "table":
+        attrs["visualizationType"] = "lnsDatatable"
+        state["visualization"] = {"layerId": layer_id, "layerType": "data",
+                                  "columns": [{"columnId": c, "isTransposed": False} for c in p.cols]}
     else:
         _set(obj, ptr["x_column"], p.x)
         _set(obj, ptr["y_column"], p.y)
@@ -114,12 +122,16 @@ def _panel(i: int, p: Panel, template: dict, meta: dict) -> dict:
     return obj
 
 
-def dashboard_object(panels_json: list[dict]) -> dict:
+DEFAULT_DESCRIPTION = "Cost, tokens, guardrails and latency for the Foo Corp HR assistant."
+
+
+def dashboard_object(panels_json: list[dict], dashboard_id: str = DASHBOARD_ID, title: str = DASHBOARD_TITLE,
+                     description: str = DEFAULT_DESCRIPTION) -> dict:
     return {
-        "type": "dashboard", "id": DASHBOARD_ID,
+        "type": "dashboard", "id": dashboard_id,
         "attributes": {
-            "title": DASHBOARD_TITLE,
-            "description": "Cost, tokens, guardrails and latency for the Foo Corp HR assistant.",
+            "title": title,
+            "description": description,
             "timeRestore": False,
             "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"query": "", "language": "kuery"}, "filter": []})},
             "panelsJSON": json.dumps(panels_json),
@@ -132,6 +144,8 @@ def dashboard_object(panels_json: list[dict]) -> dict:
     }
 
 
-def build_ndjson(panels: list[Panel], template: dict, meta: dict) -> str:
+def build_ndjson(panels: list[Panel], template: dict, meta: dict, dashboard: Dashboard | None = None) -> str:
     built = [_panel(i, p, template, meta) for i, p in enumerate(panels)]
-    return json.dumps(dashboard_object(built)) + "\n"
+    if dashboard is None:
+        return json.dumps(dashboard_object(built)) + "\n"
+    return json.dumps(dashboard_object(built, dashboard.id, dashboard.title, dashboard.description)) + "\n"

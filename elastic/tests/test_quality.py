@@ -129,3 +129,13 @@ def test_only_quality_touches_nothing_but_quality_objects():
     assert sorted(writes) == sorted(["/_component_template/glassbox-genai-response@mappings",
                                      "/_index_template/glassbox-genai-response",
                                      "/_ingest/pipeline/genai-quality", "/_ingest/pipeline/logs@custom"])
+
+
+def test_judge_returns_user_sentiment_and_it_is_mapped_as_keyword():
+    from app.quality_pipeline import JUDGE_INSTRUCTIONS, VERDICT_SCRIPT
+    assert '"sentiment":"positive|neutral|negative"' in JUDGE_INSTRUCTIONS
+    assert "q.user_sentiment = sv" in VERDICT_SCRIPT
+    props = FIELD_MAPPINGS["quality"]["properties"]
+    assert props["user_sentiment"] == {"type": "keyword"}
+    assert "sentiment_label" in props and "sentiment_score" in props   # raw binary eland signal stays
+    assert "user_sentiment" in build_component()["template"]["mappings"]["properties"]["quality"]["properties"]

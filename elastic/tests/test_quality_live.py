@@ -54,3 +54,11 @@ def test_typed_fields_are_queryable_in_esql_in_both_projects():
                      "| KEEP output_verdict, quality.faithfulness, quality.lang_mismatch | LIMIT 1"})
         assert status == 200, str(resp)[:300]
         assert [c["name"] for c in resp["columns"]] == ["output_verdict", "quality.faithfulness", "quality.lang_mismatch"]
+
+
+def test_judge_user_sentiment_neutral_negative_positive():
+    docs = [_doc("How many days of annual leave do I get?", "You get 18 days per year [hr-001]."),
+            _doc("You useless stupid bot, I hate this garbage!", "I am sorry. You get 18 days [hr-001]."),
+            _doc("Thank you so much, that was really helpful!", "You are welcome!")]
+    got = [d["quality"].get("user_sentiment") for d in _sim("observability", docs)]
+    assert got == ["neutral", "negative", "positive"], got
