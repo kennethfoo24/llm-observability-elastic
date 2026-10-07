@@ -50,7 +50,7 @@ def test_config_returns_kibana_url_without_trailing_slash_and_requires_password(
     c = _client()
     assert c.get("/api/config").status_code == 401
     body = c.get("/api/config", headers=H).json()
-    assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Nimbus Corp",
+    assert body == {"kibana_url": "https://kb.example", "security_kibana_url": None, "company": "Foo Corp",
                     "guardrail_models": {"injection": "protectai__deberta-v3-base-prompt-injection-v2",
                                          "ner": "elastic__distilbert-base-cased-finetuned-conll03-english"},
                     "guardrail_pipeline": "genai-guardrail"}
@@ -58,8 +58,9 @@ def test_config_returns_kibana_url_without_trailing_slash_and_requires_password(
 
 def test_personas_include_clearance_counts_from_the_corpus_manifest():
     people = {p["id"]: p for p in _client().get("/api/personas", headers=H).json()}
+    assert set(people) == {"employee", "manager"}
     assert {p["total_docs"] for p in people.values()} == {20}
-    assert [people[i]["can_read_docs"] for i in ("employee", "manager", "hr", "exec")] == [6, 11, 16, 20]
+    assert [people[i]["can_read_docs"] for i in ("employee", "manager")] == [6, 11]
     assert people["employee"]["name"] and people["employee"]["title"]
 
 

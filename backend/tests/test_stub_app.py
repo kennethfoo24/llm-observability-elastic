@@ -16,12 +16,14 @@ def client():
 
 
 def test_dls_differs_by_persona_using_the_real_corpus(client):
-    q = "What is the Project Aurora severance budget?"
-    emp, exe = _chat(client, "employee", q).json(), _chat(client, "exec", q).json()
-    assert "project-aurora" not in [d["id"] for d in emp["docs"]]
-    assert "project-aurora" in [g["id"] for g in emp["hidden"]]
-    assert "project-aurora" in [d["id"] for d in exe["docs"]]
-    assert exe["hidden"] == []
+    q = "What are the salary bands for L3 to L5?"
+    emp, mgr = _chat(client, "employee", q).json(), _chat(client, "manager", q).json()
+    assert "salary-bands" not in [d["id"] for d in emp["docs"]]
+    assert "salary-bands" in [g["id"] for g in emp["hidden"]]
+    assert "salary-bands" in [d["id"] for d in mgr["docs"]]
+    assert "salary-bands" not in [g["id"] for g in mgr["hidden"]]
+    # hr/exec-only documents stay hidden from both personas
+    assert "project-aurora" in [g["id"] for g in mgr["hidden"]]
 
 
 def test_answer_cites_a_retrieved_document_and_reports_cost(client):

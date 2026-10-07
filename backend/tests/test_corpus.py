@@ -7,9 +7,9 @@ from app.personas import PERSONAS, get_persona
 ROLES = {"employee", "manager", "hr", "exec"}
 
 
-def test_four_personas_with_unique_roles():
-    assert {p.role for p in PERSONAS} == ROLES
-    assert len({p.id for p in PERSONAS}) == 4
+def test_two_personas_with_unique_roles():
+    assert {p.role for p in PERSONAS} == {"employee", "manager"}
+    assert len({p.id for p in PERSONAS}) == 2
 
 
 def test_unknown_persona_raises():

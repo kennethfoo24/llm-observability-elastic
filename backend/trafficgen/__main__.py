@@ -11,7 +11,7 @@ from .prompts import BENIGN, INJECTION, PII
 MAX_REQUESTS_HARD_CAP = 5
 WEIGHTS = {"benign": 0.85, "injection": 0.10, "pii": 0.05}
 MODEL_WEIGHTS = {"eis-gpt-mini": 0.70, "eis-claude-haiku": 0.15, "eis-gemini-flash": 0.15}  # weighted toward the cheapest
-PERSONAS = ["employee", "manager", "hr", "exec"]
+PERSONAS = ["employee", "manager"]
 
 
 @dataclass

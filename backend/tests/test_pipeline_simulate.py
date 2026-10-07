@@ -110,7 +110,7 @@ def test_script_failure_falls_back_to_flat_unknown_verdict():
 
 @pytest.mark.integration
 def test_flat_dotted_attribute_key_is_expanded():
-    g = _run({"attributes": {"genai.prompt_text": "email alex.tan@nimbus-corp.example"},
+    g = _run({"attributes": {"genai.prompt_text": "email alex.tan@foo-corp.example"},
               "guard_tmp": dict(_OK_MODELS)})
     assert g["threat_verdict"] == "FLAGGED" and g["threat_reasons"] == ["pii_email"]
 
@@ -133,7 +133,7 @@ def test_multi_pii_all_reasons():
 def test_model_outage_is_unknown_not_clean_but_pii_still_flags():
     clean = _run({"attributes": {"genai": {"prompt_text": "How many PTO days do I get?"}}})
     assert clean["threat_verdict"] == "UNKNOWN" and clean["models_ok"] is False
-    pii = _run({"attributes": {"genai": {"prompt_text": "email alex.tan@nimbus-corp.example"}}})
+    pii = _run({"attributes": {"genai": {"prompt_text": "email alex.tan@foo-corp.example"}}})
     assert pii["threat_verdict"] == "FLAGGED" and pii["threat_reasons"] == ["pii_email"]
     assert pii["models_ok"] is False
 

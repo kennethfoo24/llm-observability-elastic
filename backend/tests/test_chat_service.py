@@ -138,7 +138,7 @@ def test_guardrail_exception_fails_open_for_benign_prompt(caplog):
 
 def test_guardrail_exception_still_blocks_regex_pii():
     d = _deps(guard=RaisingGuardrail())
-    out = run_chat(ChatRequest("email alex.tan@nimbus-corp.example the file", "employee", "eis-gemini-flash", "sdk"), d)
+    out = run_chat(ChatRequest("email alex.tan@foo-corp.example the file", "employee", "eis-gemini-flash", "sdk"), d)
     assert out["blocked"] and out["block_reason"] == ["pii_email"]
     assert out["guardrail"]["status"] == "degraded"
     assert d.retriever.calls == 0 and d.sdk.calls == 0

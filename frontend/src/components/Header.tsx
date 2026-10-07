@@ -5,7 +5,7 @@ export function Header({ spendUsd, onReset, canReset, pending = false }: { spend
   return (
     <header className="flex h-16 items-center justify-between border-b border-line bg-surface px-4 md:px-6">
       <h1 className="flex items-baseline gap-3">
-        <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-ink">Nimbus Corp</span>
+        <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-ink">Foo Corp</span>
         <span className="hidden text-sm font-normal text-muted sm:inline">HR Assistant</span>
       </h1>
       <div className="flex items-center gap-3 sm:gap-4">

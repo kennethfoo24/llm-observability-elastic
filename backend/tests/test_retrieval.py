@@ -85,3 +85,15 @@ def test_catalog_client_is_only_used_by_catalog_search_and_always_limits_source(
     assert uses == ["_catalog_search"]
     _, made = _run_search()
     assert made["cat-key"].calls and all("source_includes" in c for c in made["cat-key"].calls)
+
+
+def test_retriever_works_with_only_employee_manager_and_catalog_keys():
+    from app.retrieval import Retriever
+    r = Retriever("http://es", {"employee": "e", "manager": "m", "catalog": "c"}, client_factory=lambda u, k: object())
+    assert r._client("manager") is not None
+    try:
+        r.search("hr", "x")
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("hr is no longer a persona")

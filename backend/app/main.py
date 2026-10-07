@@ -109,7 +109,7 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
     @app.get("/api/config")
     def config():
         return {"kibana_url": s.obs_kibana_url.rstrip("/"),
-                "security_kibana_url": s.sec_kibana_url.rstrip("/") or None, "company": "Nimbus Corp",
+                "security_kibana_url": s.sec_kibana_url.rstrip("/") or None, "company": "Foo Corp",
                 "guardrail_models": {"injection": s.injection_model_id, "ner": s.ner_model_id},
                 "guardrail_pipeline": PIPELINE_ID}
 

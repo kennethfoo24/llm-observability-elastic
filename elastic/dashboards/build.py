@@ -119,7 +119,7 @@ def dashboard_object(panels_json: list[dict]) -> dict:
         "type": "dashboard", "id": DASHBOARD_ID,
         "attributes": {
             "title": DASHBOARD_TITLE,
-            "description": "Cost, tokens, guardrails and latency for the Nimbus HR assistant.",
+            "description": "Cost, tokens, guardrails and latency for the Foo Corp HR assistant.",
             "timeRestore": False,
             "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"query": "", "language": "kuery"}, "filter": []})},
             "panelsJSON": json.dumps(panels_json),

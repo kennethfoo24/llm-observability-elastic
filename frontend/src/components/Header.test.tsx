@@ -23,5 +23,5 @@ test("new conversation is disabled while a request is pending", () => {
 
 test("the wordmark is the page h1", () => {
   render(<Header spendUsd={0} onReset={vi.fn()} canReset={false} />);
-  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Nimbus Corp");
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Foo Corp");
 });

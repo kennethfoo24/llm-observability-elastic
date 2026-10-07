@@ -18,17 +18,17 @@ def _search(role_key, query, source=None):
     return es.search(index=INDEX_NAME, **body)["hits"]["hits"]
 
 
-def test_employee_cannot_see_restricted_docs_but_exec_can():
+def test_employee_cannot_see_manager_docs_but_manager_can():
     keys = load_keys(Settings().persona_keys_path)
     emp = {h["_id"] for h in _search(keys["employee"], {"match": {"content": "severance reorganisation salary"}})}
-    exe = {h["_id"] for h in _search(keys["exec"], {"match": {"content": "severance reorganisation salary"}})}
+    mgr = {h["_id"] for h in _search(keys["manager"], {"match": {"content": "salary bands"}})}
     # Positive control: a query that MUST hit an employee-visible doc.
     pto = {h["_id"] for h in _search(keys["employee"], {"match": {"content": "paid time off"}})}
     assert "pto-policy" in pto
     # Employees cannot see restricted docs
     assert "project-aurora" not in emp and "salary-bands" not in emp
-    # Executives see the restricted docs
-    assert {"project-aurora", "salary-bands"} <= exe
+    # Managers see manager-level docs but not the exec-only ones
+    assert "salary-bands" in mgr and "project-aurora" not in mgr
 
 
 def test_catalog_key_never_returns_content():
@@ -64,9 +64,9 @@ def test_retriever_employee_never_gets_aurora_content_but_sees_it_as_hidden():
     _assert_no_content_anywhere(res)
 
 
-def test_retriever_exec_gets_aurora_doc_with_content():
-    res = _retriever().search("exec", AURORA_Q)
-    aurora = [d for d in res.docs if d.id == "project-aurora"]
-    assert aurora and aurora[0].content
-    assert "project-aurora" not in {g.id for g in res.hidden}
+def test_retriever_manager_gets_salary_bands_with_content_but_aurora_stays_hidden():
+    res = _retriever().search("manager", "what are the salary bands for L3 to L5")
+    bands = [d for d in res.docs if d.id == "salary-bands"]
+    assert bands and bands[0].content
+    assert "salary-bands" not in {g.id for g in res.hidden}
     _assert_no_content_anywhere(res)

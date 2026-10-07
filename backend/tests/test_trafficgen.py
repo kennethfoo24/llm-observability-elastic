@@ -20,7 +20,7 @@ def _client(handler):
 
 
 def test_prompt_banks_cover_every_persona_and_are_distinct():
-    assert set(BENIGN) == {"employee", "manager", "hr", "exec"}
+    assert set(BENIGN) == {"employee", "manager"}
     assert all(len(v) >= 5 for v in BENIGN.values())
     assert len(INJECTION) >= 4 and len(PII) >= 4
     assert not any("—" in p or "–" in p for bank in (*BENIGN.values(), INJECTION, PII) for p in bank)

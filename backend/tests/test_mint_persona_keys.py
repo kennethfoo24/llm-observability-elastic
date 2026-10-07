@@ -63,7 +63,7 @@ class FakeEs:
 
 
 def test_mint_happy_path():
-    """Happy path: 5 keys created, file written, old keys invalidated after write."""
+    """Happy path: 3 keys created, file written, old keys invalidated after write."""
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = Path(tmpdir) / "test_keys.json"
         old_key_ids = ["old-1", "old-2"]
@@ -71,14 +71,14 @@ def test_mint_happy_path():
 
         result = mint_module.mint(es, out_path)
 
-        # Check that all 5 persona names are returned
-        assert set(result) == {"employee", "manager", "hr", "exec", "catalog"}
+        # Check that all 3 role names are returned
+        assert set(result) == {"employee", "manager", "catalog"}
 
         # Check file exists and has correct content
         assert out_path.exists()
         with open(out_path) as f:
             keys = json.load(f)
-        assert set(keys.keys()) == {"employee", "manager", "hr", "exec", "catalog"}
+        assert set(keys.keys()) == {"employee", "manager", "catalog"}
         assert keys["employee"] == "SECRET-ENC-glassbox-employee"
         assert keys["catalog"] == "SECRET-ENC-glassbox-catalog"
 
@@ -163,7 +163,7 @@ def test_mint_no_old_keys():
 
         result = mint_module.mint(es, out_path)
 
-        assert set(result) == {"employee", "manager", "hr", "exec", "catalog"}
+        assert set(result) == {"employee", "manager", "catalog"}
         assert out_path.exists()
         # No old keys to invalidate
         assert len(es.security.invalidated_ids) == 0
@@ -218,7 +218,7 @@ def test_mint_ordering_old_keys_invalidated_after_file_written():
 
         ev = es.security.events
         assert ev[-2:] == ["file_written", "invalidate:old-1,old-2"]
-        assert [e for e in ev if e.startswith("create:")] == ev[:5]
+        assert [e for e in ev if e.startswith("create:")] == ev[:3]
         invalidations = [e for e in ev if e.startswith("invalidate:")]
         assert invalidations == ["invalidate:old-1,old-2"]
         assert not any(i.startswith("new-key-") for i in es.security.invalidated_ids)
@@ -240,8 +240,8 @@ def test_mint_invalidate_old_failure_keeps_new_keys_and_file():
         # New keys never invalidated; file intact with all new keys
         assert not any(i.startswith("new-key-") for i in es.security.invalidated_ids)
         keys = json.loads(out_path.read_text())
-        assert set(keys) == {"employee", "manager", "hr", "exec", "catalog"}
-        assert keys["hr"] == "SECRET-ENC-glassbox-hr"
+        assert set(keys) == {"employee", "manager", "catalog"}
+        assert keys["manager"] == "SECRET-ENC-glassbox-manager"
 
 
 def test_main_invalidate_old_failure_prints_readable_error(capsys, monkeypatch):

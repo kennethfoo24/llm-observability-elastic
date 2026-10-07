@@ -45,7 +45,7 @@ def test_chain_returns_retrieval_prompt_and_usage(s):
 def test_braces_in_documents_and_question_do_not_break_template(s):
     docs = [Doc("a", "A", "public", "{system} {0} \"x\" 😀", 1.0)]
     eng = LangChainEngine(s, _gate(), llm_factory=lambda spec: _llm())
-    _, built, res = eng.run(get_models(s)["eis-gemini-flash"], get_persona("hr"), "{question}?",
+    _, built, res = eng.run(get_models(s)["eis-gemini-flash"], get_persona("manager"), "{question}?",
                             _retrieve(RetrievalResult(docs, [], 1)))
     assert "{system} {0}" in built.user and res.text
 

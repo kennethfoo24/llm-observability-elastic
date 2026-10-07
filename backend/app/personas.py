@@ -12,8 +12,6 @@ class Persona:
 PERSONAS = [
     Persona("employee", "Maya Lim", "Software Engineer", "employee"),
     Persona("manager", "Daniel Ong", "Engineering Manager", "manager"),
-    Persona("hr", "Priya Nair", "HR Business Partner", "hr"),
-    Persona("exec", "Rachel Tan", "Chief People Officer", "exec"),
 ]
 
 

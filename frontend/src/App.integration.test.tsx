@@ -26,7 +26,7 @@ beforeEach(() => {
   auth.set("pw");
   vi.spyOn(apiMod.api, "personas").mockResolvedValue(personas);
   vi.spyOn(apiMod.api, "models").mockResolvedValue(models);
-  vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "https://kb", company: "Nimbus Corp" });
+  vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "https://kb", company: "Foo Corp" });
 });
 
 test("ask a suggested question, see the answer, the cost and the x-ray", async () => {
