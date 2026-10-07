@@ -16,7 +16,10 @@ from app.quality_pipeline import build_quality_hook, build_quality_pipeline  # n
 from elastic.client import Project  # noqa: E402
 from elastic.dashboards.build import build_ndjson  # noqa: E402
 from elastic.dashboards.panels import DASHBOARDS  # noqa: E402
-from elastic.rules import cost_alert, guardrail_detection, owasp_detections, quality_alerts  # noqa: E402
+from app.doc_scan_pipeline import PIPELINE_ID as DOC_SCAN_PIPELINE_ID  # noqa: E402
+from app.doc_scan_pipeline import STAGING_INDEX, build_doc_scan_pipeline, index_body  # noqa: E402
+
+from elastic.rules import cost_alert, doc_integrity, guardrail_detection, owasp_detections, quality_alerts  # noqa: E402
 from elastic.templates import (  # noqa: E402
     COMPONENT_NAME, DEFAULT_TEMPLATE, INDEX_TEMPLATE_NAME, build_component, build_index_template)
 
@@ -90,6 +93,22 @@ def _put_pipelines(p: Project, dry: bool, quality_only: bool = False) -> None:
             _fail("hook put", status, body)
 
 
+def _put_doc_scan(p: Project, dry: bool) -> None:
+    """genai-doc-scan pipeline plus the NEW staging index (created only when absent). hr-kb is never touched."""
+    _say(f"[{p.name}] pipeline {DOC_SCAN_PIPELINE_ID}: put", dry)
+    if not dry:
+        status, body = p.es("PUT", f"/_ingest/pipeline/{DOC_SCAN_PIPELINE_ID}", build_doc_scan_pipeline())
+        if status != 200:
+            _fail("doc scan pipeline put", status, body)
+    status, _ = p.es("GET", f"/{STAGING_INDEX}/_count")
+    exists = status == 200
+    _say(f"[{p.name}] index {STAGING_INDEX}: {'exists, kept' if exists else 'create'}", dry)
+    if not dry and not exists:
+        status, body = p.es("PUT", f"/{STAGING_INDEX}", index_body())
+        if status != 200:
+            _fail("staging index create", status, body)
+
+
 def _upsert_rule(p: Project, rule_id: str, body: dict, dry: bool) -> None:
     path = f"/api/alerting/rule/{rule_id}"
     status, _ = p.kb("GET", path)
@@ -136,6 +155,8 @@ def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality
         _upsert_rule(p, cost_alert.RULE_ID, cost_alert.rule_body(cost_threshold), dry_run)
         for rid, body in quality_alerts.all_rules(alert_overrides).items():
             _upsert_rule(p, rid, body, dry_run)
+        _put_doc_scan(p, dry_run)
+        _upsert_rule(p, doc_integrity.RULE_ID, doc_integrity.rule_body(), dry_run)
         _import_dashboards(p, dry_run)
     if p.name == "security":
         _upsert_detection(p, dry_run)

@@ -111,6 +111,7 @@ _MAPPING = [
     "LLM01|Prompt injection|DeBERTa classifier in the genai-guardrail ingest pipeline; rule Glass Box: flagged LLM prompt",
     "LLM02|Sensitive information disclosure|Regex and NER on the response in genai-quality; Security rule glassbox-llm02-pii-in-response",
     "LLM03|Supply chain|Visibility only: gen_ai.response.model in traces",
+    "LLM04|Data and model poisoning|genai-doc-scan fingerprint and DeBERTa on documents (hr-kb-staging demo); alert glassbox-doc-integrity",
     "LLM05|Improper output handling|Markup scan in genai-quality; Security rule glassbox-llm05-unsafe-output",
     "LLM06|Excessive agency|Visibility only: gen_ai.response.model in traces",
     "LLM07|System prompt leakage|Canary token match in genai-quality; Security rule glassbox-llm07-system-prompt-leak",
@@ -143,6 +144,9 @@ OWASP_PANELS = [
     Panel("LLM03 and LLM06 visibility only: model usage",
           f"{TRACES} AND attributes.gen_ai.response.model IS NOT NULL | STATS requests = COUNT(*) BY model = attributes.gen_ai.response.model | SORT requests DESC | LIMIT 10",
           "bar", "model", "requests"),
+    Panel("Documents flagged or changed (LLM04)",
+          'FROM hr-kb-staging | WHERE doc_scan.scanned_at > NOW() - 24 hours AND (doc_scan.verdict == "FLAGGED" OR doc_scan.fingerprint != doc_scan.baseline_fingerprint) | STATS docs = COUNT(*)',
+          "metric", "docs", "docs"),
     Panel("OWASP risk to Elastic control",
           "ROW m = [" + ", ".join(f'"{r}"' for r in _MAPPING) + "] | MV_EXPAND m | "
           'DISSECT m "%{risk}|%{title}|%{control}" | EVAL covered = 1 | KEEP risk, title, control, covered',
