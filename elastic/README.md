@@ -39,3 +39,12 @@ Rules have no actions (they fire silently and show in Kibana).
 | glassbox-overview | Glass Box: LLM observability | cost, tokens, guardrail verdicts, latency |
 | glassbox-quality | Glass Box: Conversation quality | answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
 | glassbox-owasp | Glass Box: OWASP LLM Top 10 coverage | live evidence per risk (LLM01, 02, 05, 07, 08, 09, 10), model usage for LLM03 and LLM06 (visibility only), risk to control table |
+
+## Document scan demo (LLM04, indirect LLM01)
+
+`python -m elastic.apply --project observability` installs the `genai-doc-scan` pipeline, creates the separate
+`hr-kb-staging` index (only if absent; the live `hr-kb` is never touched) and the alert `glassbox-doc-integrity`.
+`python scripts/poison_demo.py` indexes a clean pair, a poisoned document and a tampered copy and prints the
+verdicts; the alert then fires within 5 minutes. Clear it with `python scripts/poison_demo.py --cleanup`
+(removes only the demo documents; the alert recovers on its next run). Documents longer than 2000 characters are
+scanned in up to 4 chunks (max injection probability wins).
