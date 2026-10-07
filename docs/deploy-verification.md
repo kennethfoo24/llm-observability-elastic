@@ -171,3 +171,14 @@ Image `docker.io/kennethfoo24/glassbox@sha256:ba065ded4d347ecc2368ff02e31cd36539
 | GPT-5.4 mini (langchain) | 200 | 1.7 s | 404 / 53 | $0.0005415 | adds `invoke_workflow RunnableSequence`; one chat span, no double counting |
 
 Cost check: 404 x $0.75/M + 56 x $4.50/M = $0.000555 (matches). Prices are provider list prices marked "confirm EIS rate" in backend/prices.yaml.
+
+## Two personas, Foo Corp, LLM Observability (2026-10-07)
+
+Image `docker.io/kennethfoo24/glassbox@sha256:abd29a236c4abe67b837a25cc710c09049eb02633d58bb3bbf0ba4f2359062b4` (CI run 37636025186) deployed; CronJob still suspended. Seven corpus documents that named the old company were updated in place in `hr-kb` (no index delete): pto-policy, remote-work, benefits-overview, code-of-conduct, case-4172, case-4188, background-check-vendor; 20 documents total, none mention the old name.
+
+| Item | Result | Evidence |
+|---|---|---|
+| Personas | pass | `/api/personas` returns only employee (Maya Lim) and manager (Daniel Ong) |
+| Title | pass | page title is "Foo Corp HR Assistant" |
+| DLS demo question "What are the salary bands for L3 to L5?" | pass | manager retrieves `salary-bands` and the answer cites it (2 hidden); employee does not retrieve it and is told it is not in the documents (5 hidden) |
+| LLM Observability wording in the browser | not verified | checked at 390px and 1440px against the offline stub only |
