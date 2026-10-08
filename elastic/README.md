@@ -37,7 +37,7 @@ Rules have no actions (they fire silently and show in Kibana).
 | Id | Title | Content |
 |---|---|---|
 | glassbox-overview | Glass Box: LLM observability | cost, tokens, guardrail verdicts, latency |
-| glassbox-quality | Glass Box: Conversation quality | answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
+| glassbox-quality | Glass Box: Conversation quality | two full width list tables first (answered prompts, responses and flags; blocked and flagged guardrail prompts), then answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
 | glassbox-owasp | Glass Box: OWASP LLM Top 10 coverage | live evidence per risk (LLM01, 02, 05, 07, 08, 09, 10), model usage for LLM03 and LLM06 (visibility only), risk to control table |
 
 ## Document scan demo (LLM04, indirect LLM01)

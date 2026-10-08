@@ -34,7 +34,7 @@ Key point: the control is document level security in the data layer, not a promp
 
 ## Step 3: OWASP and quality (3 minutes) - pillar: guardrails, security and quality
 
-Open the Red team menu (sections Security and Quality; the texts are in `frontend/src/lib/prompts.ts`). Input checks run before the model; output and quality checks run after the answer, asynchronously (about 5 to 10 seconds). After each answered prompt open "Output guardrail and quality" in the LLM Observability panel and use "Open the response log" (Discover, `logs-genai_response*` by trace id) or "Try it in Dev Tools" (simulates the `genai-quality` pipeline on that answer). Both need a Kibana login.
+Open the Red team menu (sections Security and Quality; the texts are in `frontend/src/lib/prompts.ts`). Input checks run before the model; output and quality checks run after the answer, asynchronously (about 5 to 10 seconds). After each answered prompt open "Output guardrail and quality" in the LLM Observability panel and read "What Elastic checks on this answer" (one row per check with what Elastic does and in which pipeline step; the OWASP id opens the official OWASP page and "See it in Kibana" opens the matching dashboard), then use "Open the response log" (Discover, `logs-genai_response*` by trace id) or "Try it in Dev Tools" (simulates the `genai-quality` pipeline on that answer). Both need a Kibana login.
 
 | Do | Say | Expect |
 |---|---|---|

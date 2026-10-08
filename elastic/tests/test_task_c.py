@@ -72,7 +72,7 @@ def test_new_panels_query_typed_fields_and_are_bounded():
     for d in (QUALITY_DASHBOARD, OWASP_DASHBOARD):
         for p in d.panels:
             assert not any(c in p.title for c in DASHES), p.title
-            assert "STATS" in p.esql or p.esql.startswith("ROW"), p.title
+            assert p.chart == "table" or "STATS" in p.esql, p.title
             m = re.search(r"LIMIT (\d+)", p.esql)
             if m:
                 assert int(m.group(1)) <= 100
@@ -111,3 +111,31 @@ def test_owasp_reason_panels_are_multivalue_safe_and_scope_column_is_not_constan
     table = by["OWASP risk to Elastic control"]
     assert "visibility only" in table and "covered" not in table
     assert "LLM03|Supply chain|Visibility only" in table and "LLM06|Excessive agency|Visibility only" in table
+
+
+def test_quality_dashboard_starts_with_two_full_width_list_tables():
+    from elastic.dashboards.build import _layout
+    first, second = QUALITY_DASHBOARD.panels[:2]
+    assert (first.title, second.title) == ("Answered prompts, responses and flags", "Blocked and flagged prompts (guardrail)")
+    assert first.chart == second.chart == "table" and first.wide and second.wide
+    assert len(QUALITY_DASHBOARD.panels) == 12
+    lay = _layout(list(QUALITY_DASHBOARD.panels))
+    assert lay[0] == (0, 0, 48, 14) and lay[1] == (0, 14, 48, 14) and lay[2][1] == 28
+    assert len({(x, y) for x, y, _, _ in lay}) == len(lay)
+    q = first.esql
+    assert q.startswith("FROM logs-genai_response* | SORT @timestamp DESC | LIMIT 100")
+    for needle in ("quality.prompt_text AS prompt", "quality.response_text AS response", "EVAL flag = CASE(joined",
+                   "output_reasons", "quality.off_topic", "quality.lang_mismatch", "quality.low_faithfulness",
+                   'quality.user_sentiment == "negative"', "quality.answered == false"):
+        assert needle in q, needle
+    g = second.esql
+    assert 'name == "guardrail.check"' in g and 'attributes.guardrail.verdict == "FLAGGED"' in g
+    assert "attributes.guardrail.prompt_text AS prompt" in g and "trace.id AS trace_id" in g
+    obj = json.loads(build_ndjson(list(QUALITY_DASHBOARD.panels), TEMPLATE, META, QUALITY_DASHBOARD))
+    panels = json.loads(obj["attributes"]["panelsJSON"])
+    for spec, panel in zip((first, second), panels[:2]):
+        assert panel["gridData"]["w"] == 48 and panel["gridData"]["h"] == 14
+        viz = panel["embeddableConfig"]["attributes"]["state"]["visualization"]
+        assert panel["embeddableConfig"]["attributes"]["visualizationType"] == "lnsDatatable"
+        assert [c["columnId"] for c in viz["columns"]] == list(spec.cols) and viz["rowHeight"] == "auto"
+        assert {c["columnId"]: c["width"] for c in viz["columns"] if "width" in c} == dict(spec.widths)

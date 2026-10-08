@@ -16,6 +16,9 @@ class Panel:
     extra_y: tuple[str, ...] = ()
     cols: tuple[str, ...] = ()     # "table" only: all columns in display order (x is the first, y the numeric one)
     index: str | None = None       # override for queries without FROM (static ROW tables)
+    kinds: tuple[tuple[str, str], ...] = ()    # "table": column name -> date | number | boolean (default string)
+    widths: tuple[tuple[str, int], ...] = ()   # "table": column name -> pixel width
+    wide: bool = False             # full width row (w=48) and tall (h=14)
 
 
 @dataclass(frozen=True)
@@ -69,7 +72,35 @@ PANELS = [
 
 # ---------------------------------------------------------------- Conversation quality (typed genai_response fields)
 RESP = "FROM logs-genai_response*"
+_FLAG_ESQL = (
+    "EVAL f1 = CASE(output_verdict == \"FLAGGED\", COALESCE(MV_CONCAT(output_reasons, \"+\"), \"flagged\"), \"\"), "
+    "f2 = CASE(quality.off_topic == true, \"off_topic\", \"\"), "
+    "f3 = CASE(quality.lang_mismatch == true, \"lang_mismatch\", \"\"), "
+    "f4 = CASE(quality.low_faithfulness == true, \"low_faithfulness\", \"\"), "
+    "f5 = CASE(quality.user_sentiment == \"negative\", \"negative_sentiment\", \"\"), "
+    "f6 = CASE(quality.answered == false, \"unanswered\", \"\"), "
+    "joined = TRIM(CONCAT(f1, \" \", f2, \" \", f3, \" \", f4, \" \", f5, \" \", f6)) | "
+    "EVAL flag = CASE(joined == \"\", \"none\", joined)")
 Q_PANELS = [
+    Panel("Answered prompts, responses and flags",
+          f"{RESP} | SORT @timestamp DESC | LIMIT 100 | {_FLAG_ESQL} | "
+          "RENAME @timestamp AS time, quality.persona AS persona, quality.prompt_text AS prompt, "
+          "quality.response_text AS response, quality.user_sentiment AS sentiment, quality.answered AS answered, "
+          "quality.faithfulness AS faithfulness, quality.relevance AS relevance | "
+          "KEEP time, persona, prompt, response, flag, sentiment, answered, faithfulness, relevance",
+          "table", "time", "flag",
+          cols=("time", "persona", "prompt", "response", "flag", "sentiment", "answered", "faithfulness", "relevance"),
+          kinds=(("time", "date"), ("answered", "boolean"), ("faithfulness", "number"), ("relevance", "number")),
+          widths=(("time", 170), ("persona", 90), ("prompt", 320), ("response", 520), ("flag", 220)), wide=True),
+    Panel("Blocked and flagged prompts (guardrail)",
+          'FROM traces-generic.otel-default | WHERE service.name == "glassbox-backend" AND name == "guardrail.check" '
+          'AND attributes.guardrail.verdict == "FLAGGED" | SORT @timestamp DESC | LIMIT 100 | '
+          "RENAME @timestamp AS time, attributes.guardrail.prompt_text AS prompt, attributes.guardrail.reasons AS reasons, "
+          "attributes.guardrail.injection_score AS injection_score, trace.id AS trace_id | "
+          "KEEP time, prompt, reasons, injection_score, trace_id",
+          "table", "time", "prompt", cols=("time", "prompt", "reasons", "injection_score", "trace_id"),
+          kinds=(("time", "date"), ("injection_score", "number")),
+          widths=(("time", 170), ("prompt", 520), ("reasons", 220), ("trace_id", 260)), wide=True),
     Panel("Answered vs unanswered over time",
           f"{RESP} | WHERE quality.answered IS NOT NULL | EVAL status = CASE(quality.answered, \"answered\", \"unanswered\") | "
           f"STATS responses = COUNT(*) BY bucket = {BUCKET}, status | SORT bucket",

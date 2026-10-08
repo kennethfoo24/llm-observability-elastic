@@ -322,8 +322,24 @@ test("an answered response shows the Output guardrail and quality section with l
   expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
   expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-quality");
   expect(within(q).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-owasp");
-  for (const t of ["Sensitive information disclosure", "Improper output handling", "System prompt leakage", "Misinformation (LLM judge)", "Quality: sentiment, language, topic, answered"]) expect(within(q).getByText(t)).toBeInTheDocument();
-  for (const id of ["LLM02", "LLM05", "LLM07", "LLM09"]) expect(within(q).getByText(id)).toBeInTheDocument();
+  expect(within(q).getByText("What Elastic checks on this answer")).toBeInTheDocument();
+  const rows = within(within(q).getByRole("list", { name: "What Elastic checks on this answer" })).getAllByRole("listitem");
+  expect(rows).toHaveLength(8);
+  for (const t of ["Sensitive information disclosure", "Improper output handling", "System prompt leakage", "Misinformation judged by an LLM", "Sentiment", "Language", "Topic", "Answered"]) expect(within(q).getByText(t)).toBeInTheDocument();
+  const owasp = { LLM02: "llm022025-sensitive-information-disclosure", LLM05: "llm052025-improper-output-handling", LLM07: "llm072025-system-prompt-leakage", LLM09: "llm092025-misinformation" };
+  for (const [id, slug] of Object.entries(owasp)) {
+    const a = within(q).getByRole("link", { name: new RegExp(`^${id}`) });
+    expect(a).toHaveAttribute("href", `https://genai.owasp.org/llmrisk/${slug}/`);
+    expect(a).toHaveAttribute("target", "_blank");
+    expect(a.getAttribute("rel")).toContain("noopener");
+    expect(a.getAttribute("rel")).toContain("noreferrer");
+    expect(a).toHaveTextContent("(opens in a new tab)");
+  }
+  const kb = within(q).getAllByRole("link", { name: /see it in kibana/i });
+  expect(kb).toHaveLength(8);
+  expect(kb.filter((a) => a.getAttribute("href")!.endsWith("glassbox-owasp"))).toHaveLength(3);
+  expect(kb.filter((a) => a.getAttribute("href")!.endsWith("glassbox-quality"))).toHaveLength(5);
+  expect(kb.every((a) => a.getAttribute("rel")!.includes("noopener") && a.textContent!.includes("(opens in a new tab)"))).toBe(true);
   expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
 });
 
@@ -335,8 +351,9 @@ test("a blocked response has no quality section", () => {
 test("without a Kibana url the quality links are hidden; without the pipeline only Dev Tools is", () => {
   const { rerender } = render(<XRayDrawer {...props} kibanaUrl={undefined} qualityPipeline="genai-quality" msg={msg(response())} />);
   const q = () => screen.getByRole("region", { name: "Output guardrail and quality" });
-  expect(within(q()).queryAllByRole("link")).toHaveLength(0);
+  expect(within(q()).queryAllByRole("link", { name: /kibana|dashboard|dev tools|response log/i })).toHaveLength(0);
+  expect(within(q()).getAllByRole("link")).toHaveLength(4);   // only the public OWASP pages remain
   rerender(<XRayDrawer {...props} msg={msg(response())} />);
   expect(within(q()).queryByRole("link", { name: /dev tools/i })).toBeNull();
-  expect(within(q()).getAllByRole("link")).toHaveLength(3);
+  expect(within(q()).getAllByRole("link")).toHaveLength(3 + 8 + 4);
 });
