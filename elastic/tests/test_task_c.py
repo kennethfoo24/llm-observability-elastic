@@ -17,7 +17,7 @@ def test_alert_ids_names_and_shape():
     assert set(rules) == {"glassbox-unanswered-rate", "glassbox-negative-sentiment", "glassbox-low-faithfulness",
                           "glassbox-restricted-probing", "glassbox-off-topic", "glassbox-language-mismatch"}
     for rid, b in rules.items():
-        assert rid.startswith("glassbox-") and b["name"].startswith("Glass Box: ")
+        assert rid.startswith("glassbox-") and b["name"].startswith("LLM Observability: ")
         assert not any(d in json.dumps(b) for d in DASHES)
         assert b["rule_type_id"] == ".es-query" and b["schedule"] == {"interval": "5m"} and b["actions"] == []
         assert b["params"]["searchType"] == "esqlQuery" and b["params"]["timeWindowSize"] == 1
@@ -33,7 +33,7 @@ def test_alert_thresholds_and_override():
     p = q["glassbox-restricted-probing"]
     assert "quality.answered == false AND quality.hidden_count > 0" in p and "top_hidden_score" not in p
     assert "BY persona = quality.persona" in p and "probes >= 3" in p
-    assert quality_alerts.BY_ID["glassbox-restricted-probing"].name == "Glass Box: Restricted topic attempts"
+    assert quality_alerts.BY_ID["glassbox-restricted-probing"].name == "LLM Observability: Restricted topic attempts"
     assert "quality.off_topic == true" in q["glassbox-off-topic"] and "hits >= 3" in q["glassbox-off-topic"]
     assert "quality.lang_mismatch == true" in q["glassbox-language-mismatch"] and "hits >= 2" in q["glassbox-language-mismatch"]
     low = quality_alerts.all_rules({"glassbox-off-topic": 1})["glassbox-off-topic"]["params"]["esqlQuery"]["esql"]
@@ -49,14 +49,14 @@ def test_detection_rules():
         assert b["query"] == f'output_reasons : "{reason}"' and b["index"] == ["logs-genai_response*"]
         assert b["interval"] == "1m" and b["from"] == "now-5m" and b["type"] == "query" and b["language"] == "kuery"
         assert f"OWASP {owasp}" in b["tags"] and owasp in b["description"] and "MITRE" in b["description"]
-        assert b["name"].startswith("Glass Box: ") and not any(d in json.dumps(b) for d in DASHES)
+        assert b["name"].startswith("LLM Observability: ") and not any(d in json.dumps(b) for d in DASHES)
         assert b["severity"] in {"medium", "high"}
 
 
 def test_dashboard_registry_ids_titles_and_overview_unchanged():
     assert [d.id for d in DASHBOARDS] == ["glassbox-overview", "glassbox-quality", "glassbox-owasp", "glassbox-gemma"]
-    assert QUALITY_DASHBOARD.title == "Glass Box: Conversation quality"
-    assert OWASP_DASHBOARD.title == "Glass Box: OWASP LLM Top 10 coverage"
+    assert QUALITY_DASHBOARD.title == "LLM Observability: Conversation quality"
+    assert OWASP_DASHBOARD.title == "LLM Observability: OWASP LLM Top 10 coverage"
     assert len(DASHBOARDS[0].panels) == len(PANELS)
     for d in DASHBOARDS:
         line = build_ndjson(list(d.panels), TEMPLATE, META, d)

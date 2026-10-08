@@ -1,4 +1,4 @@
-# Glass Box demo script (10 minutes)
+# LLM Observability demo script (10 minutes)
 
 Story: an HR assistant for a company called Foo Corp. The same question gets different answers for different people, and every step is visible, traceable and costed.
 
@@ -8,7 +8,7 @@ People in the app: Maya Lim (Software Engineer, role employee) and Daniel Ong (E
 
 1. Run `deploy/scripts/demo_up.sh` (add `--gemma` at least 10 minutes ahead if you will show Gemma).
 2. Open https://107-178-251-254.sslip.io and enter the password from `backend/secrets/app_password.txt`. Do not show the file on screen.
-3. Open Kibana in a second tab: APM service `glassbox-backend`, the dashboard `Glass Box: LLM observability`, and the Security alerts page.
+3. Open Kibana in a second tab: APM service `glassbox-backend`, the dashboard `LLM Observability: Overview`, and the Security alerts page.
 4. Pick GPT-5.4 mini as the model and Direct SDK as the engine.
 5. Provider usage: EIS token usage is under Billing and subscription, Usage, Inference in Elastic Cloud (it lags real traffic).
 
@@ -64,10 +64,10 @@ After the table, show where the prompt itself lives (blocked requests have no LL
 | Do | Say | Expect |
 |---|---|---|
 | Point at "Session cost" in the app header after a few chats. | "The app shows what this session has cost, in dollars." | A small figure, a fraction of a cent per answer. |
-| Kibana, dashboard `Glass Box: LLM observability`. | "Spend over time by model, tokens, average cost per person, guardrail verdicts and stage latency, all from the same traces." | Eight panels with data. Average cost is a fraction of a cent per request. |
+| Kibana, dashboard `LLM Observability: Overview`. | "Spend over time by model, tokens, average cost per person, guardrail verdicts and stage latency, all from the same traces." | Eight panels with data. Average cost is a fraction of a cent per request. |
 | Open Kibana, Observability, APM, Services, `glassbox-backend`, and the Kubernetes dashboards linked from it. | "Out of the box views: the GenAI service view for the model calls, and Kubernetes infrastructure for the pods." | Latency, throughput, token usage per model, and pod CPU and memory. |
 | In Elastic Cloud open Billing and subscription, Usage, Inference. | "The model calls run on the Elastic Inference Service, so the token usage is billed and visible per model in Elastic." | EIS token usage; it can lag real traffic. |
-| Show the alert firing. In a terminal run `source backend/.venv/bin/activate && python -m elastic.apply --project observability --cost-threshold 0.0001`, send two chats, then open Observability, Rules, `Glass Box: LLM spend above threshold`. | "The budget rule watches hourly spend. I lowered the limit to nearly nothing to trigger it live." | An active alert within about a minute. |
+| Show the alert firing. In a terminal run `source backend/.venv/bin/activate && python -m elastic.apply --project observability --cost-threshold 0.0001`, send two chats, then open Observability, Rules, `LLM Observability: LLM spend above threshold`. | "The budget rule watches hourly spend. I lowered the limit to nearly nothing to trigger it live." | An active alert within about a minute. |
 | Restore the real threshold: `python -m elastic.apply --project observability --cost-threshold 0.25` | "Back to the real limit of 25 cents per hour." | Rule back at 0.25. Do this before you leave the demo. |
 
 ## Step 5: Self-hosted model (1 minute) - pillar: model choice (needs `demo_up.sh --gemma`)
@@ -75,7 +75,7 @@ After the table, show where the prompt itself lives (blocked requests have no LL
 | Do | Say | Expect |
 |---|---|---|
 | Before starting: show the model list with Gemma greyed out and marked Offline. Then (already started ahead of the demo) refresh the list. | "Gemma runs on our own GPU. It is off by default because it costs about $5 to $6 an hour." | Gemma shows Offline when the VM is stopped, selectable when it is serving. |
-| Select Gemma, ask `What is the remote work policy?` | "Same app, same guardrails, same traces, different model, and cost is estimated from GPU time." | An answer in a few seconds. The trace span is named `chat google/gemma-4-31B-it`. Optional: open the `Glass Box: Gemma (vLLM)` dashboard for token and queue metrics (data exists only while the VM runs). |
+| Select Gemma, ask `What is the remote work policy?` | "Same app, same guardrails, same traces, different model, and cost is estimated from GPU time." | An answer in a few seconds. The trace span is named `chat google/gemma-4-31B-it`. Optional: open the `LLM Observability: Gemma (vLLM)` dashboard for token and queue metrics (data exists only while the VM runs). |
 | Afterwards run `deploy/scripts/demo_down.sh`. | "One command stops the GPU and the traffic generator." | Output ends with "traffic generator suspended, gemma TERMINATED". |
 
 If Gemma is not running and someone selects it, the app shows an inline error with a "Try with GPT-5.4 mini" button.
@@ -88,4 +88,4 @@ Run `deploy/scripts/demo_down.sh` (add `--teardown` to remove the load balancer 
 
 - Flagged or blocked prompt: in the Guardrail section click "See where it was blocked" (APM trace, span `guardrail.check`) and "View detection in Elastic Security" (Alerts filtered to rule `glassbox-flagged-prompts`). The alert can take a few minutes to appear.
 - Retrieval: click a document title to open it in Kibana Discover (Kibana login needed; your Kibana role applies, not the persona). Hidden cards have no link.
-- Model and cost: "Open cost dashboard" opens `Glass Box: LLM observability`.
+- Model and cost: "Open cost dashboard" opens `LLM Observability: Overview`.

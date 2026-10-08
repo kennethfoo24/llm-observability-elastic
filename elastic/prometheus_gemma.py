@@ -67,7 +67,7 @@ def inputs_from_manifest(item: dict, host: str, password: str) -> dict:
 
 
 def package_policy_body(policy_id: str, inputs: dict) -> dict:
-    return {"name": PACKAGE_POLICY_NAME, "description": "Glass Box: Gemma vLLM metrics (password protected /metrics)",
+    return {"name": PACKAGE_POLICY_NAME, "description": "LLM Observability: Gemma vLLM metrics (password protected /metrics)",
             "namespace": "default", "policy_ids": [policy_id],
             "package": {"name": PACKAGE, "version": VERSION}, "inputs": inputs}
 

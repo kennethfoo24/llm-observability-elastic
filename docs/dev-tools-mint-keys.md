@@ -1,4 +1,4 @@
-# Mint the Glass Box API keys in Kibana Dev Tools
+# Mint the LLM Observability API keys in Kibana Dev Tools
 
 Run these in **Kibana → Dev Tools** of the **Observability** project (they run as you, so they can create keys with their own privileges).
 Each response contains an `encoded` field. Copy the `encoded` value of each key into `backend/secrets/persona_keys.json` as:

@@ -9,7 +9,7 @@ P=$PROJECT_ID
 
 gcloud artifacts repositories describe glassbox --location="$REGION" --project="$P" >/dev/null 2>&1 \
   || run gcloud artifacts repositories create glassbox --repository-format=docker --location="$REGION" \
-       --project="$P" --description="Glass Box demo images"
+       --project="$P" --description="LLM Observability demo images"
 
 gcloud compute addresses describe "$STATIC_IP_NAME" --global --project="$P" >/dev/null 2>&1 \
   || run gcloud compute addresses create "$STATIC_IP_NAME" --global --project="$P"

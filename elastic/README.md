@@ -12,13 +12,13 @@ prompts score NEGATIVE), so alerts use `user_sentiment`.
 
 | Rule id | Name | Fires when | Proves | OWASP |
 |---|---|---|---|---|
-| glassbox-llm-spend | Glass Box: LLM spend above threshold | spend over $0.25 in 1h | cost control | LLM10 |
-| glassbox-unanswered-rate | Glass Box: Unanswered rate above 40 percent | at least 5 responses and over 40 percent with `quality.answered == false` | knowledge gaps | quality |
-| glassbox-negative-sentiment | Glass Box: Negative user sentiment | 3 or more `quality.user_sentiment == "negative"` | unhappy users | quality |
-| glassbox-low-faithfulness | Glass Box: Low faithfulness answers | 2 or more `quality.low_faithfulness == true` | judge sees unsupported answers | LLM09 |
-| glassbox-restricted-probing | Glass Box: Restricted topic attempts | 3 or more responses for one persona with `quality.answered == false` and `quality.hidden_count > 0` | users asking about content their role cannot see and getting nothing | LLM08 |
-| glassbox-off-topic | Glass Box: Off topic prompts | 3 or more `quality.off_topic == true` | scope drift | quality |
-| glassbox-language-mismatch | Glass Box: Language mismatch | 2 or more `quality.lang_mismatch == true` | answer language differs from prompt | quality |
+| glassbox-llm-spend | LLM Observability: LLM spend above threshold | spend over $0.25 in 1h | cost control | LLM10 |
+| glassbox-unanswered-rate | LLM Observability: Unanswered rate above 40 percent | at least 5 responses and over 40 percent with `quality.answered == false` | knowledge gaps | quality |
+| glassbox-negative-sentiment | LLM Observability: Negative user sentiment | 3 or more `quality.user_sentiment == "negative"` | unhappy users | quality |
+| glassbox-low-faithfulness | LLM Observability: Low faithfulness answers | 2 or more `quality.low_faithfulness == true` | judge sees unsupported answers | LLM09 |
+| glassbox-restricted-probing | LLM Observability: Restricted topic attempts | 3 or more responses for one persona with `quality.answered == false` and `quality.hidden_count > 0` | users asking about content their role cannot see and getting nothing | LLM08 |
+| glassbox-off-topic | LLM Observability: Off topic prompts | 3 or more `quality.off_topic == true` | scope drift | quality |
+| glassbox-language-mismatch | LLM Observability: Language mismatch | 2 or more `quality.lang_mismatch == true` | answer language differs from prompt | quality |
 
 Limit: `hidden_count` counts catalog matches (RRF top 8), not relevance, so it only means something together with `answered == false`.
 Rules have no actions (they fire silently and show in Kibana).
@@ -36,9 +36,9 @@ Rules have no actions (they fire silently and show in Kibana).
 
 | Id | Title | Content |
 |---|---|---|
-| glassbox-overview | Glass Box: LLM observability | cost, tokens, guardrail verdicts, latency |
-| glassbox-quality | Glass Box: Conversation quality | two full width list tables first (answered prompts, responses and flags; blocked and flagged guardrail prompts), then answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
-| glassbox-owasp | Glass Box: OWASP LLM Top 10 coverage | live evidence per risk (LLM01, 02, 05, 07, 08, 09, 10), model usage for LLM03 and LLM06 (visibility only), risk to control table |
+| glassbox-overview | LLM Observability: Overview | cost, tokens, guardrail verdicts, latency |
+| glassbox-quality | LLM Observability: Conversation quality | two full width list tables first (answered prompts, responses and flags; blocked and flagged guardrail prompts), then answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
+| glassbox-owasp | LLM Observability: OWASP LLM Top 10 coverage | live evidence per risk (LLM01, 02, 05, 07, 08, 09, 10), model usage for LLM03 and LLM06 (visibility only), risk to control table |
 
 ## Document scan demo (LLM04, indirect LLM01)
 

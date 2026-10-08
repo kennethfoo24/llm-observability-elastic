@@ -76,7 +76,7 @@ def test_staging_mapping_is_hr_kb_plus_typed_result_fields():
 def test_rule_is_a_5m_esql_rule_on_staging_only():
     b = doc_integrity.rule_body()
     q = b["params"]["esqlQuery"]["esql"]
-    assert doc_integrity.RULE_ID == "glassbox-doc-integrity" and b["name"] == "Glass Box: Document scan flagged or changed"
+    assert doc_integrity.RULE_ID == "glassbox-doc-integrity" and b["name"] == "LLM Observability: Document scan flagged or changed"
     assert b["schedule"]["interval"] == "5m" and b["params"]["searchType"] == "esqlQuery"
     assert q.startswith("FROM hr-kb-staging ") and "hr-kb " not in q.replace("hr-kb-staging", "")
     assert 'doc_scan.verdict == "FLAGGED"' in q and "doc_scan.fingerprint != doc_scan.baseline_fingerprint" in q

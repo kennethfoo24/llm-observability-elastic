@@ -48,7 +48,7 @@ def test_latency_panel_converts_nanoseconds_to_milliseconds_and_lists_real_span_
 def test_build_emits_one_valid_dashboard_object_with_one_by_value_panel_per_spec():
     obj, panels = _dash()
     assert obj["type"] == "dashboard" and obj["id"] == DASHBOARD_ID == "glassbox-overview"
-    assert obj["attributes"]["title"] == "Glass Box: LLM observability"
+    assert obj["attributes"]["title"] == "LLM Observability: Overview"
     assert obj["references"] == [] and len(panels) == len(PANELS)
     assert [p["embeddableConfig"]["attributes"]["title"] for p in panels] == [p.title for p in PANELS]
     assert len({p["panelIndex"] for p in panels}) == len(PANELS)

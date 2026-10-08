@@ -1,4 +1,6 @@
-# Glass Box runbook
+# LLM Observability runbook
+
+Naming: the product is called LLM Observability. Object ids, k8s names, indices and the `service.name` keep the old `glassbox` prefix (for example `glassbox-overview`, `glassbox-backend`) so live objects, links and saved state keep working.
 
 Live site: https://107-178-251-254.sslip.io (host built from the static IP `glassbox-ip` and the public sslip.io DNS service).
 Everything runs in the namespace `genai-demo` on the GKE cluster `kenneth-gke` (project `elastic-sa`, zone `asia-southeast1-a`).
@@ -30,10 +32,10 @@ Start Gemma at least 10 minutes before you need it. It switches itself off 180 m
 | What | Where |
 |---|---|
 | Traces | Kibana, Observability, APM, service `glassbox-backend` (the app has an "Open trace in Kibana" link too) |
-| Glass Box dashboard | Kibana, Dashboards, `Glass Box: LLM observability` (cost, tokens, guardrail verdicts, stage latency) |
+| LLM Observability dashboard | Kibana, Dashboards, `LLM Observability: Overview` (cost, tokens, guardrail verdicts, stage latency) |
 | LLM provider usage | Elastic Cloud, Billing and subscription, Usage, Inference (EIS token usage per model). APM GenAI service views and the Kubernetes infrastructure dashboards cover the rest of pillar 1 |
 | Security alerts | Kibana, Security project, Alerts, rule `glassbox-flagged-prompts` |
-| Cost alert | Observability, Rules, `Glass Box: LLM spend above threshold` (threshold 0.25 USD per hour) |
+| Cost alert | Observability, Rules, `LLM Observability: LLM spend above threshold` (threshold 0.25 USD per hour) |
 
 ## 4. After a demo
 
@@ -64,7 +66,7 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 - The browser waits at most 90 seconds for an answer. The load balancer allows 100 seconds, the server stays below the browser limit.
 - Rate limits are per IP: 20 chats per minute and 120 API requests per minute. About 10 failed attempts in 5 minutes (each wrong password counts once) lock that IP out for wrong or missing passwords. Requests with the correct password bypass the lockout, because the lockout only exists to throttle guessing.
 - Traces show up about 1 minute after a request.
-- Gemma metrics: the VM's vLLM `/metrics` is password protected (Caddy `basic_auth`, user `metrics`; `/v1/*` keeps the Bearer key). Password: gitignored `backend/secrets/gemma_metrics_password.txt`. The lock is in the VM startup script and applies at boot (`python3 deploy/scripts/gemma_metrics_lock.py apply|restore|status`, `DRY_RUN=1` supported). The native Prometheus integration (Fleet package policy `glassbox-gemma-vllm`, id `1d50c2fd-370c-4b30-ab30-2f4d87a5ca7c`, on agent policy `kubernetes-agent-policy`, one scraping agent via leader election, 60 s) writes `metrics-prometheus.collector-*`; the dashboard is `Glass Box: Gemma (vLLM)` (id `glassbox-gemma`). No app Secret or image uses the password. The password sits in the Fleet package policy, visible to Fleet admins. When the VM is stopped there is simply no data. Rotate: delete the password file, run `gemma_metrics_lock.py apply`, run `python -m elastic.prometheus_gemma` (updates the package policy), then boot the VM so the new startup script takes effect. Live check: `/metrics` 401 without auth and with a wrong password, 200 with the password (388 vllm series), `/v1/models` 200, a chat on gemma 200. Boots took 507 s and 492 s; one earlier boot had a transient vLLM container exit (no cause found, not repeated).
+- Gemma metrics: the VM's vLLM `/metrics` is password protected (Caddy `basic_auth`, user `metrics`; `/v1/*` keeps the Bearer key). Password: gitignored `backend/secrets/gemma_metrics_password.txt`. The lock is in the VM startup script and applies at boot (`python3 deploy/scripts/gemma_metrics_lock.py apply|restore|status`, `DRY_RUN=1` supported). The native Prometheus integration (Fleet package policy `glassbox-gemma-vllm`, id `1d50c2fd-370c-4b30-ab30-2f4d87a5ca7c`, on agent policy `kubernetes-agent-policy`, one scraping agent via leader election, 60 s) writes `metrics-prometheus.collector-*`; the dashboard is `LLM Observability: Gemma (vLLM)` (id `glassbox-gemma`). No app Secret or image uses the password. The password sits in the Fleet package policy, visible to Fleet admins. When the VM is stopped there is simply no data. Rotate: delete the password file, run `gemma_metrics_lock.py apply`, run `python -m elastic.prometheus_gemma` (updates the package policy), then boot the VM so the new startup script takes effect. Live check: `/metrics` 401 without auth and with a wrong password, 200 with the password (388 vllm series), `/v1/models` 200, a chat on gemma 200. Boots took 507 s and 492 s; one earlier boot had a transient vLLM container exit (no cause found, not repeated).
 
 ## 7. Troubleshooting
 
@@ -104,7 +106,7 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
    - GCP: service account `glassbox-monitoring` (its `roles/monitoring.viewer` binding and the Workload Identity binding to `genai-demo/glassbox-monitoring`);
    - Kubernetes: Deployment `glassbox-elastic-agent`, Secret `glassbox-fleet` and ServiceAccount `glassbox-monitoring` in `genai-demo`;
    - Elastic Fleet: agent policy `glassbox-gcp` and package policy `glassbox-vertexai`, plus the unused `[GCP VertexAI]` dashboards.
-2. Lens rendering of the Glass Box dashboard and the Kibana trace link were checked through REST only. Please eyeball both once in a logged-in browser.
+2. Lens rendering of the LLM Observability dashboard and the Kibana trace link were checked through REST only. Please eyeball both once in a logged-in browser.
 3. Post-login UI visuals were checked by API calls and frontend tests only.
 4. Guardrail log export uses project admin keys (see section 5).
 5. Gemma `/metrics` is open (accepted risk) and the hardening proposal awaits approval.

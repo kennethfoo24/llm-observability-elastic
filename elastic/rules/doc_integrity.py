@@ -2,7 +2,7 @@
 from .cost_alert import esql_rule_body
 
 RULE_ID = "glassbox-doc-integrity"
-NAME = "Glass Box: Document scan flagged or changed"
+NAME = "LLM Observability: Document scan flagged or changed"
 INDEX = "hr-kb-staging"
 CONDITION = 'doc_scan.verdict == "FLAGGED" OR doc_scan.fingerprint != doc_scan.baseline_fingerprint'
 BASE = f"FROM {INDEX} | WHERE doc_scan.scanned_at > NOW() - 24 hours AND ({CONDITION})"

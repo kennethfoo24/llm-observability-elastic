@@ -139,7 +139,7 @@ Q_PANELS = [
 # ---------------------------------------------------------------- OWASP LLM Top 10 coverage
 TRACES = 'FROM traces-generic.otel-default | WHERE service.name == "glassbox-backend"'
 _MAPPING = [
-    "LLM01|Prompt injection|DeBERTa classifier in the genai-guardrail ingest pipeline; rule Glass Box: flagged LLM prompt",
+    "LLM01|Prompt injection|DeBERTa classifier in the genai-guardrail ingest pipeline; rule LLM Observability: flagged LLM prompt",
     "LLM02|Sensitive information disclosure|Regex and NER on the response in genai-quality; Security rule glassbox-llm02-pii-in-response",
     "LLM03|Supply chain|Visibility only: gen_ai.response.model in traces",
     "LLM04|Data and model poisoning|genai-doc-scan fingerprint and DeBERTa on documents (hr-kb-staging demo); alert glassbox-doc-integrity",
@@ -184,13 +184,13 @@ OWASP_PANELS = [
           "table", "risk", "scope", cols=("risk", "title", "control", "scope"), index="traces-generic.otel-default"),
 ]
 
-QUALITY_DASHBOARD = Dashboard("glassbox-quality", "Glass Box: Conversation quality",
+QUALITY_DASHBOARD = Dashboard("glassbox-quality", "LLM Observability: Conversation quality",
                               "Answer rate, sentiment, language, topic and judge scores for the HR assistant.",
                               tuple(Q_PANELS))
-OWASP_DASHBOARD = Dashboard("glassbox-owasp", "Glass Box: OWASP LLM Top 10 coverage",
+OWASP_DASHBOARD = Dashboard("glassbox-owasp", "LLM Observability: OWASP LLM Top 10 coverage",
                             "Live evidence per OWASP LLM risk and the Elastic control behind it.",
                             tuple(OWASP_PANELS))
-OVERVIEW_DASHBOARD = Dashboard("glassbox-overview", "Glass Box: LLM observability",
+OVERVIEW_DASHBOARD = Dashboard("glassbox-overview", "LLM Observability: Overview",
                                "Cost, tokens, guardrails and latency for the Foo Corp HR assistant.", tuple(PANELS))
 # ---------------------------------------------------------------- Gemma (vLLM) via the Fleet Prometheus integration
 # Counters are of ES|QL type `counter` (no MAX/MIN), so TO_DOUBLE first; per bucket MAX-MIN is the increase.
@@ -220,7 +220,7 @@ GEMMA_PANELS = [
           f"{GM} | STATS samples = COUNT(*) BY bucket = {BUCKET} | SORT bucket",
           "line", "bucket", "samples"),
 ]
-GEMMA_DASHBOARD = Dashboard("glassbox-gemma", "Glass Box: Gemma (vLLM)",
+GEMMA_DASHBOARD = Dashboard("glassbox-gemma", "LLM Observability: Gemma (vLLM)",
                             "Self-hosted Gemma on vLLM: tokens, requests, queue and KV cache from the Fleet Prometheus integration. Data exists only while the VM runs.",
                             tuple(GEMMA_PANELS))
 DASHBOARDS = [OVERVIEW_DASHBOARD, QUALITY_DASHBOARD, OWASP_DASHBOARD, GEMMA_DASHBOARD]

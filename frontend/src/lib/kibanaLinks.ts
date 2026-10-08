@@ -14,7 +14,7 @@ export function traceUrl(base: string, traceId: string): string {
   return `${base}/app/apm/link-to/trace/${encodeURIComponent(traceId)}`;
 }
 
-/** Security alerts page filtered to the Glass Box detection rule, last 24 hours. */
+/** Security alerts page filtered to the LLM Observability detection rule, last 24 hours. */
 export function alertsUrl(base: string): string {
   const query = `(language:kuery,query:${rison(`kibana.alert.rule.rule_id : "${DETECTION_RULE_ID}"`)})`;
   const timerange = `(global:(linkTo:!(),timerange:(from:now-24h,kind:relative,to:now)))`;

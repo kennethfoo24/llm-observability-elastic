@@ -82,7 +82,7 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
         raise RuntimeError(f"models registered without a price entry in prices.yaml: {', '.join(unpriced)}")
     # FastAPI >= 0.14x auto-adds a second OTLP exporter from OTEL_* env, which duplicates every span
     # and log next to opentelemetry-instrument; the distro owns export.
-    app = FastAPI(title="Glass Box", telemetry={"auto_configure": False},
+    app = FastAPI(title="LLM Observability", telemetry={"auto_configure": False},
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)

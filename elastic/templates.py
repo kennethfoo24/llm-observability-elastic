@@ -10,7 +10,7 @@ PRIORITY = 130   # above the default otel logs template (120)
 
 def build_component() -> dict:
     return {"template": {"mappings": {"properties": FIELD_MAPPINGS}},
-            "_meta": {"description": "Glass Box: typed output guardrail and quality fields for genai_response logs"}}
+            "_meta": {"description": "LLM Observability: typed output guardrail and quality fields for genai_response logs"}}
 
 
 def build_index_template(default_template: dict) -> dict:
@@ -19,7 +19,7 @@ def build_index_template(default_template: dict) -> dict:
     composed = [c for c in default_template["composed_of"] if c != COMPONENT_NAME] + [COMPONENT_NAME]
     body = {"index_patterns": [INDEX_PATTERN], "priority": PRIORITY, "data_stream": {}, "composed_of": composed,
             "allow_auto_create": True,
-            "_meta": {"description": "Glass Box: genai_response logs with typed quality fields"}}
+            "_meta": {"description": "LLM Observability: genai_response logs with typed quality fields"}}
     inline = (default_template.get("template") or {}).get("mappings")
     if inline:   # keep the default template's own mappings (data_stream.type constant_keyword)
         body["template"] = {"mappings": inline}

@@ -49,7 +49,7 @@ Data still exists: 180 `glassbox-backend` spans, 2026-10-04 10:06 to 10:15 UTC; 
 | `attributes.app.blocked` | boolean |
 | `attributes.guardrail.verdict` | not present as a column (`attributes.guardrail.status`, `.injection_score` double, `.latency_ms` long, `.person_count`, `.reasons` exist) |
 
-Dynamic mapping rule for numerics: native OTLP numerics are typed (int -> long, double -> double, bool -> boolean), not keyword or flattened; confirmed on the otel-demo attributes (`app.order.amount` double, `app.products.count` long, `app.shipping.amount` double, `app.guardrail`-style fields as above). Caveat: a field whose first-seen value was a string stays keyword forever (`attributes.app.payment.amount` is keyword), so `TO_DOUBLE` is NOT needed for the Glass Box fields but is harmless; the app must always emit `cost_usd` as a float, never a string. Filter field `service.name` is correct.
+Dynamic mapping rule for numerics: native OTLP numerics are typed (int -> long, double -> double, bool -> boolean), not keyword or flattened; confirmed on the otel-demo attributes (`app.order.amount` double, `app.products.count` long, `app.shipping.amount` double, `app.guardrail`-style fields as above). Caveat: a field whose first-seen value was a string stays keyword forever (`attributes.app.payment.amount` is keyword), so `TO_DOUBLE` is NOT needed for the LLM Observability fields but is harmless; the app must always emit `cost_usd` as a float, never a string. Filter field `service.name` is correct.
 
 Working ES|QL, unchanged from the brief (no casts):
 

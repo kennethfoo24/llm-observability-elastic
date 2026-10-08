@@ -38,17 +38,17 @@ def _probing(n: float) -> str:
 
 
 SPECS: list[AlertSpec] = [
-    AlertSpec("glassbox-unanswered-rate", "Glass Box: Unanswered rate above 40 percent", "Quality", 40.0,
+    AlertSpec("glassbox-unanswered-rate", "LLM Observability: Unanswered rate above 40 percent", "Quality", 40.0,
               ("quality", "unanswered"), _unanswered),
-    AlertSpec("glassbox-negative-sentiment", "Glass Box: Negative user sentiment", "Quality", 3,
+    AlertSpec("glassbox-negative-sentiment", "LLM Observability: Negative user sentiment", "Quality", 3,
               ("quality", "sentiment"), _count_rule('quality.user_sentiment == "negative"')),
-    AlertSpec("glassbox-low-faithfulness", "Glass Box: Low faithfulness answers", "OWASP LLM09", 2,
+    AlertSpec("glassbox-low-faithfulness", "LLM Observability: Low faithfulness answers", "OWASP LLM09", 2,
               ("owasp", "llm09", "faithfulness"), _count_rule("quality.low_faithfulness == true")),
-    AlertSpec("glassbox-restricted-probing", "Glass Box: Restricted topic attempts", "OWASP LLM08", 3,
+    AlertSpec("glassbox-restricted-probing", "LLM Observability: Restricted topic attempts", "OWASP LLM08", 3,
               ("owasp", "llm08", "probing"), _probing),
-    AlertSpec("glassbox-off-topic", "Glass Box: Off topic prompts", "Quality", 3,
+    AlertSpec("glassbox-off-topic", "LLM Observability: Off topic prompts", "Quality", 3,
               ("quality", "off-topic"), _count_rule("quality.off_topic == true")),
-    AlertSpec("glassbox-language-mismatch", "Glass Box: Language mismatch", "Quality", 2,
+    AlertSpec("glassbox-language-mismatch", "LLM Observability: Language mismatch", "Quality", 2,
               ("quality", "language"), _count_rule("quality.lang_mismatch == true")),
 ]
 BY_ID = {s.rule_id: s for s in SPECS}

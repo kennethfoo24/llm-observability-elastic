@@ -1,4 +1,4 @@
-"""Build the Glass Box dashboard as ONE dashboard saved object with by-value Lens panels.
+"""Build the LLM Observability dashboard as ONE dashboard saved object with by-value Lens panels.
 
 Serverless Kibana stores Lens panels inline in the dashboard (no separate `lens` saved objects), so each
 panel is a clone of the extracted template (template.lens-esql.json, RFC 6901 pointers in template.meta.json)
@@ -13,7 +13,7 @@ import uuid
 from .panels import Dashboard, Panel
 
 DASHBOARD_ID = "glassbox-overview"
-DASHBOARD_TITLE = "Glass Box: LLM observability"
+DASHBOARD_TITLE = "LLM Observability: Overview"
 TIME_FIELD = "@timestamp"
 _FROM = re.compile(r"^\s*(?:FROM|TS)\s+([^\s|,]+)", re.IGNORECASE)
 
