@@ -3,11 +3,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from elastic.client import Project
-from elastic.dashboards.panels import OWASP_DASHBOARD, QUALITY_DASHBOARD
+from elastic.dashboards.panels import GEMMA_DASHBOARD, OWASP_DASHBOARD, QUALITY_DASHBOARD
 from elastic.rules import quality_alerts
 
 pytestmark = pytest.mark.integration
-NEW_PANELS = [*QUALITY_DASHBOARD.panels, *OWASP_DASHBOARD.panels]
+NEW_PANELS = [*QUALITY_DASHBOARD.panels, *OWASP_DASHBOARD.panels, *GEMMA_DASHBOARD.panels]
 
 
 @pytest.fixture(scope="module")

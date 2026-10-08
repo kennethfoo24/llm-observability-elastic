@@ -75,7 +75,7 @@ After the table, show where the prompt itself lives (blocked requests have no LL
 | Do | Say | Expect |
 |---|---|---|
 | Before starting: show the model list with Gemma greyed out and marked Offline. Then (already started ahead of the demo) refresh the list. | "Gemma runs on our own GPU. It is off by default because it costs about $5 to $6 an hour." | Gemma shows Offline when the VM is stopped, selectable when it is serving. |
-| Select Gemma, ask `What is the remote work policy?` | "Same app, same guardrails, same traces, different model, and cost is estimated from GPU time." | An answer in a few seconds. The trace span is named `chat google/gemma-4-31B-it`. |
+| Select Gemma, ask `What is the remote work policy?` | "Same app, same guardrails, same traces, different model, and cost is estimated from GPU time." | An answer in a few seconds. The trace span is named `chat google/gemma-4-31B-it`. Optional: open the `Glass Box: Gemma (vLLM)` dashboard for token and queue metrics (data exists only while the VM runs). |
 | Afterwards run `deploy/scripts/demo_down.sh`. | "One command stops the GPU and the traffic generator." | Output ends with "traffic generator suspended, gemma TERMINATED". |
 
 If Gemma is not running and someone selects it, the app shows an inline error with a "Try with GPT-5.4 mini" button.

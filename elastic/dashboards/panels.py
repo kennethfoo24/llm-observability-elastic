@@ -192,4 +192,35 @@ OWASP_DASHBOARD = Dashboard("glassbox-owasp", "Glass Box: OWASP LLM Top 10 cover
                             tuple(OWASP_PANELS))
 OVERVIEW_DASHBOARD = Dashboard("glassbox-overview", "Glass Box: LLM observability",
                                "Cost, tokens, guardrails and latency for the Foo Corp HR assistant.", tuple(PANELS))
-DASHBOARDS = [OVERVIEW_DASHBOARD, QUALITY_DASHBOARD, OWASP_DASHBOARD]
+# ---------------------------------------------------------------- Gemma (vLLM) via the Fleet Prometheus integration
+# Counters are of ES|QL type `counter` (no MAX/MIN), so TO_DOUBLE first; per bucket MAX-MIN is the increase.
+# The vLLM histograms are the legacy `histogram` type, which ES|QL cannot aggregate: no latency panel.
+GM = "FROM metrics-prometheus.collector-*"
+_GEN = "`prometheus.vllm:generation_tokens_total.counter`"
+_PRM = "`prometheus.vllm:prompt_tokens_total.counter`"
+_REQ = "`prometheus.vllm:request_success_total.counter`"
+GEMMA_PANELS = [
+    Panel("Gemma generated tokens per bucket",
+          f"{GM} | WHERE {_GEN} IS NOT NULL | EVAL v = TO_DOUBLE({_GEN}) | STATS gen_tokens = MAX(v) - MIN(v) BY bucket = {BUCKET} | SORT bucket",
+          "line", "bucket", "gen_tokens"),
+    Panel("Gemma prompt tokens per bucket",
+          f"{GM} | WHERE {_PRM} IS NOT NULL | EVAL v = TO_DOUBLE({_PRM}) | STATS prompt_tokens = MAX(v) - MIN(v) BY bucket = {BUCKET} | SORT bucket",
+          "line", "bucket", "prompt_tokens"),
+    Panel("Gemma requests finished (selected range)",
+          f"{GM} | WHERE {_REQ} IS NOT NULL | EVAL v = TO_DOUBLE({_REQ}) | STATS d = MAX(v) - MIN(v) BY reason = prometheus.labels.finished_reason | STATS requests = SUM(d)",
+          "metric", "requests", "requests"),
+    Panel("Gemma running and waiting requests",
+          f"{GM} | WHERE `prometheus.vllm:num_requests_running.value` IS NOT NULL | STATS running = MAX(`prometheus.vllm:num_requests_running.value`), "
+          f"waiting = MAX(`prometheus.vllm:num_requests_waiting.value`) BY bucket = {BUCKET} | SORT bucket",
+          "line", "bucket", "running", None, ("waiting",)),
+    Panel("Gemma KV cache usage (percent)",
+          f"{GM} | WHERE `prometheus.vllm:kv_cache_usage_perc.value` IS NOT NULL | STATS cache_pct = MAX(`prometheus.vllm:kv_cache_usage_perc.value`) * 100 BY bucket = {BUCKET} | SORT bucket",
+          "line", "bucket", "cache_pct"),
+    Panel("Gemma scrape samples (zero while the VM is stopped)",
+          f"{GM} | STATS samples = COUNT(*) BY bucket = {BUCKET} | SORT bucket",
+          "line", "bucket", "samples"),
+]
+GEMMA_DASHBOARD = Dashboard("glassbox-gemma", "Glass Box: Gemma (vLLM)",
+                            "Self-hosted Gemma on vLLM: tokens, requests, queue and KV cache from the Fleet Prometheus integration. Data exists only while the VM runs.",
+                            tuple(GEMMA_PANELS))
+DASHBOARDS = [OVERVIEW_DASHBOARD, QUALITY_DASHBOARD, OWASP_DASHBOARD, GEMMA_DASHBOARD]

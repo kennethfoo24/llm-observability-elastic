@@ -123,3 +123,12 @@ def test_dashboard_object_has_no_em_dash_and_is_default_time_range_aware():
 def test_dashboard_carries_migration_versions_or_kibana_import_returns_500():
     obj, _ = _dash()
     assert obj["coreMigrationVersion"] == "8.8.0" and obj["typeMigrationVersion"] == "10.3.0"
+
+
+def test_gemma_dashboard_panels_and_no_dashes():
+    from elastic.dashboards.panels import DASHBOARDS, GEMMA_DASHBOARD
+    assert GEMMA_DASHBOARD in DASHBOARDS and GEMMA_DASHBOARD.id == "glassbox-gemma"
+    assert len(GEMMA_DASHBOARD.panels) == 6
+    for p in GEMMA_DASHBOARD.panels:
+        assert "metrics-prometheus.collector-*" in p.esql and "—" not in p.title + p.esql and "–" not in p.title
+    assert "—" not in GEMMA_DASHBOARD.description and "–" not in GEMMA_DASHBOARD.description

@@ -56,3 +56,5 @@ Projection at 1 request per 5 minutes, 07:00 to 22:00 SGT (180 requests per day,
 observed mix (1 Flash in 13). If Flash is 20 percent of traffic as the design assumes, the blended cost is about $0.0012 per
 request, or about $6.6 per month. This is well below the earlier $15 estimate, and the $0.25 per hour alert threshold is never
 approached (the rule stayed `ok` with no active alerts).
+
+Gemma metrics: the VM's `/metrics` is behind basic auth (`deploy/scripts/gemma_metrics_lock.py`), scraped by the Fleet Prometheus package policy `glassbox-gemma-vllm` (`python -m elastic.prometheus_gemma`); nothing in this deploy needs the password.

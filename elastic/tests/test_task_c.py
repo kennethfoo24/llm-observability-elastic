@@ -54,7 +54,7 @@ def test_detection_rules():
 
 
 def test_dashboard_registry_ids_titles_and_overview_unchanged():
-    assert [d.id for d in DASHBOARDS] == ["glassbox-overview", "glassbox-quality", "glassbox-owasp"]
+    assert [d.id for d in DASHBOARDS] == ["glassbox-overview", "glassbox-quality", "glassbox-owasp", "glassbox-gemma"]
     assert QUALITY_DASHBOARD.title == "Glass Box: Conversation quality"
     assert OWASP_DASHBOARD.title == "Glass Box: OWASP LLM Top 10 coverage"
     assert len(DASHBOARDS[0].panels) == len(PANELS)
