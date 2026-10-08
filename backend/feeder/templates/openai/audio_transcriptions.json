@@ -1,0 +1,44 @@
+{
+  "dataset": "openai.audio_transcriptions",
+  "dir": "audio_transcriptions",
+  "package": "openai",
+  "sample": {
+    "@timestamp": "2024-11-04T00:00:00.000Z",
+    "data_stream": {
+      "dataset": "openai.audio_transcriptions",
+      "namespace": "default",
+      "type": "logs"
+    },
+    "ecs": {
+      "version": "9.3.0"
+    },
+    "event": {
+      "agent_id_status": "verified",
+      "created": "2025-01-28T21:56:24.113Z",
+      "dataset": "openai.audio_transcriptions",
+      "ingested": "2025-01-28T21:56:24Z",
+      "kind": "metric"
+    },
+    "openai": {
+      "audio_transcriptions": {
+        "seconds": 2
+      },
+      "base": {
+        "api_key_id": "key_dummy",
+        "end_time": "2024-11-05T00:00:00.000Z",
+        "model": "whisper-1",
+        "num_model_requests": 1,
+        "project_id": "proj_dummy",
+        "start_time": "2024-11-04T00:00:00.000Z",
+        "usage_object_type": "organization.usage.audio_transcriptions.result",
+        "user_id": "user-dummy"
+      }
+    },
+    "tags": [
+      "forwarded",
+      "openai-audio-transcriptions"
+    ]
+  },
+  "type": "logs",
+  "version": "2.4.0"
+}

@@ -1,0 +1,78 @@
+{
+  "dataset": "gcp_vertexai.metrics",
+  "dir": "metrics",
+  "package": "gcp_vertexai",
+  "sample": {
+    "@timestamp": "2024-11-07T05:50:40.000Z",
+    "agent": {
+      "ephemeral_id": "6c42a949-d522-44bf-818b-12c4a5908b90",
+      "id": "f9c4beb9-c0c0-47ca-963a-a9dc00e2df5e",
+      "name": "docker-fleet-agent",
+      "type": "metricbeat",
+      "version": "8.15.2"
+    },
+    "cloud": {
+      "account": {
+        "id": "elastic-sa",
+        "name": "elastic-sa"
+      },
+      "provider": "gcp"
+    },
+    "data_stream": {
+      "dataset": "gcp_vertexai.metrics",
+      "namespace": "default",
+      "type": "metrics"
+    },
+    "ecs": {
+      "version": "8.0.0"
+    },
+    "elastic_agent": {
+      "id": "f9c4beb9-c0c0-47ca-963a-a9dc00e2df5e",
+      "snapshot": false,
+      "version": "8.15.2"
+    },
+    "event": {
+      "agent_id_status": "verified",
+      "dataset": "gcp_vertexai.metrics",
+      "duration": 913154084,
+      "ingested": "2024-11-07T05:57:17Z",
+      "module": "gcp"
+    },
+    "gcp": {
+      "labels": {
+        "metrics": {
+          "request_type": "shared",
+          "type": "input"
+        },
+        "resource": {
+          "location": "us-central1",
+          "model_user_id": "gemini-1.5-flash-002",
+          "model_version_id": "",
+          "publisher": "google"
+        }
+      },
+      "vertexai": {
+        "publisher": {
+          "online_serving": {
+            "token_count": 13
+          }
+        }
+      }
+    },
+    "host": {
+      "hostname": "docker-fleet-agent",
+      "ip": [
+        "172.25.0.7"
+      ]
+    },
+    "metricset": {
+      "name": "metrics",
+      "period": 60000
+    },
+    "service": {
+      "type": "gcp"
+    }
+  },
+  "type": "metrics",
+  "version": "1.5.0"
+}

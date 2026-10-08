@@ -1,0 +1,46 @@
+{
+  "dataset": "openai.images",
+  "dir": "images",
+  "package": "openai",
+  "sample": {
+    "@timestamp": "2024-09-04T00:00:00.000Z",
+    "data_stream": {
+      "dataset": "openai.images",
+      "namespace": "default",
+      "type": "logs"
+    },
+    "ecs": {
+      "version": "9.3.0"
+    },
+    "event": {
+      "agent_id_status": "verified",
+      "created": "2025-01-28T21:56:17.758Z",
+      "dataset": "openai.images",
+      "ingested": "2025-01-28T21:56:19Z",
+      "kind": "metric"
+    },
+    "openai": {
+      "base": {
+        "api_key_id": "key_dummy",
+        "end_time": "2024-09-05T00:00:00.000Z",
+        "model": "dall-e-3",
+        "num_model_requests": 1,
+        "project_id": "",
+        "start_time": "2024-09-04T00:00:00.000Z",
+        "usage_object_type": "organization.usage.images.result",
+        "user_id": "user-dummy"
+      },
+      "images": {
+        "images": 1,
+        "size": "1024x1024",
+        "source": "image.generation"
+      }
+    },
+    "tags": [
+      "forwarded",
+      "openai-images"
+    ]
+  },
+  "type": "logs",
+  "version": "2.4.0"
+}

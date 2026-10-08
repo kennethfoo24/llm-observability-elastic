@@ -1,0 +1,44 @@
+{
+  "dataset": "openai.moderations",
+  "dir": "moderations",
+  "package": "openai",
+  "sample": {
+    "@timestamp": "2024-09-04T00:00:00.000Z",
+    "data_stream": {
+      "dataset": "openai.moderations",
+      "namespace": "default",
+      "type": "logs"
+    },
+    "ecs": {
+      "version": "9.3.0"
+    },
+    "event": {
+      "agent_id_status": "verified",
+      "created": "2025-01-28T21:56:17.099Z",
+      "dataset": "openai.moderations",
+      "ingested": "2025-01-28T21:56:19Z",
+      "kind": "metric"
+    },
+    "openai": {
+      "base": {
+        "api_key_id": "key_dummy",
+        "end_time": "2024-09-05T00:00:00.000Z",
+        "model": "text-moderation:2023-10-25",
+        "num_model_requests": 2,
+        "project_id": "",
+        "start_time": "2024-09-04T00:00:00.000Z",
+        "usage_object_type": "organization.usage.moderations.result",
+        "user_id": "user-dummy"
+      },
+      "moderations": {
+        "input_tokens": 16
+      }
+    },
+    "tags": [
+      "forwarded",
+      "openai-moderations"
+    ]
+  },
+  "type": "logs",
+  "version": "2.4.0"
+}

@@ -1,0 +1,44 @@
+{
+  "dataset": "openai.audio_speeches",
+  "dir": "audio_speeches",
+  "package": "openai",
+  "sample": {
+    "@timestamp": "2024-09-05T00:00:00.000Z",
+    "data_stream": {
+      "dataset": "openai.audio_speeches",
+      "namespace": "default",
+      "type": "logs"
+    },
+    "ecs": {
+      "version": "9.3.0"
+    },
+    "event": {
+      "agent_id_status": "verified",
+      "created": "2025-01-28T21:56:18.550Z",
+      "dataset": "openai.audio_speeches",
+      "ingested": "2025-01-28T21:56:19Z",
+      "kind": "metric"
+    },
+    "openai": {
+      "audio_speeches": {
+        "characters": 45
+      },
+      "base": {
+        "api_key_id": "key_dummy",
+        "end_time": "2024-09-06T00:00:00.000Z",
+        "model": "tts-1",
+        "num_model_requests": 1,
+        "project_id": "proj_dummy",
+        "start_time": "2024-09-05T00:00:00.000Z",
+        "usage_object_type": "organization.usage.audio_speeches.result",
+        "user_id": "user-dummy"
+      }
+    },
+    "tags": [
+      "forwarded",
+      "openai-audio-speeches"
+    ]
+  },
+  "type": "logs",
+  "version": "2.4.0"
+}
