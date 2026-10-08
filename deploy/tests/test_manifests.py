@@ -120,3 +120,28 @@ def test_trafficgen_is_suspended_capped_and_hardened():
     assert pod["securityContext"]["runAsNonRoot"] is True and pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
     csc = c["securityContext"]
     assert csc["readOnlyRootFilesystem"] is True and csc["allowPrivilegeEscalation"] is False and csc["capabilities"]["drop"] == ["ALL"]
+
+
+def test_synthetic_data_feeder_cronjob_is_active_hardened_and_uses_only_secret_refs():
+    cj = _find("CronJob", "synthetic-data-feeder")
+    assert cj["metadata"]["namespace"] == "genai-demo"
+    s = cj["spec"]
+    assert s["schedule"] == "*/5 * * * *" and s["concurrencyPolicy"] == "Forbid" and s["startingDeadlineSeconds"] == 120
+    assert not s.get("suspend")  # active by default, never suspended by demo_down
+    job = s["jobTemplate"]["spec"]
+    assert job["activeDeadlineSeconds"] == 240 and job["backoffLimit"] == 0
+    pod = job["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsNonRoot"] is True and pod["securityContext"]["runAsUser"] == 10001
+    assert pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
+    c = pod["containers"][0]
+    assert c["image"] == SETS["IMAGE"]
+    assert c["command"] == ["python", "-m", "feeder", "tick", "--group", "all", "--window-minutes", "5"]
+    csc = c["securityContext"]
+    assert csc["readOnlyRootFilesystem"] is True and csc["allowPrivilegeEscalation"] is False and csc["capabilities"]["drop"] == ["ALL"]
+    assert {v["name"] for v in pod["volumes"]} == {"tmp"}
+    env = {e["name"]: e for e in c["env"]}
+    assert set(env) == {"OBS_ES_URL", "FEEDER_KEY"}
+    assert all("value" not in e and "secretKeyRef" in e["valueFrom"] for e in env.values())  # no inline values
+    assert env["OBS_ES_URL"]["valueFrom"]["secretKeyRef"] == {"name": "glassbox-app", "key": "obs_es_url"}
+    assert env["FEEDER_KEY"]["valueFrom"]["secretKeyRef"] == {"name": "glassbox-app", "key": "feeder_key", "optional": True}

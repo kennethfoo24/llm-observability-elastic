@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # After a demo: suspend the traffic generator, stop the Gemma VM, optionally remove the load balancer.
 # Usage: demo_down.sh [--teardown]     DRY_RUN=1 echoes every mutating command.
+# The synthetic-data-feeder CronJob (56-feeder.yaml) is deliberately NOT suspended here: dashboards must stay fresh.
 # Ends by confirming the CronJob is suspended and the Gemma VM is TERMINATED (fails loudly otherwise).
 set -euo pipefail
 . "$(dirname "$0")/_common.sh"

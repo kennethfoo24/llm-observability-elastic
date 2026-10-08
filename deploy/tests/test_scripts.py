@@ -165,3 +165,14 @@ def test_teardown_offers_ip_release_and_no_script_mentions_the_removed_agent():
         t = (ROOT / "deploy/scripts" / n).read_text()
         assert "WITH_AGENT" not in t and "elastic.fleet" not in t and "elastic-agent" not in t, n
     assert "addresses delete" in (ROOT / "deploy/scripts/teardown.sh").read_text()
+
+
+def test_feeder_key_wiring_and_demo_down_leaves_feeder_running():
+    t = (ROOT / "deploy/scripts/create_secrets.sh").read_text()
+    assert "feeder_key" in t and "OBSERVABILITY_FEEDER_API_KEY" in t and "backend/secrets/feeder_key.txt" in t and "FEEDER_KEY" in t
+    assert "printf 'feeder_key=%s" in t and not re.search(r"echo[^\n]*\$FEEDER_KEY", t)
+    assert "56-feeder.yaml" in (ROOT / "deploy/scripts/deploy.sh").read_text()
+    down = (ROOT / "deploy/scripts/demo_down.sh").read_text()
+    assert "synthetic-data-feeder" in down and "patch cronjob synthetic-data-feeder" not in down
+    r = subprocess.run(["bash", str(ROOT / "deploy/scripts/create_secrets.sh")], env={"DRY_RUN": "1", "PATH": "/usr/bin:/bin:/opt/homebrew/bin"}, capture_output=True, text=True)
+    assert "feeder_key" in r.stdout

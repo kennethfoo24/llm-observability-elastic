@@ -2,7 +2,9 @@
 # Create/update the app Secrets in namespace genai-demo from gitignored local files ONLY:
 #   backend/secrets/persona_keys.json, backend/secrets/guardrail_log_keys.json (keys obs, sec),
 #   elasticsearch.txt, backend/secrets/app_password.txt and backend/secrets/system_prompt_canary.txt (both generated if missing).
-# Env overrides: APP_PASSWORD, GEMMA_API_KEY, GLOG_OBS_KEY, GLOG_SEC_KEY.
+# Env overrides: APP_PASSWORD, GEMMA_API_KEY, GLOG_OBS_KEY, GLOG_SEC_KEY, FEEDER_KEY.
+# feeder_key (synthetic-data-feeder narrow write-only key) comes from env FEEDER_KEY, else elasticsearch.txt
+#   OBSERVABILITY_FEEDER_API_KEY, else backend/secrets/feeder_key.txt; skipped with a note when none is present.
 # Values are never printed, only key NAMES. DRY_RUN=1 prints key names and target only.
 # The guardrail log keys must be ingest-only keys (docs/dev-tools-mint-ingest-keys.md); the script
 # refuses to fall back to the admin keys unless ALLOW_ADMIN_LOG_KEYS=1.
@@ -11,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ "${NAMESPACE:-$NS}" = "$NS" ] || die "namespace must be $NS"
 
-APP_KEYS="obs_es_url kibana_url sec_kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key system_prompt_canary"
+APP_KEYS="obs_es_url kibana_url sec_kibana_url guardrail_key app_password gemma_api_key glog_obs_endpoint glog_obs_key glog_sec_endpoint glog_sec_key system_prompt_canary feeder_key"
 PERSONA_KEYS="persona_keys.json"
 
 if [ "$DRY_RUN" = "1" ]; then
@@ -43,6 +45,7 @@ out = {
     "S_SEC_OTLP": raw["SECURITY_OPENTELEMETRY"],
     "S_ADMIN_OBS": raw.get("OBSERVABILITY_API_KEY", ""),
     "S_ADMIN_SEC": raw.get("SECURITY_API_KEY", ""),
+    "S_FEEDER_KEY": raw.get("OBSERVABILITY_FEEDER_API_KEY", ""),
     "S_GUARDRAIL_KEY": keys["guardrail"],
 }
 gl = Path("backend/secrets/guardrail_log_keys.json")
@@ -62,6 +65,10 @@ if [ -z "$LOG_OBS_KEY" ] || [ -z "$LOG_SEC_KEY" ]; then
   LOG_OBS_KEY="${LOG_OBS_KEY:-$S_ADMIN_OBS}"
   LOG_SEC_KEY="${LOG_SEC_KEY:-$S_ADMIN_SEC}"
 fi
+
+FEEDER_KEY_VAL="${FEEDER_KEY:-${S_FEEDER_KEY:-}}"
+if [ -z "$FEEDER_KEY_VAL" ] && [ -s backend/secrets/feeder_key.txt ]; then FEEDER_KEY_VAL="$(cat backend/secrets/feeder_key.txt)"; fi
+[ -n "$FEEDER_KEY_VAL" ] || echo "note: no feeder key (FEEDER_KEY, elasticsearch.txt OBSERVABILITY_FEEDER_API_KEY or backend/secrets/feeder_key.txt): the synthetic-data-feeder job will fail until feeder_key is set"
 
 PW_FILE=backend/secrets/app_password.txt
 if [ -z "${APP_PASSWORD:-}" ]; then
@@ -101,6 +108,7 @@ trap 'rm -f "$ENVF"' EXIT
   printf 'glog_sec_endpoint=%s\n' "$S_SEC_OTLP"
   printf 'glog_sec_key=%s\n' "$LOG_SEC_KEY"
   printf 'system_prompt_canary=%s\n' "$SYSTEM_PROMPT_CANARY"
+  [ -z "$FEEDER_KEY_VAL" ] || printf 'feeder_key=%s\n' "$FEEDER_KEY_VAL"
 } > "$ENVF"
 kubectl -n "$NS" create secret generic glassbox-app --from-env-file="$ENVF" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null

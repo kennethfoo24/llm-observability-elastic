@@ -1,0 +1,35 @@
+# synthetic-data-feeder: keeps the out-of-the-box integration dashboards filled with TAGGED synthetic data (docs/feeder.md).
+# NOT suspended by default and NOT touched by demo_down.sh (data must stay fresh between demos). To pause it:
+#   kubectl -n genai-demo patch cronjob synthetic-data-feeder -p '{"spec":{"suspend":true}}'
+# Needs Secret glassbox-app keys obs_es_url and feeder_key (the narrow write-only key). Without feeder_key the job
+# fails fast with a clear message and the rest of the app is unaffected.
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: synthetic-data-feeder, namespace: genai-demo}
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 240
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: feeder
+              image: ${IMAGE}
+              command: ["python", "-m", "feeder", "tick", "--group", "all", "--window-minutes", "5"]
+              env:
+                - {name: OBS_ES_URL, valueFrom: {secretKeyRef: {name: glassbox-app, key: obs_es_url}}}
+                - {name: FEEDER_KEY, valueFrom: {secretKeyRef: {name: glassbox-app, key: feeder_key, optional: true}}}
+              resources: {requests: {cpu: 20m, memory: 96Mi}, limits: {cpu: 300m, memory: 192Mi}}
+              securityContext: {readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+              volumeMounts: [{name: tmp, mountPath: /tmp}]
+          volumes: [{name: tmp, emptyDir: {}}]

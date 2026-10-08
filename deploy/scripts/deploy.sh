@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Render and apply the manifests, wait for the rollout and the managed certificate, then check healthz.
-# Usage: IMAGE=<image@digest> deploy/scripts/deploy.sh   (WITH_TRAFFICGEN=1 also applies the suspended CronJob)
+# Usage: IMAGE=<image@digest> deploy/scripts/deploy.sh   (WITH_TRAFFICGEN=1 also applies the suspended CronJob;
+# the synthetic-data-feeder CronJob deploy/k8s/56-feeder.yaml is always applied and NOT suspended)
 # DRY_RUN=1 renders and echoes the apply instead of running it.
 set -euo pipefail
 . "$(dirname "$0")/_common.sh"
@@ -11,7 +12,7 @@ guard_gcloud
 
 if [ "$DRY_RUN" = "1" ]; then IP="${STATIC_IP:-$(static_ip 2>/dev/null || echo 0.0.0.0)}"; else IP="${STATIC_IP:-$(static_ip)}"; fi
 HOST="$(host_for_ip "$IP")"
-FILES=(deploy/k8s/00-namespace.yaml deploy/k8s/10-serviceaccounts.yaml deploy/k8s/30-app.yaml deploy/k8s/40-ingress.yaml)
+FILES=(deploy/k8s/00-namespace.yaml deploy/k8s/10-serviceaccounts.yaml deploy/k8s/30-app.yaml deploy/k8s/40-ingress.yaml deploy/k8s/56-feeder.yaml)
 [ "${WITH_TRAFFICGEN:-0}" = "1" ] && FILES+=(deploy/k8s/50-trafficgen.yaml)
 
 RENDERED="$(python3 deploy/render.py "${FILES[@]}" --set IMAGE="$IMAGE" --set HOST="$HOST" \
