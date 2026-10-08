@@ -34,7 +34,7 @@ def build_plan(rng: random.Random, models: list[dict], gemma_ok: bool) -> Reques
     if gemma_ok and "gemma" in available:
         pool["gemma"] = 0.10
     model = rng.choices(list(pool), weights=list(pool.values()))[0] if pool else "eis-gpt-mini"
-    engine = "langchain" if rng.random() < 0.30 else "sdk"
+    engine = "langchain"  # standardised on the default engine
     return Request(kind, persona, model, engine, bank[idx], f"{kind}-{persona if kind == 'benign' else 'any'}-{idx}")
 
 

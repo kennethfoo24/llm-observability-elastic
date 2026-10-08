@@ -187,3 +187,11 @@ def test_model_mix_is_weighted_toward_the_cheapest_eis_model():
     c = Counter(build_plan(random.Random(i), MODELS, gemma_ok=False).model for i in range(3000))
     assert set(c) == {"eis-gpt-mini", "eis-claude-haiku", "eis-gemini-flash"}
     assert 0.65 < c["eis-gpt-mini"] / 3000 < 0.75
+
+
+def test_every_planned_request_uses_the_langchain_engine():
+    import random
+    from trafficgen.__main__ import build_plan
+    models = [{"key": "eis-gpt-mini", "available": True}, {"key": "eis-claude-haiku", "available": True}]
+    rng = random.Random(7)
+    assert {build_plan(rng, models, False).engine for _ in range(200)} == {"langchain"}
