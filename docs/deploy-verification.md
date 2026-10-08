@@ -206,3 +206,7 @@ Image `docker.io/kennethfoo24/glassbox@sha256:26eb7d9a9d5ce3da4d418181182abe62ef
 ## Review fixes deployed (2026-10-07)
 
 Image `docker.io/kennethfoo24/glassbox@sha256:a9bd8b4ac48115ebb8b1a84580c34ffdc202424a275e3e51065cf122fa6e6bd9` (commit e9d9258): multi-reason panels, restricted-topic attempts rule, full judge context (`quality_context` in the chat response), hardened judge delimiters, refreshed demo hints and RUNBOOK section 10. CronJob suspended. Elastic-side changes were applied live earlier the same day. Lens rendering of the new dashboards and the live click-through of the new UI links remain unverified without a Kibana browser session.
+
+## Gemma /metrics lock (2026-10-08)
+
+The startup script now adds Caddy `basic_auth` for `/metrics` only (original saved in a gitignored file, restore with `deploy/scripts/gemma_metrics_lock.py restore`). Live result after boot: `/metrics` without credentials 401, with a wrong password 401, with the right credentials passes auth (502 because the vLLM container exited about 37 s after start on this boot, unrelated to Caddy). `/v1/models` 200 and a `/metrics` 200 with `vllm:` series were NOT verified because vLLM did not come up within 900 s. VM uptime about 17 minutes, final state TERMINATED. The Fleet Prometheus package policy and the Gemma dashboard are not applied yet.

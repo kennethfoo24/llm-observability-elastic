@@ -64,7 +64,7 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 - The browser waits at most 90 seconds for an answer. The load balancer allows 100 seconds, the server stays below the browser limit.
 - Rate limits are per IP: 20 chats per minute and 120 API requests per minute. About 10 failed attempts in 5 minutes (each wrong password counts once) lock that IP out for wrong or missing passwords. Requests with the correct password bypass the lockout, because the lockout only exists to throttle guessing.
 - Traces show up about 1 minute after a request.
-- The Gemma VM exposes vLLM `/metrics` without a password. This is an accepted risk (counters only, no prompts) until the gated proposal is approved: `basic_auth` on `/metrics`, a Prometheus integration (needs an Elastic Agent, which this deploy no longer runs) and a Gemma dashboard.
+- The Gemma VM's vLLM `/metrics` is password protected (Caddy `basic_auth`, user `metrics`; `/v1/*` keeps the Bearer key). The password is in the gitignored `backend/secrets/gemma_metrics_password.txt`. The lock is part of the VM startup script and applies at boot: `python3 deploy/scripts/gemma_metrics_lock.py apply` (restore the original with `restore`, check with `status`; `DRY_RUN=1` supported). To rotate: delete the password file, run `apply` again, restart the VM, then update the Fleet package policy `glassbox-gemma-vllm` with `python -m elastic.prometheus_gemma` (not applied yet, pending approval). When the VM is stopped the Prometheus integration gets no data.
 
 ## 7. Troubleshooting
 
