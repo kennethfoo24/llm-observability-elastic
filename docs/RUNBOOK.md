@@ -137,3 +137,13 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 ## LLM Observability deep links config
 
 The LLM Observability links use `OBS_KIBANA_URL` (trace, Discover, cost dashboard) and `SEC_KIBANA_URL` (Security alerts link). Both come from Secret `glassbox-app` (keys `kibana_url`, `sec_kibana_url`), which `deploy/scripts/create_secrets.sh` fills from `OBSERVABILITY_KIBANA` and `SECURITY_KIBANA` in `elasticsearch.txt`. Re-run it before deploying this version. If `sec_kibana_url` is empty the Security links are hidden. The Discover and alerts URL states use Kibana rison format; open each once in a logged-in browser.
+
+## synthetic-data-feeder (OOTB integration dashboards)
+
+CronJob `synthetic-data-feeder` (every 5 minutes, not suspended by demo_down.sh) fills the integration dashboards
+with TAGGED synthetic data (`tags: synthetic`). Details, key creation and the extension guide: docs/feeder.md.
+* Hide it: KQL `not tags: synthetic`. Remove it: `cd backend && python -m feeder cleanup --group all`.
+* Pause: `kubectl -n genai-demo patch cronjob synthetic-data-feeder -p '{"spec":{"suspend":true}}'`.
+* Job fails with "FEEDER_KEY is not set": run `deploy/scripts/create_secrets.sh` after adding `OBSERVABILITY_FEEDER_API_KEY` to elasticsearch.txt.
+* Coverage: `cd backend && python -m feeder coverage --group all -v`. Disclose that this data is synthetic in demos.
+
