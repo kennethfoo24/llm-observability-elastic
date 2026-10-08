@@ -27,7 +27,7 @@ def _status(c: Ctx) -> dict:
     d = infra.metric_base("mysql/status", name, module="mysql")
     d["service"] = {"address": f"{name}:{MYSQL_PORT}", "type": "mysql"}
     mult = 1.0 if role == "primary" else 0.55
-    qps = (40 + 520 * min(c.load, 1.5) / 1.5) * mult * r.uniform(0.9, 1.1)
+    qps = infra.LoadRate(40 * mult, 520 * mult, c.load)  # counters integrate it (monotonic); no per document jitter
     q = infra.counter(c.ts, qps, name + "q", False)
     st = d["mysql"]["status"]
     st.update({"queries": q, "questions": int(q * 0.97), "connections": infra.counter(c.ts, 0.6 * mult, name + "conn", False), "max_used_connections": int(60 + 90 * min(c.load, 1.5) / 1.5),

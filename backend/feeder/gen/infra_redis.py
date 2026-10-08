@@ -29,7 +29,8 @@ def _info(c: Ctx) -> dict:
     d["service"] = {"address": f"{name}:6379", "type": "redis", "version": "7.4.1"}
     d["process"] = {"pid": 1}
     mult = 1.0 if role == "master" else 0.45  # the replica serves fewer reads
-    ops = max(1, int((250 + 2400 * min(c.load, 1.5) / 1.5) * mult * r.uniform(0.9, 1.1)))
+    ops_c = infra.LoadRate(250 * mult, 2400 * mult, c.load)
+    ops = max(1, int(float(ops_c) * r.uniform(0.9, 1.1)))
     t = c.ts.timestamp()
     start = 1_759_000_000 + infra.stable(name) % 1000
     used = int((380e6 + 140e6 * infra.wave(c.ts, 240, 0.25, name)) * (1.0 if role == "master" else 0.95))
@@ -51,13 +52,13 @@ def _info(c: Ctx) -> dict:
     ri["replication"]["master"] = {"offset": off if role == "master" else off - r.randrange(0, 900), "second_offset": -1}
     ri["replication"]["backlog"] = {"active": 1, "first_byte_offset": max(0, off - 1048576), "histlen": 1048576, "size": 1048576}
     ri["server"].update({"mode": "standalone", "uptime": int(t) - start, "run_id": f"{infra.stable(name):08x}" * 5, "tcp_port": 6379, "version": "7.4.1", "arch_bits": "64"})
-    processed = infra.counter(c.ts, ops * 0.6, name + "cmd", False)
+    processed = infra.counter(c.ts, ops_c * 0.6, name + "cmd", False)
     hits = int(processed * 0.46 * 0.88)
     ri["stats"].update({"commands_processed": processed, "connections": {"received": infra.counter(c.ts, 0.4 * mult, name + "conn", False), "rejected": 0},
                         "instantaneous": {"input_kbps": round(ops * 0.05, 2), "ops_per_sec": ops, "output_kbps": round(ops * 0.2, 2)},
                         "keys": {"evicted": infra.counter(c.ts, 0.02, name + "ev", False) if role == "master" else 0, "expired": infra.counter(c.ts, 2.5 * mult, name + "ex", False)},
                         "keyspace": {"hits": hits, "misses": int(hits * 0.136)}, "latest_fork_usec": 800 + r.randrange(0, 400),
-                        "net": {"input": {"bytes": infra.counter(c.ts, ops * 55, name + "ni", False)}, "output": {"bytes": infra.counter(c.ts, ops * 210, name + "no", False)}}})
+                        "net": {"input": {"bytes": infra.counter(c.ts, ops_c * 55, name + "ni", False)}, "output": {"bytes": infra.counter(c.ts, ops_c * 210, name + "no", False)}}})
     ri["slowlog"] = {"count": int(infra.counter(c.ts, 0.001, name + "sl", False))}
     ri["commandstats"] = {cmd: {"calls": int(processed * w), "failed_calls": 0, "rejected_calls": 0, "usec": int(processed * w * 3.2), "usec_per_call": round(1.5 + 8 * w, 2)}
                           for cmd, w in COMMANDS.items()}

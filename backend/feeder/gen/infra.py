@@ -9,7 +9,7 @@ import functools
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .. import catalog, engine, profile
 from ..harvest import load_template
@@ -109,9 +109,55 @@ def wave(ts: datetime, period_min: float, amp: float, phase: str = "") -> float:
     return 1 + amp * math.sin(2 * math.pi * (ts.timestamp() / 60) / period_min + p)
 
 
+ANCHOR = datetime(2026, 9, 1, tzinfo=timezone.utc).timestamp()
+STEP = 600
+_CUM = [0.0]
+
+
+def _cum(step: int) -> float:
+    """Integral of the activity profile from ANCHOR to the start of 10 minute step `step` (cached, one pass)."""
+    while len(_CUM) <= step:
+        t = ANCHOR + (len(_CUM) - 1) * STEP
+        _CUM.append(_CUM[-1] + profile.activity(datetime.fromtimestamp(t + STEP / 2, timezone.utc)) * STEP)
+    return _CUM[step]
+
+
+class LoadRate(float):
+    """A per second rate that follows the activity profile: base + peak * load/1.5. As a float it is the instantaneous
+    rate (for gauges); `counter` integrates it over time so counters stay monotonic while the load changes."""
+    b: float
+    p: float
+
+    def __new__(cls, base: float, peak: float, load: float = 1.0):
+        o = float.__new__(cls, base + peak * min(load, 1.5) / 1.5)
+        o.b, o.p = base, peak
+        return o
+
+    def scaled(self, k: float) -> "LoadRate":
+        o = float.__new__(LoadRate, float(self) * k)
+        o.b, o.p = self.b * k, self.p * k
+        return o
+
+    def __mul__(self, k):  # type: ignore[override]
+        return self.scaled(float(k))
+
+    __rmul__ = __mul__
+
+
+def load_counter(ts: datetime, rate: "LoadRate", key: str) -> int:
+    t = ts.timestamp() - ANCHOR
+    step = int(t // STEP)
+    frac = (t - step * STEP) / STEP
+    integ = _cum(step) + (_cum(step + 1) - _cum(step)) * frac  # activity-seconds, linearly interpolated: monotonic
+    return int(stable(key) % 5_000_000 + rate.b * t + rate.p / 1.5 * integ)
+
+
 def counter(ts: datetime, rate_per_s: float, key: str, load_aware: bool = True) -> int:
     """Monotonic counter value at ts: the integral of rate over time since an epoch (deterministic, no state).
-    Works for streams that are written at arbitrary minute resolution: value(t2) >= value(t1)."""
+    Works for streams that are written at arbitrary minute resolution: value(t2) >= value(t1).
+    A LoadRate follows the activity profile (still monotonic)."""
+    if isinstance(rate_per_s, LoadRate):
+        return load_counter(ts, rate_per_s, key)
     t = ts.timestamp()
     base = 1_700_000_000
     avg = 0.55 if load_aware else 1.0  # average profile load, so counters grow at roughly rate * avg

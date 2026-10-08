@@ -171,7 +171,7 @@ def _redis(c: Ctx) -> dict:
     r = c.rng
     mult = 1.0 if role == "master" else 0.45
     if k == 0:
-        ops = int((250 + 2400 * min(c.load, 1.5) / 1.5) * mult)
+        ops = infra.LoadRate(250 * mult, 2400 * mult, c.load)
         used = int((380e6 + 140e6 * infra.wave(c.ts, 240, 0.25, node)) * (1.0 if role == "master" else 0.95))
         proc = infra.counter(c.ts, ops * 0.6, node + "otel-cmd", False)
         hits = int(proc * 0.4)
@@ -287,7 +287,7 @@ def _mysql(c: Ctx) -> dict:
     res = host_res(node, "mysql", {"mysql.instance.endpoint": f"{node}:3306"})
     sc = scope("mysqlreceiver", "0.152.0")
     mult = 1.0 if role == "primary" else 0.55
-    qps = (40 + 520 * min(c.load, 1.5) / 1.5) * mult
+    qps = infra.LoadRate(40 * mult, 520 * mult, c.load)
     cn = lambda rate, key: infra.counter(c.ts, rate, node + key, False)  # noqa: E731
     M = lambda attrs, **m: metric_doc(MYM, c.ts, res, sc, attrs, {k.replace("__", "."): v for k, v in m.items()})  # noqa: E731
     if what == "base":
