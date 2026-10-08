@@ -1,0 +1,8 @@
+{
+"redis.key.expire.ttl": "long",
+"redis.key.id": "keyword",
+"redis.key.length": "long",
+"redis.key.name": "keyword",
+"redis.key.type": "keyword",
+"redis.keyspace.id": "keyword"
+}

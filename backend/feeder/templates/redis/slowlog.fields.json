@@ -1,0 +1,7 @@
+{
+"redis.slowlog.args": "keyword",
+"redis.slowlog.cmd": "keyword",
+"redis.slowlog.duration.us": "long",
+"redis.slowlog.id": "long",
+"redis.slowlog.key": "keyword"
+}

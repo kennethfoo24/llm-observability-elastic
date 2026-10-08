@@ -1,0 +1,7 @@
+{
+"redis.keyspace.avg_ttl": "long",
+"redis.keyspace.expires": "long",
+"redis.keyspace.id": "keyword",
+"redis.keyspace.keys": "long",
+"redis.keyspace.subexpiry": "long"
+}

@@ -1,0 +1,8 @@
+{
+"kafka_connect.connector.class": "keyword",
+"kafka_connect.connector.name": "keyword",
+"kafka_connect.connector.status": "keyword",
+"kafka_connect.connector.type": "keyword",
+"kafka_connect.connector.version": "keyword",
+"kafka_connect.mbean": "keyword"
+}

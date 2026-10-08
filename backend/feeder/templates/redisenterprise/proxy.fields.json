@@ -1,0 +1,10 @@
+{
+"redisenterprise.proxy.labels.bdb": "keyword",
+"redisenterprise.proxy.labels.cluster": "keyword",
+"redisenterprise.proxy.labels.endpoint": "keyword",
+"redisenterprise.proxy.labels.instance": "keyword",
+"redisenterprise.proxy.labels.job": "keyword",
+"redisenterprise.proxy.labels.node": "keyword",
+"redisenterprise.proxy.labels.port": "keyword",
+"redisenterprise.proxy.labels.proxy": "keyword"
+}

@@ -1,0 +1,16 @@
+{
+"kafka.raft.append_records_rate": "double",
+"kafka.raft.commit_latency_avg": "double",
+"kafka.raft.commit_latency_max": "double",
+"kafka.raft.current_epoch": "long",
+"kafka.raft.current_leader": "long",
+"kafka.raft.current_state": "keyword",
+"kafka.raft.current_vote": "long",
+"kafka.raft.fetch_records_rate": "double",
+"kafka.raft.high_watermark": "long",
+"kafka.raft.log_end_epoch": "long",
+"kafka.raft.log_end_offset": "long",
+"kafka.raft.number_of_voters": "double",
+"kafka.raft.number_unknown_voter_connections": "double",
+"kafka.raft.poll_idle_ratio_avg": "double"
+}

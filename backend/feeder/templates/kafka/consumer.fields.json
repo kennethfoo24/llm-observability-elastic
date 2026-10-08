@@ -1,0 +1,17 @@
+{
+"kafka.broker.address": "keyword",
+"kafka.broker.id": "long",
+"kafka.consumer.bytes_consumed": "float",
+"kafka.consumer.client_id": "keyword",
+"kafka.consumer.fetch_rate": "float",
+"kafka.consumer.in.bytes_per_sec": "float",
+"kafka.consumer.max_lag": "float",
+"kafka.consumer.mbean": "keyword",
+"kafka.consumer.metric_fingerprint": "keyword",
+"kafka.consumer.records_consumed": "float",
+"kafka.partition.id": "long",
+"kafka.partition.topic_broker_id": "keyword",
+"kafka.partition.topic_id": "keyword",
+"kafka.topic.error.code": "long",
+"kafka.topic.name": "keyword"
+}

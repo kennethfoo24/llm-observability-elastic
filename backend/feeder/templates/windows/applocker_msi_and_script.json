@@ -1,0 +1,133 @@
+{
+  "dataset": "windows.applocker_msi_and_script",
+  "dir": "applocker_msi_and_script",
+  "package": "windows",
+  "sample": {
+    "@timestamp": "2023-08-04T21:26:32.757Z",
+    "agent": {
+      "ephemeral_id": "17b8f200-259d-4f9f-898e-ccfd2f82705a",
+      "id": "15b01abd-cefe-4ddd-8359-617acef7bf30",
+      "name": "docker-fleet-agent",
+      "type": "filebeat",
+      "version": "8.7.1"
+    },
+    "data_stream": {
+      "dataset": "windows.applocker_msi_and_script",
+      "namespace": "ep",
+      "type": "logs"
+    },
+    "ecs": {
+      "version": "8.0.0"
+    },
+    "elastic_agent": {
+      "id": "15b01abd-cefe-4ddd-8359-617acef7bf30",
+      "snapshot": false,
+      "version": "8.7.1"
+    },
+    "event": {
+      "action": "None",
+      "agent_id_status": "verified",
+      "category": [
+        "process"
+      ],
+      "code": "8006",
+      "created": "2023-08-05T12:31:30.395Z",
+      "dataset": "windows.applocker_msi_and_script",
+      "ingested": "2023-08-05T12:31:34Z",
+      "kind": "event",
+      "original": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-AppLocker' Guid='{cbda4dbf-8d5d-4f69-9578-be14aa540d22}' /><EventID>8006</EventID><Version>0</Version><Level>3</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x4000000000000000</Keywords><TimeCreated SystemTime='2023-08-04T21:26:32.7572144Z' /><EventRecordID>239</EventRecordID><Correlation ActivityID='{f64315e2-bea0-0000-6d01-d5f6a0bed901}' /><Execution ProcessID='25192' ThreadID='7740' /><Channel>Microsoft-Windows-AppLocker/MSI and Script</Channel><Computer>el33t-b00k-1</Computer><Security UserID='S-1-5-21-2707992022-4034939591-3454028951-1001' /></System><UserData><RuleAndFileData xmlns='http://schemas.microsoft.com/schemas/event/Microsoft.Windows/1.0.0.0'><PolicyNameLength>6</PolicyNameLength><PolicyName>SCRIPT</PolicyName><RuleId>{00000000-0000-0000-0000-000000000000}</RuleId><RuleNameLength>1</RuleNameLength><RuleName>-</RuleName><RuleSddlLength>1</RuleSddlLength><RuleSddl>-</RuleSddl><TargetUser>S-1-5-21-2707992022-4034939591-3454028951-1001</TargetUser><TargetProcessId>25192</TargetProcessId><FilePathLength>124</FilePathLength><FilePath>%OSDRIVE%\\USERS\\NICPE\\.VSCODE\\EXTENSIONS\\MS-VSCODE.POWERSHELL-2023.6.0\\MODULES\\PSSCRIPTANALYZER\\1.21.0\\PSSCRIPTANALYZER.PSM1</FilePath><FileHashLength>32</FileHashLength><FileHash>D2A09AC074F8D326B4DCC8B8BE5BC003C41CCB6EB5FC35E13B73F834F2946B01</FileHash><FqbnLength>65</FqbnLength><Fqbn>O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US\\\\\\0.0.0.00</Fqbn><TargetLogonId>0x4c18f</TargetLogonId><FullFilePathLength>117</FullFilePathLength><FullFilePath>C:\\Users\\nicpe\\.vscode\\extensions\\ms-vscode.powershell-2023.6.0\\modules\\PSScriptAnalyzer\\1.21.0\\PSScriptAnalyzer.psm1</FullFilePath></RuleAndFileData></UserData></Event>",
+      "provider": "Microsoft-Windows-AppLocker",
+      "type": [
+        "start"
+      ]
+    },
+    "file": {
+      "hash": {
+        "sha256": "D2A09AC074F8D326B4DCC8B8BE5BC003C41CCB6EB5FC35E13B73F834F2946B01"
+      },
+      "name": "PSScriptAnalyzer.psm1",
+      "pe": {
+        "file_version": "0.0.0.00",
+        "original_file_name": "",
+        "product": ""
+      },
+      "x509": {
+        "subject": {
+          "country": [
+            "US"
+          ],
+          "locality": [
+            "REDMOND"
+          ],
+          "organization": [
+            "MICROSOFT CORPORATION"
+          ],
+          "state_or_province": [
+            "WASHINGTON"
+          ]
+        }
+      }
+    },
+    "host": {
+      "name": "el33t-b00k-1"
+    },
+    "input": {
+      "type": "httpjson"
+    },
+    "log": {
+      "level": "warning"
+    },
+    "tags": [
+      "forwarded",
+      "preserve_original_event"
+    ],
+    "user": {
+      "id": "S-1-5-21-2707992022-4034939591-3454028951-1001"
+    },
+    "winlog": {
+      "activity_id": "{f64315e2-bea0-0000-6d01-d5f6a0bed901}",
+      "channel": "Microsoft-Windows-AppLocker/MSI and Script",
+      "computer_name": "el33t-b00k-1",
+      "event_id": "8006",
+      "level": "warning",
+      "opcode": "Info",
+      "process": {
+        "pid": 25192,
+        "thread": {
+          "id": 7740
+        }
+      },
+      "provider_guid": "{cbda4dbf-8d5d-4f69-9578-be14aa540d22}",
+      "provider_name": "Microsoft-Windows-AppLocker",
+      "record_id": "239",
+      "task": "None",
+      "time_created": "2023-08-04T21:26:32.757Z",
+      "user": {
+        "identifier": "S-1-5-21-2707992022-4034939591-3454028951-1001"
+      },
+      "user_data": {
+        "FileHash": "D2A09AC074F8D326B4DCC8B8BE5BC003C41CCB6EB5FC35E13B73F834F2946B01",
+        "FileHashLength": 32,
+        "FilePath": "%OSDRIVE%\\USERS\\NICPE\\.VSCODE\\EXTENSIONS\\MS-VSCODE.POWERSHELL-2023.6.0\\MODULES\\PSSCRIPTANALYZER\\1.21.0\\PSSCRIPTANALYZER.PSM1",
+        "FilePathLength": 124,
+        "Fqbn": "O=MICROSOFT CORPORATION, L=REDMOND, S=WASHINGTON, C=US\\\\\\0.0.0.00",
+        "FqbnLength": 65,
+        "FullFilePath": "C:\\Users\\nicpe\\.vscode\\extensions\\ms-vscode.powershell-2023.6.0\\modules\\PSScriptAnalyzer\\1.21.0\\PSScriptAnalyzer.psm1",
+        "FullFilePathLength": 117,
+        "PolicyName": "SCRIPT",
+        "PolicyNameLength": 6,
+        "RuleId": "{00000000-0000-0000-0000-000000000000}",
+        "RuleName": "-",
+        "RuleNameLength": 1,
+        "RuleSddl": "-",
+        "RuleSddlLength": 1,
+        "TargetLogonId": "0x4c18f",
+        "TargetProcessId": 25192,
+        "TargetUser": "S-1-5-21-2707992022-4034939591-3454028951-1001",
+        "xml_name": "RuleAndFileData"
+      }
+    }
+  },
+  "type": "logs",
+  "version": "3.10.0"
+}

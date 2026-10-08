@@ -1,0 +1,12 @@
+{
+"windows.service.display_name": "keyword",
+"windows.service.exit_code": "keyword",
+"windows.service.id": "keyword",
+"windows.service.name": "keyword",
+"windows.service.path_name": "keyword",
+"windows.service.pid": "long",
+"windows.service.start_name": "keyword",
+"windows.service.start_type": "keyword",
+"windows.service.state": "keyword",
+"windows.service.uptime.ms": "long"
+}

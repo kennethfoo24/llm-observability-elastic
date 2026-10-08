@@ -1,0 +1,6 @@
+{
+"kafka.log.class": "keyword",
+"kafka.log.component": "keyword",
+"kafka.log.thread": "keyword",
+"kafka.log.trace.class": "keyword"
+}

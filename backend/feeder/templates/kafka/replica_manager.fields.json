@@ -1,0 +1,23 @@
+{
+"kafka.replica_manager.at_min_isr_partition_count": "double",
+"kafka.replica_manager.failed_isr_updates_per_sec.one_minute_rate": "float",
+"kafka.replica_manager.isr_expands_per_sec.one_minute_rate": "float",
+"kafka.replica_manager.isr_shrinks_per_sec.one_minute_rate": "float",
+"kafka.replica_manager.leader_count": "double",
+"kafka.replica_manager.metric_fingerprint": "keyword",
+"kafka.replica_manager.offline_replica_count": "double",
+"kafka.replica_manager.partition_count": "double",
+"kafka.replica_manager.partitions_with_late_transactions_count": "double",
+"kafka.replica_manager.producer_id_count": "double",
+"kafka.replica_manager.reassigning_partitions": "double",
+"kafka.replica_manager.replica_alter_log_dirs_manager.dead_thread_count": "double",
+"kafka.replica_manager.replica_alter_log_dirs_manager.failed_partitions_count": "double",
+"kafka.replica_manager.replica_alter_log_dirs_manager.max_lag": "double",
+"kafka.replica_manager.replica_alter_log_dirs_manager.min_fetch_rate": "double",
+"kafka.replica_manager.replica_fetcher_manager.dead_thread_count": "double",
+"kafka.replica_manager.replica_fetcher_manager.failed_partitions_count": "double",
+"kafka.replica_manager.replica_fetcher_manager.max_lag": "double",
+"kafka.replica_manager.replica_fetcher_manager.min_fetch_rate": "float",
+"kafka.replica_manager.under_min_isr_partition_count": "double",
+"kafka.replica_manager.under_replicated_partitions": "double"
+}

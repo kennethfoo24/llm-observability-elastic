@@ -1,0 +1,15 @@
+{
+"nginx_ingress_controller.access.http.request.length": "long",
+"nginx_ingress_controller.access.http.request.time": "double",
+"nginx_ingress_controller.access.remote_ip_list": "keyword",
+"nginx_ingress_controller.access.upstream.ip": "ip",
+"nginx_ingress_controller.access.upstream.name": "keyword",
+"nginx_ingress_controller.access.upstream.port": "long",
+"nginx_ingress_controller.access.upstream.response.length": "long",
+"nginx_ingress_controller.access.upstream.response.length_list": "keyword",
+"nginx_ingress_controller.access.upstream.response.status_code": "long",
+"nginx_ingress_controller.access.upstream.response.status_code_list": "keyword",
+"nginx_ingress_controller.access.upstream.response.time": "double",
+"nginx_ingress_controller.access.upstream.response.time_list": "keyword",
+"nginx_ingress_controller.access.upstream_address_list": "keyword"
+}

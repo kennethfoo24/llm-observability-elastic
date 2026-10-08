@@ -1,0 +1,4 @@
+{
+"windows.perfmon.instance": "keyword",
+"windows.perfmon.object": "keyword"
+}

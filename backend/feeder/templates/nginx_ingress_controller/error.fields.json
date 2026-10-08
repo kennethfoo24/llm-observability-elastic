@@ -1,0 +1,5 @@
+{
+"nginx_ingress_controller.error.source.file": "keyword",
+"nginx_ingress_controller.error.source.line_number": "long",
+"nginx_ingress_controller.error.thread_id": "long"
+}

@@ -1,0 +1,12 @@
+{
+"mysql.performance.events_statements.avg.timer.wait": "long",
+"mysql.performance.events_statements.count.star": "long",
+"mysql.performance.events_statements.max.timer.wait": "long",
+"mysql.performance.events_statements.quantile.95": "long",
+"mysql.performance.events_statements.query_id": "keyword",
+"mysql.performance.events_statements.schemaname": "keyword",
+"mysql.performance.table_io_waits.count.fetch": "long",
+"mysql.performance.table_io_waits.index.name": "keyword",
+"mysql.performance.table_io_waits.object.name": "keyword",
+"mysql.performance.table_io_waits.object.schema": "keyword"
+}

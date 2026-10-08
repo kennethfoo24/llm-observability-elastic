@@ -1,0 +1,20 @@
+{
+"kafka.topic.log.end_offset": "double",
+"kafka.topic.log.segments_count": "double",
+"kafka.topic.log.size": "double",
+"kafka.topic.log.start_offset": "double",
+"kafka.topic.metric_fingerprint": "keyword",
+"kafka.topic.partition.at_min_isr": "long",
+"kafka.topic.partition.id": "keyword",
+"kafka.topic.partition.insync_replicas_count": "double",
+"kafka.topic.partition.last_stable_offset_lag": "double",
+"kafka.topic.partition.replicas_count": "double",
+"kafka.topic.partition.under_min_isr": "long",
+"kafka.topic.partition.under_replicated": "long",
+"kafka.topic.topic.bytes_in_per_sec": "double",
+"kafka.topic.topic.bytes_out_per_sec": "double",
+"kafka.topic.topic.bytes_rejected_per_sec": "double",
+"kafka.topic.topic.fetch_requests_per_sec": "double",
+"kafka.topic.topic.messages_in_per_sec": "double",
+"kafka.topic.topic.name": "keyword"
+}

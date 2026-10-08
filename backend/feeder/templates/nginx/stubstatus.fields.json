@@ -1,0 +1,12 @@
+{
+"nginx.stubstatus.accepts": "long",
+"nginx.stubstatus.active": "long",
+"nginx.stubstatus.current": "long",
+"nginx.stubstatus.dropped": "long",
+"nginx.stubstatus.handled": "long",
+"nginx.stubstatus.hostname": "keyword",
+"nginx.stubstatus.reading": "long",
+"nginx.stubstatus.requests": "long",
+"nginx.stubstatus.waiting": "long",
+"nginx.stubstatus.writing": "long"
+}

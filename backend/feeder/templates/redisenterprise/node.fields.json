@@ -1,0 +1,10 @@
+{
+"redisenterprise.node.labels.addr": "keyword",
+"redisenterprise.node.labels.cluster": "keyword",
+"redisenterprise.node.labels.cnm_version": "keyword",
+"redisenterprise.node.labels.instance": "keyword",
+"redisenterprise.node.labels.job": "keyword",
+"redisenterprise.node.labels.logical_name": "keyword",
+"redisenterprise.node.labels.node": "keyword",
+"redisenterprise.node.labels.path": "keyword"
+}

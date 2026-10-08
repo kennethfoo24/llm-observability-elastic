@@ -1,0 +1,4 @@
+{
+"nginx.access.remote_ip_list": "keyword",
+"nginx.access.response_time": "long"
+}

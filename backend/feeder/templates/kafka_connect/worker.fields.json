@@ -1,0 +1,15 @@
+{
+"kafka_connect.mbean": "keyword",
+"kafka_connect.worker.address": "keyword",
+"kafka_connect.worker.completed_rebalances_total": "long",
+"kafka_connect.worker.connector_count": "long",
+"kafka_connect.worker.connector_startup_attempts_total": "long",
+"kafka_connect.worker.connector_startup_failure_percentage": "double",
+"kafka_connect.worker.connector_startup_failure_total": "long",
+"kafka_connect.worker.connector_startup_success_total": "long",
+"kafka_connect.worker.task_count": "long",
+"kafka_connect.worker.task_startup_attempts_total": "long",
+"kafka_connect.worker.task_startup_failure_total": "long",
+"kafka_connect.worker.task_startup_success_percentage": "double",
+"kafka_connect.worker.task_startup_success_total": "long"
+}

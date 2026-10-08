@@ -68,10 +68,20 @@ def generate(g: Generator, start: datetime, end: datetime) -> Iterator[tuple[str
             yield doc_id(s.key, m, i), tag(doc)
 
 
+NO_ID_PREFIXES: list[str] = []  # index prefixes of TSDB data streams (gen modules append), see is_tsdb
+
+
+def is_tsdb(index: str) -> bool:
+    """TSDB data streams (OTel metrics and most integration metrics) refuse a custom _id: it is derived from the
+    dimensions and the timestamp, so a repeated document answers 409 as well. Gen modules register their prefixes."""
+    return (index.startswith("metrics-") and ".otel-" in index) or any(index.startswith(p) for p in NO_ID_PREFIXES)
+
+
 def bulk_lines(index: str, docs: list[tuple[str, dict]]) -> list[dict]:
     out: list[dict] = []
+    tsdb = is_tsdb(index)
     for _id, d in docs:
-        out.append({"create": {"_index": index, "_id": _id}})
+        out.append({"create": {"_index": index} if tsdb else {"_index": index, "_id": _id}})
         out.append(d)
     return out
 

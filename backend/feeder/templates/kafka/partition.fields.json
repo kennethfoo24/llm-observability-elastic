@@ -1,0 +1,16 @@
+{
+"kafka.broker.address": "keyword",
+"kafka.broker.id": "long",
+"kafka.partition.id": "long",
+"kafka.partition.offset.newest": "long",
+"kafka.partition.offset.oldest": "long",
+"kafka.partition.partition.error.code": "long",
+"kafka.partition.partition.insync_replica": "boolean",
+"kafka.partition.partition.is_leader": "boolean",
+"kafka.partition.partition.leader": "long",
+"kafka.partition.partition.replica": "long",
+"kafka.partition.topic_broker_id": "keyword",
+"kafka.partition.topic_id": "keyword",
+"kafka.topic.error.code": "long",
+"kafka.topic.name": "keyword"
+}
