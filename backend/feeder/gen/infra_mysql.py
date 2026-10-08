@@ -51,12 +51,12 @@ def _status(c: Ctx) -> dict:
     st["handler"].update({"commit": infra.counter(c.ts, qps * 0.3, name + "hc", False), "external_lock": infra.counter(c.ts, qps * 2, name + "hx", False)})
     st["handler"]["read"].update({"key": infra.counter(c.ts, qps * 3, name + "hk", False), "rnd_next": infra.counter(c.ts, qps * 9, name + "hn", False), "first": infra.counter(c.ts, qps * 0.2, name + "hf", False)})
     st["binlog"] = {"cache": {"disk_use": 0, "use": infra.counter(c.ts, 2 * mult, name + "bc", False)}}
-    return d
+    return infra.fill(d, "mysql/status", c, base=mult)
 
 
 def _performance(c: Ctx) -> dict:
-    name, role = _n(c.i // 4)
-    k = c.i % 4
+    name, role = _n(c.i // 2)
+    k = c.i % 2 + 2 * (c.ts.minute // 10 % 2)
     r = c.rng
     d = infra.metric_base("mysql/performance", name, module="mysql")
     d["service"] = {"address": f"{name}:{MYSQL_PORT}", "type": "mysql"}
@@ -162,9 +162,9 @@ def _error(c: Ctx) -> dict:
 registry.register(
     GROUP,
     Generator(S["mysql/status"], _status, mode="entities", entities=3, every_min=5),
-    Generator(S["mysql/performance"], _performance, mode="entities", entities=12, every_min=10),
+    Generator(S["mysql/performance"], _performance, mode="entities", entities=6, every_min=10),
     Generator(S["mysql/replica_status"], _replica, mode="entities", entities=2, every_min=5),
-    Generator(S["mysql/galera_status"], _galera, mode="entities", entities=3, every_min=10),
-    Generator(S["mysql/slowlog"], _slowlog, rate_per_min=0.8),
+    Generator(S["mysql/galera_status"], _galera, mode="entities", entities=3, every_min=20),
+    Generator(S["mysql/slowlog"], _slowlog, rate_per_min=0.5),
     Generator(S["mysql/error"], _error, rate_per_min=0.4),
 )

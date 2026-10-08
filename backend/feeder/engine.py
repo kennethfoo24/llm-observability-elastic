@@ -81,7 +81,11 @@ def bulk_lines(index: str, docs: list[tuple[str, dict]]) -> list[dict]:
     out: list[dict] = []
     tsdb = is_tsdb(index)
     for _id, d in docs:
-        out.append({"create": {"_index": index} if tsdb else {"_index": index, "_id": _id}})
+        meta = {"_index": index} if tsdb else {"_index": index, "_id": _id}
+        dyn = d.pop("_dynamic_templates", None)  # OTel metrics: field path -> counter_long / gauge_double ... (mapped like the OTLP endpoint does)
+        if dyn:
+            meta["dynamic_templates"] = dyn
+        out.append({"create": meta})
         out.append(d)
     return out
 

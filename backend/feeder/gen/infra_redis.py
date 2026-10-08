@@ -76,8 +76,8 @@ def _keyspace(c: Ctx) -> dict:
 
 
 def _key(c: Ctx) -> dict:
-    name, role = _node(c.i // len(KEYS))
-    kname, ktype, length, ttl = KEYS[c.i % len(KEYS)]
+    name, role = _node(c.i // 3)
+    kname, ktype, length, ttl = KEYS[(c.i % 3) + 3 * (c.ts.minute // 10 % 2)]
     r = c.rng
     db = 1 if kname.startswith("cache:") else 0
     d = infra.metric_base("redis/key", name, module="redis")
@@ -172,9 +172,9 @@ registry.register(
     GROUP,
     Generator(S["redis/info"], _info, mode="entities", entities=2, every_min=5),
     Generator(S["redis/keyspace"], _keyspace, mode="entities", entities=4, every_min=10),
-    Generator(S["redis/key"], _key, mode="entities", entities=2 * len(KEYS), every_min=10),
-    Generator(S["redis/log"], _log, rate_per_min=1.0),
-    Generator(S["redis/slowlog"], _slowlog, rate_per_min=0.6),
+    Generator(S["redis/key"], _key, mode="entities", entities=2 * 3, every_min=10),
+    Generator(S["redis/log"], _log, rate_per_min=0.7),
+    Generator(S["redis/slowlog"], _slowlog, rate_per_min=0.4),
     Generator(S["redisenterprise/node"], _re_node, mode="entities", entities=3, every_min=5),
     Generator(S["redisenterprise/proxy"], _re_proxy, mode="entities", entities=6, every_min=10),
 )

@@ -141,8 +141,8 @@ def cmd_simulate(a) -> int:
     rc = 0
     for g in _gens(a.group):
         s = g.stream
-        if (a.stream and s.key != a.stream) or s.key == "azure_openai/billing":
-            continue  # billing has no package pipeline
+        if (a.stream and s.key != a.stream) or s.key == "azure_openai/billing" or getattr(s, "no_pipeline", False):
+            continue  # billing and the OTel content streams (infra group) have no package pipeline
         docs = []
         for t in range(0, 600, 1):
             docs = [d for _, d in engine.generate(g, now - timedelta(minutes=t + 5), now - timedelta(minutes=t))]
@@ -188,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
     add("harvest", cmd_harvest, "fetch sample_event.json templates from Fleet (admin key)")
     b = add("backfill", cmd_backfill, "generate history in bulk (admin key)")
     b.add_argument("--days", type=int, default=7)
-    b.add_argument("--max-docs", type=int, default=200000)
+    b.add_argument("--max-docs", type=int, default=400000)
     t = add("tick", cmd_tick, "generate [last covered, now) with env OBS_ES_URL + FEEDER_KEY (CronJob)")
     t.add_argument("--window-minutes", type=int, default=5)
     t.add_argument("--max-docs", type=int, default=5000)

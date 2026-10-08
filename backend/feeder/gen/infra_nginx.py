@@ -140,9 +140,9 @@ def _ing_error(c: Ctx) -> dict:
 
 registry.register(
     GROUP,
-    Generator(S["nginx/access"], _nginx_access, rate_per_min=11.0),
-    Generator(S["nginx/error"], _nginx_error, rate_per_min=0.9),
+    Generator(S["nginx/access"], _nginx_access, rate_per_min=4.0),
+    Generator(S["nginx/error"], _nginx_error, rate_per_min=0.5),
     Generator(S["nginx/stubstatus"], _stub, mode="entities", entities=len(NGINX_HOSTS), every_min=5),
-    Generator(S["nginx_ingress_controller/access"], _ing_access, rate_per_min=6.0),
+    Generator(S["nginx_ingress_controller/access"], _ing_access, rate_per_min=2.5),
     Generator(S["nginx_ingress_controller/error"], _ing_error, rate_per_min=0.5),
 )

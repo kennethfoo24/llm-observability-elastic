@@ -57,6 +57,7 @@ class OtelStream(catalog.Stream):
     """A data stream of an OTel content package. Written in its own namespace so the synthetic series never mix with
     real collector data that may already live in the `default` namespace of the same dataset."""
     namespace: str = "synthetic"
+    no_pipeline = True  # documents are final OTel shaped: no package ingest pipeline to simulate
 
     @property
     def index(self) -> str:
@@ -194,7 +195,7 @@ def metric_base(key: str, host: str, kind: str = "linux", module: str | None = N
     d["agent"] = agent_block(host, "metricbeat")
     d.setdefault("event", {})
     d["event"].pop("ingested", None)
-    if module:
+    if module and not d["event"].get("module"):  # constant_keyword event.module: keep the sample's (e.g. kafka JMX streams use jolokia)
         d["event"]["module"] = module
     d.pop("cloud", None)
     d.get("data_stream", {}).pop("namespace", None)

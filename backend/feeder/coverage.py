@@ -44,6 +44,15 @@ class Panel:
 
 # ---------- filter conversion -------------------------------------------------------------------------------------
 
+def _legacy_match(q: Any) -> Any:
+    """Old saved filters hold {"match": {field: {"query": v, "type": "phrase"}}}, which current Elasticsearch rejects: use match_phrase."""
+    if isinstance(q, dict) and set(q) == {"match"} and isinstance(q["match"], dict) and len(q["match"]) == 1:
+        (field, v), = q["match"].items()
+        if isinstance(v, dict) and v.get("type") == "phrase" and "query" in v:
+            return {"match_phrase": {field: v["query"]}}
+    return q
+
+
 def filter_to_query(f: dict) -> dict | None:
     meta = f.get("meta") or {}
     if meta.get("disabled"):
@@ -54,7 +63,7 @@ def filter_to_query(f: dict) -> dict | None:
         if parts:
             q = {"bool": {"should": parts, "minimum_should_match": 1}} if meta.get("relation") == "OR" else {"bool": {"filter": parts}}
     elif f.get("query"):
-        q = f["query"]
+        q = _legacy_match(f["query"])
     elif meta.get("key") and isinstance(meta.get("params"), dict) and "query" in meta["params"]:
         q = {"match_phrase": {meta["key"]: meta["params"]["query"]}}
     elif meta.get("type") == "exists" and meta.get("key"):

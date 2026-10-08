@@ -60,23 +60,28 @@ SERVICES = [("W32Time", "Windows Time", "Automatic", "LocalService"), ("EventLog
             ("MSSQLSERVER", "SQL Server (MSSQLSERVER)", "Automatic", "CORP\\svc-sql"), ("W3SVC", "World Wide Web Publishing Service", "Automatic", "LocalSystem"),
             ("BITS", "Background Intelligent Transfer Service", "Manual", "LocalSystem"), ("WinDefend", "Microsoft Defender Antivirus Service", "Automatic", "LocalSystem"),
             ("LanmanServer", "Server", "Automatic", "LocalSystem")]
-SVC_PER_HOST = 8
+SVC_PER_HOST = 2
+
+
+HOST_SERVICES = {"WIN-AD01": ["W32Time", "Dnscache"], "WIN-FS01": ["LanmanServer", "Spooler"], "WIN-APP01": ["W3SVC", "BITS"], "WIN-SQL01": ["MSSQLSERVER", "WinDefend"],
+                 "WIN-WKS07": ["Spooler", "WinRM"]}
+SVC = {s[0]: s for s in SERVICES}
 
 
 def _service(c: Ctx) -> dict:
     host = WINDOWS_HOSTS[c.i // SVC_PER_HOST % len(WINDOWS_HOSTS)]
-    name, display, start, acct = SERVICES[(c.i + c.i // SVC_PER_HOST * 3) % len(SERVICES)]
+    name, display, start, acct = SVC[HOST_SERVICES[host][c.i % SVC_PER_HOST]]
     r = c.rng
-    # one believable flaky service: Spooler on the workstation stops now and then (about a minute in 40), BITS (manual) is mostly stopped
-    flaky = name == "Spooler" and host == "WIN-WKS07" and r.random() < 0.18
-    state = "Stopped" if flaky or (name == "BITS" and r.random() < 0.8) else "Running"
-    d = infra.metric_base("windows/service", host, "windows", "windows") if "windows/service" in infra.S and infra.fields_path("windows/service").exists() and infra.S["windows/service"].template_path.exists() else _svc_empty(host)
-    d["host"]["name"] = host
-    pid = 0 if state == "Stopped" else 400 + infra.stable(host, name) % 8000
-    up = 0 if state == "Stopped" else (infra.stable(host, name, "up") % 20 + 1) * 86400_000 + int(c.ts.timestamp() % 86400) * 1000
+    # one believable flaky service (Spooler on the workstation crashes now and then), BITS is a manual start service that is mostly stopped
+    crashed = name == "Spooler" and host == "WIN-WKS07" and r.random() < 0.18
+    stopped = crashed or (name == "BITS" and r.random() < 0.8)
+    state = "Stopped" if stopped else "Running"
+    d = _svc_empty(host)
+    pid = 0 if stopped else 400 + infra.stable(host, name) % 8000
+    up = 0 if stopped else (infra.stable(host, name, "up") % 20 + 1) * 86400_000 + int(c.ts.timestamp() % 86400) * 1000
     d["windows"] = {"service": {"display_name": display, "id": f"{host}_{name}".replace("-", "_")[:40] + f"_{infra.stable(host, name) % 1000}", "name": name,
                                 "path_name": f"C:\\Windows\\System32\\svchost.exe -k {name}", "pid": pid, "start_name": acct, "start_type": start,
-                                "state": state, "exit_code": "0" if state == "Running" else "1066", "uptime": {"ms": up}}}
+                                "state": state, "exit_code": "1066" if crashed else ("ERROR_SERVICE_NEVER_STARTED" if stopped else "0"), "uptime": {"ms": up}}}
     d["service"] = {"type": "windows"}
     d["event"] = {"module": "windows", "duration": 1_000_000 + c.rng.randrange(900_000)}
     d["metricset"] = {"name": "service", "period": 600000}
@@ -202,7 +207,7 @@ def _ps_classic(c: Ctx) -> dict:
                        "command": {"name": r.choice(PS_CMDS), "path": "", "type": "Cmdlet", "invocation_details": [{"name": "ParameterBinding", "type": "Command", "related_command": r.choice(PS_CMDS), "value": "Name=*"}]},
                        "connected_user": {"name": r.choice(PS_USERS), "domain": CORP}}
     parts = app.split(" ", 1)
-    d["process"] = {"args": app.split(" "), "args_count": len(app.split(" ")), "command_line": app, "entity_id": profile.uuid_for(r), "title": "Windows PowerShell"}
+    d["process"] = {"args": app.split(" "), "args_count": len(app.split(" ")), "command_line": app, "entity_id": profile.uuid_for(r), "title": "ServerRemoteHost" if r.random() < 0.14 else "Windows PowerShell"}
     d["user"] = {"name": d["powershell"]["connected_user"]["name"].split("\\")[-1], "domain": CORP}
     d["related"] = {"user": [d["user"]["name"]]}
     d["winlog"].update({"channel": "Windows PowerShell", "event_id": code, "keywords": ["Classic"], "provider_name": "PowerShell"})
@@ -233,7 +238,7 @@ def _ps_operational(c: Ctx) -> dict:
         # raw winlog event data: the integration pipeline splits ContextInfo / Payload into powershell.* and process.*
         cmd = r.choice(PS_CMDS)
         host_app = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -File " + r.choice(PS_SCRIPTS)
-        ctx_lines = [("Severity", "Informational"), ("Host Name", "ConsoleHost"), ("Host Version", "5.1.20348.2700"), ("Host ID", profile.uuid_for(r)),
+        ctx_lines = [("Severity", "Informational"), ("Host Name", "ServerRemoteHost" if r.random() < 0.14 else "ConsoleHost"), ("Host Version", "5.1.20348.2700"), ("Host ID", profile.uuid_for(r)),
                      ("Host Application", host_app), ("Engine Version", "5.1.20348.2700"), ("Runspace ID", profile.uuid_for(r)), ("Pipeline ID", str(r.randrange(1, 60))),
                      ("Command Name", cmd), ("Command Type", "Cmdlet"), ("Script Name", ""), ("Command Path", ""), ("Sequence Number", str(r.randrange(10, 900))),
                      ("User", f"{CORP}\\{user}"), ("Connected User", ""), ("Shell ID", "Microsoft.PowerShell")]
@@ -353,6 +358,7 @@ def _forwarded(c: Ctx) -> dict:
     if code == "4104":
         d = _ps_operational(c)
         d["event"]["dataset"] = S["windows/forwarded"].dataset
+        d["data_stream"]["dataset"] = S["windows/forwarded"].dataset
         return d
     user, _ = USERS[r.randrange(len(USERS))]
     ok = code != "4625"
@@ -383,14 +389,14 @@ N_SVC = SVC_PER_HOST * len(WINDOWS_HOSTS)
 registry.register(
     GROUP,
     Generator(S["windows/service"], _service, mode="entities", entities=N_SVC, every_min=10),
-    Generator(S["windows/perfmon"], _perfmon, mode="entities", entities=len(WINDOWS_HOSTS), every_min=5),
+    Generator(S["windows/perfmon"], _perfmon, mode="entities", entities=len(WINDOWS_HOSTS), every_min=20),
     Generator(S["windows/applocker_exe_and_dll"], _applocker("windows/applocker_exe_and_dll", "EXE", {"8002": 0.7, "8003": 0.2, "8004": 0.1}), rate_per_min=1.2),
     Generator(S["windows/applocker_msi_and_script"], _applocker("windows/applocker_msi_and_script", "SCRIPT", {"8005": 0.55, "8006": 0.3, "8007": 0.15}, True), rate_per_min=0.5),
     Generator(S["windows/applocker_packaged_app_deployment"], _applocker("windows/applocker_packaged_app_deployment", "PACKAGED_APP", {"8020": 0.6, "8021": 0.25, "8022": 0.15}, packaged=True), rate_per_min=0.15),
     Generator(S["windows/applocker_packaged_app_execution"], _applocker("windows/applocker_packaged_app_execution", "PACKAGED_APP", {"8023": 0.6, "8024": 0.25, "8025": 0.15}, packaged=True), rate_per_min=0.3),
-    Generator(S["windows/powershell"], _ps_classic, rate_per_min=1.0),
-    Generator(S["windows/powershell_operational"], _ps_operational, rate_per_min=1.2),
-    Generator(S["windows/sysmon_operational"], _sysmon, rate_per_min=3.0),
+    Generator(S["windows/powershell"], _ps_classic, rate_per_min=0.8),
+    Generator(S["windows/powershell_operational"], _ps_operational, rate_per_min=0.8),
+    Generator(S["windows/sysmon_operational"], _sysmon, rate_per_min=1.1),
     Generator(S["windows/windows_defender"], _defender, rate_per_min=0.08),
-    Generator(S["windows/forwarded"], _forwarded, rate_per_min=2.5),
+    Generator(S["windows/forwarded"], _forwarded, rate_per_min=1.0),
 )

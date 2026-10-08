@@ -1,0 +1,236 @@
+{
+"kafka/broker": [
+"agent.id",
+"service.address",
+"kafka.partition.topic_id",
+"kafka.partition.topic_broker_id",
+"kafka.topic.name",
+"kafka.broker.mbean",
+"kafka.broker.address",
+"host.name"
+],
+"kafka/consumer": [
+"agent.id",
+"service.address",
+"kafka.partition.topic_id",
+"kafka.partition.topic_broker_id",
+"kafka.topic.name",
+"kafka.broker.address",
+"kafka.consumer.metric_fingerprint",
+"kafka.consumer.client_id",
+"host.name"
+],
+"kafka/consumergroup": [
+"agent.id",
+"service.address",
+"kafka.consumergroup.meta",
+"kafka.consumergroup.client.member_id",
+"kafka.consumergroup.client.id",
+"kafka.consumergroup.id",
+"kafka.partition.topic_id",
+"kafka.partition.topic_broker_id",
+"kafka.topic.name",
+"kafka.broker.address",
+"host.name"
+],
+"kafka/controller": [
+"agent.id",
+"service.address",
+"kafka.controller.metric_fingerprint",
+"host.name"
+],
+"kafka/jvm": [
+"agent.id",
+"service.address",
+"kafka.jvm.memory_pool.name",
+"kafka.jvm.memory_pool.type",
+"kafka.jvm.compilation.name",
+"kafka.jvm.metric_fingerprint",
+"kafka.jvm.runtime.vm_version",
+"kafka.jvm.runtime.name",
+"kafka.jvm.runtime.vm_vendor",
+"kafka.jvm.runtime.vm_name",
+"kafka.jvm.gc.name",
+"kafka.jvm.buffer_pool.name",
+"host.name"
+],
+"kafka/log_manager": [
+"agent.id",
+"service.address",
+"kafka.log_manager.cleaner_manager.uncleanable_bytes.log_directory",
+"kafka.log_manager.cleaner_manager.uncleanable_partitions_count.log_directory",
+"kafka.log_manager.metric_fingerprint",
+"kafka.log_manager.directory_offline_count.log_directory",
+"host.name"
+],
+"kafka/network": [
+"agent.id",
+"service.address",
+"kafka.network.acceptor_blocked.listener",
+"kafka.network.request_channel.response_queue_size.processor",
+"kafka.network.metric_fingerprint",
+"kafka.network.processor_idle_percent.network_processor",
+"kafka.network.request_metrics.temporary_memory_bytes.request_type",
+"kafka.network.request_metrics.request_type",
+"kafka.network.request_metrics.total_time_ms.request_type",
+"kafka.network.request_metrics.throttle_time_ms.request_type",
+"kafka.network.request_metrics.local_time_ms.request_type",
+"kafka.network.request_metrics.response_queue_time_ms.request_type",
+"kafka.network.request_metrics.message_conversions_time_ms.request_type",
+"kafka.network.request_metrics.response_send_time_ms.request_type",
+"kafka.network.request_metrics.error_type",
+"kafka.network.request_metrics.remote_time_ms.request_type",
+"kafka.network.request_metrics.request_queue_time_ms.request_type",
+"kafka.network.request_metrics.request_bytes.request_type",
+"host.name"
+],
+"kafka/partition": [
+"agent.id",
+"service.address",
+"kafka.partition.topic_id",
+"kafka.partition.topic_broker_id",
+"kafka.topic.name",
+"kafka.broker.address",
+"host.name"
+],
+"kafka/producer": [
+"agent.id",
+"service.address",
+"kafka.partition.topic_id",
+"kafka.partition.topic_broker_id",
+"kafka.producer.metric_fingerprint",
+"kafka.producer.client_id",
+"kafka.producer.node_id",
+"kafka.topic.name",
+"kafka.broker.address",
+"host.name"
+],
+"kafka/raft": [
+"agent.id",
+"service.address",
+"host.name"
+],
+"kafka/replica_manager": [
+"agent.id",
+"service.address",
+"kafka.replica_manager.metric_fingerprint",
+"host.name"
+],
+"kafka/topic": [
+"agent.id",
+"service.address",
+"kafka.topic.partition.id",
+"kafka.topic.metric_fingerprint",
+"kafka.topic.topic.name",
+"host.name"
+],
+"kafka_connect/client": [
+"agent.id",
+"service.address",
+"kafka_connect.client.id",
+"host.name"
+],
+"kafka_connect/connector": [
+"agent.id",
+"service.address",
+"kafka_connect.connector.name",
+"host.name"
+],
+"kafka_connect/task": [
+"agent.id",
+"service.address",
+"kafka_connect.task.id",
+"kafka_connect.connector.name",
+"host.name"
+],
+"kafka_connect/worker": [
+"agent.id",
+"service.address",
+"kafka_connect.worker.address",
+"host.name"
+],
+"mysql/galera_status": [
+"agent.id",
+"service.address",
+"host.name"
+],
+"mysql/performance": [
+"agent.id",
+"service.address",
+"host.name",
+"mysql.performance.table_io_waits.index.name",
+"mysql.performance.table_io_waits.object.schema",
+"mysql.performance.table_io_waits.object.name",
+"mysql.performance.events_statements.schemaname",
+"mysql.performance.events_statements.query_id"
+],
+"mysql/replica_status": [
+"host.name",
+"mysql.replica_status.source.server.id",
+"mysql.replica_status.source.server.uuid",
+"source.port",
+"user.name"
+],
+"mysql/status": [
+"agent.id",
+"service.address",
+"host.name"
+],
+"nginx/stubstatus": [
+"agent.id",
+"nginx.stubstatus.hostname",
+"service.address",
+"host.name"
+],
+"redis/info": [
+"agent.id",
+"service.address",
+"host.name"
+],
+"redis/key": [
+"agent.id",
+"service.address",
+"host.name",
+"redis.keyspace.id",
+"redis.key.id"
+],
+"redis/keyspace": [
+"agent.id",
+"service.address",
+"host.name",
+"redis.keyspace.id"
+],
+"redisenterprise/node": [
+"agent.id",
+"service.address",
+"host.name",
+"redisenterprise.node.labels.cluster",
+"redisenterprise.node.labels.node",
+"redisenterprise.node.labels.path",
+"redisenterprise.node.labels.logical_name",
+"redisenterprise.node.labels.instance",
+"redisenterprise.node.labels.addr",
+"redisenterprise.node.labels.cnm_version",
+"redisenterprise.node.labels.job"
+],
+"redisenterprise/proxy": [
+"agent.id",
+"service.address",
+"host.name",
+"redisenterprise.proxy.labels.bdb",
+"redisenterprise.proxy.labels.cluster",
+"redisenterprise.proxy.labels.proxy",
+"redisenterprise.proxy.labels.node",
+"redisenterprise.proxy.labels.endpoint",
+"redisenterprise.proxy.labels.instance",
+"redisenterprise.proxy.labels.port",
+"redisenterprise.proxy.labels.job"
+],
+"windows/service": [
+"agent.id",
+"host.name",
+"windows.service.pid",
+"windows.service.id",
+"windows.service.state"
+]
+}
