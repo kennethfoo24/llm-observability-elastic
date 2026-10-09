@@ -1,4 +1,4 @@
-# Suspended by default. Resume with: kubectl -n genai-demo patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":false}}'
+# Running after every deploy (deploy.sh applies it). demo_down.sh suspends it; the next deploy resumes it.
 apiVersion: batch/v1
 kind: CronJob
 metadata: {name: glassbox-trafficgen, namespace: genai-demo}
@@ -6,7 +6,7 @@ spec:
   schedule: "*/5 7-21 * * *"
   timeZone: Asia/Singapore
   concurrencyPolicy: Forbid
-  suspend: true
+  suspend: false
   successfulJobsHistoryLimit: 2
   failedJobsHistoryLimit: 3
   jobTemplate:

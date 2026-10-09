@@ -105,9 +105,9 @@ def test_ingress_annotations_and_configs():
     assert _find("ManagedCertificate", "glassbox-cert")["spec"]["domains"] == ["1-2-3-4.sslip.io"]
 
 
-def test_trafficgen_is_suspended_capped_and_hardened():
+def test_trafficgen_runs_by_default_capped_and_hardened():
     cj = _find("CronJob", "glassbox-trafficgen")["spec"]
-    assert cj["suspend"] is True and cj["concurrencyPolicy"] == "Forbid" and cj["timeZone"] == "Asia/Singapore"
+    assert cj["suspend"] is False and cj["concurrencyPolicy"] == "Forbid" and cj["timeZone"] == "Asia/Singapore"
     assert cj["schedule"] == "*/5 7-21 * * *"
     job = cj["jobTemplate"]["spec"]
     assert job["activeDeadlineSeconds"] <= 600 and job["backoffLimit"] == 0

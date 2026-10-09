@@ -33,8 +33,7 @@ Internal ids keep the old `glassbox-` prefix (service name, dashboards, k8s obje
 GitHub Actions (`.github/workflows/build-image.yml`) runs backend and frontend tests, then pushes `kennethfoo24/glassbox:<sha>` to Docker Hub. Deploy by digest:
 
 ```
-IMAGE=docker.io/kennethfoo24/glassbox@sha256:<64 hex> WITH_TRAFFICGEN=1 bash deploy/scripts/deploy.sh
-kubectl -n genai-demo patch cronjob glassbox-trafficgen -p '{"spec":{"suspend":false}}'   # deploy.sh re-suspends it
+IMAGE=docker.io/kennethfoo24/glassbox@sha256:<64 hex> bash deploy/scripts/deploy.sh   # also leaves the traffic generator running (WITH_TRAFFICGEN=0 skips it)
 ```
 
 `deploy.sh` refuses a malformed digest. Full setup and demo steps are in `docs/RUNBOOK.md` and `docs/DEMO.md`.
@@ -58,4 +57,3 @@ Check any time: `cd backend && python -m feeder coverage --group all` (reports E
 - **Real AI integration accounts:** the feeder fakes them; decide which have real accounts (Claude Code telemetry is free to wire up).
 - **Gemma:** decide on Local SSD (`GEMMA_DISCARD_SSD`) and whether `prices.yaml` should use measured throughput. VM is stopped and its `/metrics` is locked.
 - **Visual checks in Kibana** not yet done: Lens panel rendering, the new Discover and Dev Tools links, Dev Tools console URL format.
-- **Trafficgen:** every deploy re-suspends it; un-suspend after each deploy (see above).

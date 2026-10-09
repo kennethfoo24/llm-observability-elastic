@@ -81,5 +81,5 @@ jobs:
 
       - name: Deploy reference
         run: |
-          echo "Deploy with: IMAGE=docker.io/<dockerhub user>/glassbox@${{ steps.push.outputs.digest }} WITH_TRAFFICGEN=1 deploy/scripts/deploy.sh" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deploy with: IMAGE=docker.io/<dockerhub user>/glassbox@${{ steps.push.outputs.digest }} deploy/scripts/deploy.sh" >> "$GITHUB_STEP_SUMMARY"
           echo "digest: ${{ steps.push.outputs.digest }}"

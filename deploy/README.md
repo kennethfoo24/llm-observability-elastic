@@ -25,7 +25,7 @@ context is `gke_elastic-sa_asia-southeast1-a_kenneth-gke`.
    (reads only gitignored local files, prints key names only; refuses admin keys for log export unless `ALLOW_ADMIN_LOG_KEYS=1`).
 4. `IMAGE=<image@digest> deploy/scripts/deploy.sh`: renders `deploy/k8s/*.yaml` with `deploy/render.py`, applies, waits
    for the rollout and the managed certificate (up to 90 minutes), then checks `https://<host>/healthz`.
-   `WITH_TRAFFICGEN=1` also applies the CronJob, which is created suspended.
+   The traffic generator CronJob is always applied and running; `WITH_TRAFFICGEN=0` skips it.
 5. `deploy/scripts/teardown.sh [--all]`: removes the Ingress and load balancer objects, scales the app to 0;
    `--all` deletes the namespace after you type `delete genai-demo`.
 

@@ -178,6 +178,11 @@ def test_feeder_key_wiring_and_demo_down_leaves_feeder_running():
     assert "feeder_key" in r.stdout
 
 
+def test_deploy_applies_the_traffic_generator_by_default():
+    t = (ROOT / "deploy/scripts/deploy.sh").read_text()
+    assert 'WITH_TRAFFICGEN:-1' in t and "50-trafficgen.yaml" in t
+
+
 def test_deploy_rejects_a_malformed_image_digest():
     import subprocess
     r = subprocess.run(["bash", "deploy/scripts/deploy.sh"], capture_output=True, text=True,
