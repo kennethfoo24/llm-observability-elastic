@@ -218,6 +218,7 @@ def test_postgres_otel_hit_ratio_is_high_and_counters_have_the_real_mapping_kind
 
 
 # --- volume and idempotency ---------------------------------------------------------------------------------------------------
+@pytest.mark.timeout(240)  # generates a full 7 day backfill; slow on shared CI runners
 def test_volume_budget_per_tick_and_backfill():
     week = datetime(2026, 10, 5, 0, 0, tzinfo=UTC)
     total = sum(1 for g in gens() for _ in engine.generate(g, week, week + timedelta(days=7)))
