@@ -205,7 +205,7 @@ every feeder document and never touch the real ones.
 | `netflow` | log | flow records shaped like the Filebeat input output with PUBLIC addresses, so the pipeline adds geo (country, city) and AS organization for source and destination, plus `netflow.vlan_id` |
 | `postgresql` | log | RAW server log lines (default `log_line_prefix`): statement durations (slow queries over 30 ms), errors, deadlocks, FATAL auth failures, checkpoints |
 | `postgresql_otel` | metrics and logs of `postgresqlreceiver.otel` | namespace `synthetic`: two instances (`pg-orders-01`, `pg-analytics-01`), 3 databases; blks_hit and blks_read, deadlocks, temp files and io, rollbacks, tuple counters, locks by type, mode and relation, bgwriter, plus `db.server.query_sample` and `db.server.top_query` log records |
-| `system` | auth, security, memory | RAW Linux auth syslog lines (useradd, groupadd, sudo errors, ssh accepted and failed), 100+ Windows Security event codes as winlogbeat shaped raw events (`winlog.event_data` per code, mapped to ECS by `logs-system.security-2.23.0`), `system.memory` with swap fields |
+| `system` | auth, security, memory | RAW Linux auth syslog lines (useradd, groupadd, sudo errors, ssh accepted and failed), 110 Windows Security event codes as winlogbeat shaped raw events (`winlog.event_data` per code, mapped to ECS by `logs-system.security-2.23.0`), `system.memory` with swap fields |
 | `system_otel` | none | assets only, already FILLED by real data |
 
 ### What made it work
@@ -231,7 +231,7 @@ every feeder document and never touch the real ones.
 
 ### Known unfillable or unchecked panels
 
-* The `coverage` report cannot analyse map, links and markdown panels (counted as unchecked, 70 in the group: navigation links, markdown help, 5 maps: PANW source and destination flows, NetFlow
+* The `coverage` report cannot analyse map, links and markdown panels (counted as unchecked, 68 in the group: navigation links, markdown help, two log analysis embeddables, 5 maps: PANW source and destination flows, NetFlow
   destination heat map, Meraki IP flows, System SSH failed logins). The data behind the maps is generated: `source.geo.location` and `destination.geo.location` exist on panw, netflow
   and Meraki flow documents, and `source.geo.location` on the ssh failures.
 * The Windows Security dashboards read some event codes the package pipeline does not map to `group.*` (4783 to 4792); they are covered by the other group codes in the same panels.
