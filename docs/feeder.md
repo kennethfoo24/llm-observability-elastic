@@ -249,3 +249,39 @@ python -m feeder tick --group rest --local-key
 The narrow feeder key (`create_doc` on `logs-*` and `metrics-*`) is enough for every stream; no index pattern is denied. `system.security` and `logs-postgresqlreceiver.otel-synthetic` are
 created by the first write (`auto_configure`). If a generator changes what an existing document contains, run `cleanup --group rest --stream <key>` and backfill again: the same ids would only
 answer 409.
+
+## Group devtools: NVIDIA GPU, Cursor, GitLab, Slack (stage 3)
+
+Code: `backend/feeder/gen/devtools*.py` (catalog and helpers in `devtools.py`). Fictional data only: invented engineers, projects, GPUs and a Slack
+workspace. `python -m feeder backfill --days 7 --group devtools` writes about 115 thousand documents, a normal 5 minute tick is about 40 documents
+(peak about 120).
+
+| Package | Streams | Shape |
+|---|---|---|
+| `nvidia_gpu` 0.4.1 | `stats` (TSDB metrics) | 2 servers x 4 A100 80GB (DCGM style). `gpu-node-a` trains (about 90 percent utilisation, 64 GB framebuffer, hot, checkpoint dips), `gpu-node-b` serves inference (follows the working day). Counters follow a per node rate so they never decrease. About one XID error per GPU every two days: that sample is the `err_code` / `err_msg` series |
+| `nvidia_gpu_otel` 0.3.0 | `metrics-nvidia_gpu.otel-default` | The same GPUs as OpenTelemetry `DCGM_FI_DEV_*` metrics with `UUID`, `Hostname`, `modelName`, `DCGM_FI_DRIVER_VERSION` attributes. Written to the `default` namespace because the dashboard queries exactly that index |
+| `cursor` 0.2.2 | `audit` | 22 person team: logins, logouts, API keys, MCP server, rule and command changes, privacy mode, spend limits, role changes (raw JSON events through the package pipeline) |
+| `gitlab` 3.1.0 | `api`, `production`, `application`, `audit`, `auth`, `pages`, `sidekiq` | One instance, 20 users, 8 projects. Each line starts from the package's own sample JSON line, then the user, project, path, status, duration and IP are replaced. Application messages follow the patterns the dashboard filters on (`Successful Login: username=...`, `... created a new project "..."`, `User ... was created`, `Group ... was removed`) |
+| `slack` 1.32.0 | `audit` | Audit Logs API events: logins (and failures), file uploads and downloads, channel joins and creation, app installs, role changes and anomaly events. The package ships no dashboard; the data is for Discover and alerting |
+
+### Coverage
+
+`coverage --group devtools`: 7 of 8 dashboards FILLED. `[Logs Cursor] Audit Logs Overview` stays 11 of 12: the missing panel counts pipeline errors
+(`error.message` exists), which are absent by design. GitLab Application needed the specific message patterns above and the
+`mergeability_merge_request_id` field.
+
+### Lessons
+
+* The engine always sets `@timestamp` to the bucket minute, so a second sample "30 seconds later" for the same series is a duplicate in a TSDB stream:
+  vary a dimension instead (the XID error series does that).
+* A counter must be driven by a rate that does not depend on the noisy instantaneous value (`devtools_nvidia.rate`); use `infra.LoadRate` for load shaped rates.
+
+### Operating the group
+
+```
+python -m feeder install --group devtools
+python -m feeder backfill --days 7 --group devtools   # run twice if the first run reports timestamp_error on a new OTel stream
+python -m feeder coverage --group devtools -v
+python -m feeder tick --group devtools --local-key
+python -m feeder cleanup --group devtools              # only documents tagged synthetic-data-feeder
+```
