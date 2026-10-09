@@ -1,4 +1,4 @@
-import type { AppConfig, ChatRequest, ChatResponse, ModelInfo, Persona } from "./types";
+import type { AppConfig, ChatRequest, ChatResponse, Findings, ModelInfo, Persona } from "./types";
 
 const KEY = "glassbox.pw";
 
@@ -68,5 +68,6 @@ export const api = {
   personas: () => request<Persona[]>("/api/personas"),
   models: () => request<ModelInfo[]>("/api/models"),
   config: () => request<AppConfig>("/api/config"),
+  findings: (traceId: string) => request<Findings>(`/api/findings/${encodeURIComponent(traceId)}`),
   chat: (body: ChatRequest) => request<ChatResponse>("/api/chat", { method: "POST", body: JSON.stringify(body) }),
 };

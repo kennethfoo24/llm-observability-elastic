@@ -22,7 +22,6 @@ export function CostPanel({ r, kibanaUrl }: { r: ChatResponse; kibanaUrl?: strin
         {stat("Thinking tokens", r.usage.thinking_tokens)}
       </dl>
       <p className="num mt-4 break-all text-xs text-on-ink-muted">{r.model}</p>
-      <p className="mt-1 text-xs text-on-ink-muted">{r.engine === "langchain" ? "LangChain engine" : "Direct SDK engine"}</p>
       {kibanaUrl && <div className="mt-4"><ExtLink href={costDashboardUrl(kibanaUrl)}>Open cost dashboard</ExtLink></div>}
     </div>
   );

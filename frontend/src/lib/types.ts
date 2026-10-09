@@ -40,3 +40,6 @@ export type ChatResponse = {
   /** Server-built context the response log carries (only documents the persona may see). */
   quality_context?: string;
 };
+
+/** What Elastic's async quality pipeline found on one answer: only the checks that triggered. */
+export type Findings = { status: "pending" | "ready" | "unavailable"; security: string[]; quality: string[] };

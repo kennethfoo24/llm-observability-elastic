@@ -1,5 +1,4 @@
 import { ShieldCheck, ShieldWarning, ShieldSlash } from "@phosphor-icons/react";
-import { reasonLabel } from "../../lib/copy";
 import { formatMs } from "../../lib/format";
 import { alertsUrl, devToolsUrl, traceUrl, type GuardrailConfig } from "../../lib/kibanaLinks";
 import { DETECTION_INTERVAL_MINUTES, DEVTOOLS_HELP } from "../../lib/copy";
@@ -23,11 +22,6 @@ export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl, prompt, guardr
         {g.status === "degraded" && <span className="rounded-full border border-ink-line px-2 py-0.5 text-xs font-medium text-on-ink-muted">Degraded</span>}
         <span className="num ml-auto text-xs text-on-ink-muted">{formatMs(g.latency_ms)}</span>
       </div>
-      {g.reasons.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {g.reasons.map((x) => <li key={x} className="min-w-0 break-words rounded-full bg-ink-3 px-3 py-1 text-sm">{reasonLabel(x)}</li>)}
-        </ul>
-      )}
       <dl className="mt-3 flex items-baseline justify-between gap-3 text-sm">
         <dt className="text-on-ink-muted">Injection probability</dt>
         <dd className="num font-bold">{scored ? g.injection_score!.toFixed(2) : "n/a"}</dd>

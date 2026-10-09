@@ -5,6 +5,8 @@ import { traceUrl } from "../../lib/kibanaLinks";
 import { CostPanel } from "./CostPanel";
 import { GuardrailStrip } from "./GuardrailStrip";
 import { QualityPanel } from "./QualityPanel";
+import { SecurityPanel } from "./SecurityPanel";
+import { useFindings } from "../../hooks/useFindings";
 import { Retrieval } from "./Retrieval";
 import { Waterfall } from "./Waterfall";
 import type { AssistantMsg } from "../../state/chatState";
@@ -35,6 +37,7 @@ function Skeleton() {
 
 export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUrl, guardrailConfig, qualityPipeline, highlightDocId }: Props) {
   const r = msg?.response;
+  const findings = useFindings(r?.trace_id, msg?.status === "done" && !!r && !r.blocked);
   return (
     <div className="min-w-0 pb-8">
       <div className="px-5 pb-4 pt-5">
@@ -59,7 +62,8 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
       {msg?.status === "done" && r && (
         <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 140, damping: 20 }}>
           <Section title="Guardrail"><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} prompt={question} guardrailConfig={guardrailConfig} /></Section>
-          {!r.blocked && <Section title="Output guardrail and quality"><QualityPanel r={r} kibanaUrl={kibanaUrl} prompt={question} qualityPipeline={qualityPipeline} /></Section>}
+          <Section title="Security"><SecurityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
+          <Section title="Quality"><QualityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} prompt={question} qualityPipeline={qualityPipeline} /></Section>
           <Section title="Trace">
             <Waterfall stages={r.stages} verdict={r.guardrail.verdict} scored={r.guardrail.injection_score !== null} />
             {kibanaUrl && r.trace_id ? (
@@ -71,7 +75,7 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
           <Section title="Retrieval">
             <Retrieval docs={r.docs} hidden={r.hidden} personaName={persona?.name ?? "this person"} highlightDocId={highlightDocId} kibanaUrl={kibanaUrl} />
           </Section>
-          <Section title="Model and cost"><CostPanel r={r} kibanaUrl={kibanaUrl} /></Section>
+          <Section title="Cost"><CostPanel r={r} kibanaUrl={kibanaUrl} /></Section>
         </motion.div>
       )}
     </div>

@@ -30,9 +30,9 @@ test("pending shows a busy skeleton", () => {
   expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
 });
 
-test("a done answer shows all four sections and the Kibana deep link", () => {
+test("a done answer shows every section and the Kibana deep link", () => {
   render(<XRayDrawer {...props} msg={msg(response())} />);
-  for (const h of ["Guardrail", "Trace", "Retrieval", "Model and cost"]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
+  for (const h of ["Guardrail", "Security", "Quality", "Trace", "Retrieval", "Cost"]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
   const link = screen.getByRole("link", { name: /open trace in kibana/i });
   expect(link).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/4bf92f3577b34da6a3ce929d0e0e4736");
   expect(link).toHaveAttribute("target", "_blank");
@@ -64,7 +64,7 @@ test("nothing hidden says so instead of rendering an empty list", () => {
 
 test("model and cost show tokens, thinking tokens and cost in monospace numbers", () => {
   render(<XRayDrawer {...props} msg={msg(response())} />);
-  const cost = screen.getByRole("region", { name: "Model and cost" });
+  const cost = screen.getByRole("region", { name: "Cost" });
   expect(within(cost).getByText("$0.00135")).toBeInTheDocument();
   expect(within(cost).getByText("3,120")).toBeInTheDocument();
   expect(within(cost).getByText("410")).toBeInTheDocument();
@@ -72,14 +72,15 @@ test("model and cost show tokens, thinking tokens and cost in monospace numbers"
   expect(within(cost).getByText("gpt-5.4-mini")).toBeInTheDocument();
 });
 
-test("a blocked prompt says Blocked in the guardrail panel, with its reasons and its reasons, and no retrieval section content", () => {
+test("a blocked prompt says Blocked in the guardrail panel, with its reasons under Security, and no retrieval section content", () => {
   const blocked = response({ blocked: true, answer: "", docs: [], hidden: [], cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 },
     block_reason: ["prompt_injection"], guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 30, injection_score: 0.99 }, stages: [{ name: "guardrail.check", ms: 30 }] });
   render(<XRayDrawer {...props} msg={msg(blocked)} />);
   const g = screen.getByRole("region", { name: "Guardrail" });
   expect(within(g).getByText("Blocked")).toBeInTheDocument();
   expect(within(g).queryByText("Flagged")).toBeNull();
-  expect(within(g).getByText("Prompt injection attempt")).toBeInTheDocument();
+  expect(within(g).queryByText("Prompt injection attempt")).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Security" })).getByText("Prompt injection attempt")).toBeInTheDocument();
   expect(within(g).getByText("0.99")).toBeInTheDocument();
   expect(screen.getByText(/stopped before any search or model call/i)).toBeInTheDocument();
 });
@@ -312,48 +313,31 @@ test("Dev Tools link is hidden without kibana url, guardrail config or prompt", 
   expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
 });
 
-test("an answered response shows the Output guardrail and quality section with links and OWASP chips", () => {
+test("an answered response shows Quality with its links and no checklist of untriggered checks", () => {
   render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response())} />);
-  const q = screen.getByRole("region", { name: "Output guardrail and quality" });
+  const q = screen.getByRole("region", { name: "Quality" });
   expect(within(q).getByText(/5 to 10 seconds/)).toBeInTheDocument();
   const dev = within(q).getByRole("link", { name: /try it in dev tools/i });
   const text = decompressFromEncodedURIComponent(dev.getAttribute("href")!.split("load_from=data:text/plain,")[1])!;
   expect(text).toContain("POST _ingest/pipeline/genai-quality/_simulate");
   expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
   expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-quality");
-  expect(within(q).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-owasp");
-  expect(within(q).getByText("What Elastic checks on this answer")).toBeInTheDocument();
-  const rows = within(within(q).getByRole("list", { name: "What Elastic checks on this answer" })).getAllByRole("listitem");
-  expect(rows).toHaveLength(8);
-  for (const t of ["Sensitive information disclosure", "Improper output handling", "System prompt leakage", "Misinformation judged by an LLM", "Sentiment", "Language", "Topic", "Answered"]) expect(within(q).getByText(t)).toBeInTheDocument();
-  const owasp = { LLM02: "llm022025-sensitive-information-disclosure", LLM05: "llm052025-improper-output-handling", LLM07: "llm072025-system-prompt-leakage", LLM09: "llm092025-misinformation" };
-  for (const [id, slug] of Object.entries(owasp)) {
-    const a = within(q).getByRole("link", { name: new RegExp(`^${id}`) });
-    expect(a).toHaveAttribute("href", `https://genai.owasp.org/llmrisk/${slug}/`);
-    expect(a).toHaveAttribute("target", "_blank");
-    expect(a.getAttribute("rel")).toContain("noopener");
-    expect(a.getAttribute("rel")).toContain("noreferrer");
-    expect(a).toHaveTextContent("(opens in a new tab)");
-  }
-  const kb = within(q).getAllByRole("link", { name: /see it in kibana/i });
-  expect(kb).toHaveLength(8);
-  expect(kb.filter((a) => a.getAttribute("href")!.endsWith("glassbox-owasp"))).toHaveLength(3);
-  expect(kb.filter((a) => a.getAttribute("href")!.endsWith("glassbox-quality"))).toHaveLength(5);
-  expect(kb.every((a) => a.getAttribute("rel")!.includes("noopener") && a.textContent!.includes("(opens in a new tab)"))).toBe(true);
+  expect(within(q).queryByText("What Elastic checks on this answer")).toBeNull();
+  expect(within(q).queryByRole("list")).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-owasp");
   expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
 });
 
-test("a blocked response has no quality section", () => {
+test("a blocked response says there is nothing to score under Quality", () => {
   render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response({ blocked: true, docs: [], hidden: [] }))} />);
-  expect(screen.queryByRole("region", { name: "Output guardrail and quality" })).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Quality" })).getByText(/nothing to score/i)).toBeInTheDocument();
 });
 
 test("without a Kibana url the quality links are hidden; without the pipeline only Dev Tools is", () => {
   const { rerender } = render(<XRayDrawer {...props} kibanaUrl={undefined} qualityPipeline="genai-quality" msg={msg(response())} />);
-  const q = () => screen.getByRole("region", { name: "Output guardrail and quality" });
-  expect(within(q()).queryAllByRole("link", { name: /kibana|dashboard|dev tools|response log/i })).toHaveLength(0);
-  expect(within(q()).getAllByRole("link")).toHaveLength(4);   // only the public OWASP pages remain
+  const q = () => screen.getByRole("region", { name: "Quality" });
+  expect(within(q()).queryAllByRole("link")).toHaveLength(0);
   rerender(<XRayDrawer {...props} msg={msg(response())} />);
   expect(within(q()).queryByRole("link", { name: /dev tools/i })).toBeNull();
-  expect(within(q()).getAllByRole("link")).toHaveLength(3 + 8 + 4);
+  expect(within(q()).getAllByRole("link")).toHaveLength(2);
 });

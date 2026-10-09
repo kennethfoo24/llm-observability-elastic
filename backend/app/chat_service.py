@@ -42,6 +42,7 @@ class Deps:
     emit_log: Callable = emit_prompt_log
     emit_response_log: Callable = emit_response_log
     gate: object | None = None  # GemmaGate-like; consulted first so an offline VM answers 503 fast
+    findings_es: object | None = None  # Elasticsearch-like, reads the response log; built from settings when unset
 
 
 @contextmanager

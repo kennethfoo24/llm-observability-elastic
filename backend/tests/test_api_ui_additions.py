@@ -99,3 +99,52 @@ def test_config_exposes_security_kibana_url_when_set():
     deps = Deps(_Ret(), _Guard(), _Sdk(), None, SPECS, PRICES, emit_log=lambda **kw: None, gate=_Gate())
     body = TestClient(create_app(deps, s, gate=_Gate(), static_dir=None)).get("/api/config").json()
     assert body["security_kibana_url"] == "https://sec.example"
+
+
+class _FindingsEs:
+    def __init__(self, hits=None, boom=False):
+        self.hits, self.boom, self.seen = hits or [], boom, None
+
+    def search(self, **kw):
+        self.seen = kw
+        if self.boom:
+            raise RuntimeError("down")
+        return {"hits": {"hits": self.hits}}
+
+
+def _findings_client(es):
+    s = Settings(_env_file=None, obs_es_url="http://x", obs_es_admin_key="k", obs_kibana_url="https://kb.example/", app_password="pw")
+    deps = Deps(_Ret(), _Guard(), _Sdk(), None, SPECS, PRICES, emit_log=lambda **kw: None, gate=_Gate(), findings_es=es)
+    return TestClient(create_app(deps, s, gate=_Gate()), headers={"X-Demo-Password": "pw"})
+
+
+TID = "a" * 32
+
+
+def test_findings_rejects_a_malformed_trace_id():
+    assert _findings_client(_FindingsEs()).get("/api/findings/not-a-trace").status_code == 400
+
+
+def test_findings_pending_until_the_response_log_exists():
+    r = _findings_client(_FindingsEs()).get(f"/api/findings/{TID}").json()
+    assert r == {"status": "pending", "security": [], "quality": []}
+
+
+def test_findings_lists_only_what_triggered_and_never_returns_text():
+    src = {"output_verdict": "FLAGGED", "output_reasons": ["unsafe_markup", "pii_in_response"],
+           "quality": {"answered": False, "lang_mismatch": False, "off_topic": True, "user_sentiment": "negative"}}
+    es = _FindingsEs([{"_source": src}])
+    r = _findings_client(es).get(f"/api/findings/{TID}").json()
+    assert r["status"] == "ready"
+    assert r["security"] == ["unsafe_markup", "pii_in_response"]
+    assert r["quality"] == ["not_answered", "off_topic", "negative_sentiment"]
+    assert es.seen["query"] == {"term": {"trace_id": TID}}
+
+
+def test_findings_clean_answer_has_no_findings_and_flattened_keys_work():
+    es = _FindingsEs([{"_source": {"output_reasons": [], "quality.answered": True, "quality.user_sentiment": "neutral"}}])
+    assert _findings_client(es).get(f"/api/findings/{TID}").json() == {"status": "ready", "security": [], "quality": []}
+
+
+def test_findings_degrades_when_elasticsearch_is_down():
+    assert _findings_client(_FindingsEs(boom=True)).get(f"/api/findings/{TID}").json()["status"] == "unavailable"

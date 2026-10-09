@@ -1,5 +1,6 @@
 import hmac
 import logging
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -48,6 +49,50 @@ class ChatBody(BaseModel):
         if len(v) > MAX_MESSAGE_CHARS:
             raise ValueError("message too long")
         return v
+
+
+_TRACE_ID = re.compile(r"[0-9a-f]{32}")
+_FINDING_FIELDS = ["output_verdict", "output_reasons", "quality.answered", "quality.judge_answered", "quality.lang_mismatch",
+                   "quality.off_topic", "quality.user_sentiment", "quality.sentiment_label", "quality.low_faithfulness", "quality.faithfulness"]
+
+
+def _findings_client(s: Settings) -> Elasticsearch:
+    return Elasticsearch(s.obs_es_url, api_key=s.obs_es_admin_key, request_timeout=10)
+
+
+def _get(doc: dict, path: str):
+    cur = doc
+    for part in path.split("."):
+        cur = cur.get(part) if isinstance(cur, dict) else None
+    return doc.get(path, cur)
+
+
+def read_findings(es, trace_id: str) -> dict:
+    """pending until the pipeline has written the response log; then the triggered findings (an empty list means clean)."""
+    try:
+        hits = es.search(index="logs-genai_response*", size=1, source=_FINDING_FIELDS, query={"term": {"trace_id": trace_id}})["hits"]["hits"]
+    except Exception as e:
+        logger.warning("findings lookup failed: %s", type(e).__name__)
+        return {"status": "unavailable", "security": [], "quality": []}
+    if not hits:
+        return {"status": "pending", "security": [], "quality": []}
+    d = hits[0]["_source"]
+    security = [r for r in (_get(d, "output_reasons") or []) if r in ("pii_in_response", "system_prompt_leak", "unsafe_markup")]
+    quality: list[str] = []
+    if _get(d, "quality.answered") is False or _get(d, "quality.judge_answered") is False:
+        quality.append("not_answered")
+    if _get(d, "quality.lang_mismatch") is True:
+        quality.append("language_mismatch")
+    if _get(d, "quality.off_topic") is True:
+        quality.append("off_topic")
+    if _get(d, "quality.low_faithfulness") is True:
+        quality.append("low_faithfulness")
+    sentiment = str(_get(d, "quality.user_sentiment") or _get(d, "quality.sentiment_label") or "").lower()
+    if sentiment == "negative":
+        quality.append("negative_sentiment")
+    if sentiment == "positive":
+        quality.append("positive_sentiment")
+    return {"status": "ready", "security": security, "quality": quality}
 
 
 def _default_deps(s: Settings, gate: GemmaGate) -> Deps:
@@ -150,6 +195,13 @@ def create_app(deps: Deps | None = None, settings: Settings | None = None, gate=
             # Never echo the exception message: it can carry request content.
             logger.exception("upstream LLM error")
             return JSONResponse({"error": "upstream_error", "detail": type(e).__name__}, status_code=502)
+
+    @app.get("/api/findings/{trace_id}")
+    async def findings(trace_id: str):
+        """What Elastic's async quality pipeline found on one answer. Returns derived flags only, never the prompt or answer text."""
+        if not _TRACE_ID.fullmatch(trace_id):
+            return JSONResponse({"error": "bad_trace_id"}, status_code=400)
+        return await run_in_threadpool(read_findings, deps.findings_es or _findings_client(s), trace_id)
 
     dist = static_dir if static_dir is not None else default_dist()
     if dist.is_dir() and (dist / "index.html").exists():

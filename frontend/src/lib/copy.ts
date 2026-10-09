@@ -67,3 +67,20 @@ export const QUALITY_CHECKS: QualityCheck[] = [
   { key: "answered", id: "Quality", name: "Answered", dashboard: "quality",
     what: "Records whether the assistant actually answered or said it could not (app flag quality.answered, confirmed by the judge)." },
 ];
+
+export type FindingInfo = { label: string; owasp?: string; owaspUrl?: string };
+/** Output (security) findings from the genai-quality pipeline. */
+export const OUTPUT_FINDINGS: Record<string, FindingInfo> = {
+  pii_in_response: { label: "Personal data in the answer", owasp: "LLM02", owaspUrl: OWASP_BASE + "llm022025-sensitive-information-disclosure/" },
+  unsafe_markup: { label: "Unsafe markup in the answer", owasp: "LLM05", owaspUrl: OWASP_BASE + "llm052025-improper-output-handling/" },
+  system_prompt_leak: { label: "System prompt leaked", owasp: "LLM07", owaspUrl: OWASP_BASE + "llm072025-system-prompt-leakage/" },
+};
+/** Conversation-quality findings. */
+export const QUALITY_FINDINGS: Record<string, FindingInfo> = {
+  not_answered: { label: "Did not answer" },
+  language_mismatch: { label: "Language mismatch" },
+  off_topic: { label: "Off topic" },
+  low_faithfulness: { label: "Answer not supported by the documents", owasp: "LLM09", owaspUrl: OWASP_BASE + "llm092025-misinformation/" },
+  negative_sentiment: { label: "Negative sentiment" },
+  positive_sentiment: { label: "Positive sentiment" },
+};
