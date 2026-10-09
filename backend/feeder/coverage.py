@@ -81,6 +81,9 @@ def query_to_clause(q: Any) -> dict | None:
         return None
     if q.get("language") == "lucene":
         return {"query_string": {"query": text}}
+    m = re.fullmatch(r"\s*([\w@.\-]+)\s*:\s*\*\s*", text)
+    if m:  # Kibana turns `field:*` into an exists query (also for object fields); the ES `kql` query does not
+        return {"exists": {"field": m.group(1)}}
     return {"kql": {"query": text}}
 
 

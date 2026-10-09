@@ -1,7 +1,8 @@
 """Cisco ASA (cisco_asa.log) and Cisco Meraki (cisco_meraki.log) as RAW syslog lines through the package pipelines.
 
 Both streams already hold real data of other demos; these documents fill what the dashboards miss: ASA `event.original`
-(Top ASA Messages) and the Meraki Air Marshal events (source.mac, rogue SSID and SSID spoofing counters).
+(Top ASA Messages), the Meraki Air Marshal events (source.mac, rogue SSID and SSID spoofing counters) and IP flows to public
+addresses (geo for the IP Flows map).
 """
 from __future__ import annotations
 
@@ -38,8 +39,8 @@ def _asa(c: Ctx) -> dict:
         (6, 106015, f"Deny TCP (no connection) from {ext}/{sp} to {inside}/{port} flags RST on interface outside"),
         (4, 710003, f"TCP access denied by ACL from {ext}/{sp} to outside:{inside}/{port}"),
     ], weights=[26, 24, 12, 14, 3, 6, 6, 6, 3])[0]
-    pri = 20 * 8 + tpl[0]  # facility local4 (20), severity
-    return {"message": f"<{pri}>{_asa_ts(c.ts)} {host} : %ASA-{tpl[0]}-{tpl[1]}: {tpl[2]}", "tags": ["cisco-asa", "forwarded"],
+    pri = 20 * 8 + tpl[0]  # facility local4 (20), severity; the tag keeps event.original (Top ASA Messages reads it)
+    return {"message": f"<{pri}>{_asa_ts(c.ts)} {host} : %ASA-{tpl[0]}-{tpl[1]}: {tpl[2]}", "tags": ["cisco-asa", "forwarded", "preserve_original_event"],
             "input": {"type": "udp"}, "log": {"source": {"address": "10.20.0.23:50033"}}}
 
 
@@ -51,8 +52,27 @@ def _mac(r) -> str:
     return r.choice(MAC_PREFIX) + ":" + ":".join(f"{r.randrange(256):02X}" for _ in range(3))
 
 
+PUBLIC = ["8.8.8.8", "81.2.69.142", "89.160.20.112", "216.160.83.56", "2.125.160.216", "175.16.199.0", "128.101.101.101", "52.95.110.1", "13.107.42.14", "31.13.71.36"]
+
+
+def _meraki_flow(c: Ctx) -> dict:
+    """ip_flow_start / ip_flow_end towards public addresses: the pipeline adds destination.geo, which the IP Flows map plots."""
+    r = c.rng
+    ap = "meraki-mx-01"
+    ns = f"{int(c.ts.timestamp())}.{r.randrange(10**8, 10**9)}"
+    src, dst, sport = f"10.10.5.{r.randrange(20, 80)}", r.choice(PUBLIC), r.randrange(1024, 65000)
+    if r.random() < 0.5:
+        line = f"<134>1 {ns} {ap} ip_flow_start src={src} dst={dst} protocol=tcp sport={sport} dport={r.choice([443, 80, 53, 22])}"
+    else:
+        line = (f"<134>1 {ns} {ap} ip_flow_end src={src} dst={dst} protocol=tcp sport={sport} dport={r.choice([443, 80, 53, 22])} "
+                f"duration={r.randrange(1, 300)} sent={r.randrange(200, 90000)} rcvd={r.randrange(200, 900000)}")
+    return {"message": line, "tags": ["cisco-meraki", "forwarded"], "input": {"type": "udp"}, "log": {"source": {"address": "10.20.1.29:45073"}}}
+
+
 def _meraki(c: Ctx) -> dict:
     r = c.rng
+    if r.random() < 0.5:
+        return _meraki_flow(c)
     sub = r.choices(["rogue_ssid_detected", "ssid_spoofing_detected"], weights=[0.65, 0.35])[0]
     ssid = r.choice(SSIDS[:6]) if sub == "rogue_ssid_detected" else r.choice(SSIDS[6:])
     ap = f"meraki-mr-{r.randrange(1, 5):02d}"
@@ -63,4 +83,4 @@ def _meraki(c: Ctx) -> dict:
     return {"message": line, "tags": ["cisco-meraki", "forwarded"], "input": {"type": "udp"}, "log": {"source": {"address": "10.20.1.29:45073"}}}
 
 
-registry.register(rest.GROUP, Generator(ASA, _asa, rate_per_min=0.8), Generator(MER, _meraki, rate_per_min=0.25))
+registry.register(rest.GROUP, Generator(ASA, _asa, rate_per_min=0.8), Generator(MER, _meraki, rate_per_min=0.4))

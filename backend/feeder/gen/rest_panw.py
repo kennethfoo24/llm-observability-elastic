@@ -348,7 +348,11 @@ def _panos(c: Ctx) -> dict:
     kind = profile.pick(r, [(k, w) for k, w in TYPES])
     typ, sub, body = BUILD[kind](c, fw)
     line = f"1,{_ts(c.ts)},{fw[1]},{typ},{sub},2562,{_ts(c.ts)},{body}"
-    return {"message": line, "tags": ["panw-panos", "forwarded"],
+    extra: dict = {}
+    if kind == "THREAT":  # the package pipeline never derives client.ip / server.ip, but the Threats Overview "Top attackers" panels read them
+        src, dst = body.split(",", 2)[:2]
+        extra = {"client": {"ip": src}, "server": {"ip": dst}}
+    return {**extra, "message": line, "tags": ["panw-panos", "forwarded"],
             "log": {"source": {"address": "10.20.0.25:514"}, "syslog": {"hostname": fw[0]}}, "input": {"type": "udp"},
             "observer": {"hostname": fw[0], "serial_number": fw[1]}, "agent": rest.agent_block("elastic-agent-synthetic", "filebeat")}
 
