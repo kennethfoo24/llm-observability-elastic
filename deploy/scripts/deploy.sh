@@ -7,6 +7,8 @@ set -euo pipefail
 . "$(dirname "$0")/_common.sh"
 cd "$(dirname "$0")/../.."
 : "${IMAGE:?set IMAGE to the output of build_push.sh}"
+# A truncated reference (for example an empty digest from a failed CI run) would roll out an InvalidImageName pod.
+[[ "$IMAGE" =~ @sha256:[0-9a-f]{64}$ ]] || die "IMAGE must end with @sha256:<64 hex digits> (got a malformed or empty digest)"
 guard_gcloud
 [ "$DRY_RUN" = "1" ] || guard_kube
 

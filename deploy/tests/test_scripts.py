@@ -176,3 +176,10 @@ def test_feeder_key_wiring_and_demo_down_leaves_feeder_running():
     assert "synthetic-data-feeder" in down and "patch cronjob synthetic-data-feeder" not in down
     r = subprocess.run(["bash", str(ROOT / "deploy/scripts/create_secrets.sh")], env={"DRY_RUN": "1", "PATH": "/usr/bin:/bin:/opt/homebrew/bin"}, capture_output=True, text=True)
     assert "feeder_key" in r.stdout
+
+
+def test_deploy_rejects_a_malformed_image_digest():
+    import subprocess
+    r = subprocess.run(["bash", "deploy/scripts/deploy.sh"], capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin", "DRY_RUN": "1", "IMAGE": "docker.io/x/glassbox@"})
+    assert r.returncode != 0 and "IMAGE must end with @sha256" in (r.stderr + r.stdout)
