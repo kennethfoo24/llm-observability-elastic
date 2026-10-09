@@ -65,6 +65,7 @@ test("a blocked red-team prompt shows the block card and the LLM Observability s
 
 test("the offline Gemma model is visible but cannot be selected", async () => {
   render(<App />);
+  await userEvent.click(await screen.findByRole("button", { name: /^model:/i }));
   const gemma = await screen.findByRole("radio", { name: /gemma/i });
   expect(gemma).toBeDisabled();
   expect(screen.getByText("Offline")).toBeInTheDocument();
@@ -183,7 +184,8 @@ test("picking a model by click closes the open disclosure and returns focus to i
   await userEvent.click(toggle);
   await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await userEvent.click(screen.getByRole("radio", { name: /gpt-5\.4 mini/i }));
+  await userEvent.click(screen.getByRole("button", { name: /^model:/i }));
+  await userEvent.click(await screen.findByRole("radio", { name: /gpt-5\.4 mini/i }));
   expect(toggle).toHaveAttribute("aria-expanded", "false");
   expect(toggle).toHaveFocus();
 });
@@ -192,7 +194,8 @@ test("arrowing through the models with the keyboard does not close the disclosur
   render(<App />);
   const toggle = await screen.findByRole("button", { name: /change person or model/i });
   await userEvent.click(toggle);
-  screen.getByRole("radio", { name: /gpt-5\.4 mini/i }).focus();
+  await userEvent.click(screen.getByRole("button", { name: /^model:/i }));
+  (await screen.findByRole("radio", { name: /gpt-5\.4 mini/i })).focus();
   await userEvent.keyboard("{ArrowDown}");
   expect(toggle).toHaveAttribute("aria-expanded", "true");
 });

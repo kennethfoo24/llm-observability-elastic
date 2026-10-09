@@ -10,139 +10,109 @@ const models: ModelInfo[] = [
   { key: "gemma", label: "Gemma 4 31B (self-hosted)", provider: "gemma", model_id: "google/gemma-4-31B-it", available: false },
 ];
 
-test("lists models, marks the selected one and disables an offline model with a text reason", () => {
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
-  expect(screen.getByRole("radio", { name: /^gpt-5\.4 mini/i })).toHaveAttribute("aria-checked", "true");
-  const gemma = screen.getByRole("radio", { name: /gemma/i });
-  expect(gemma).toBeDisabled();
+const setup = (props: Partial<React.ComponentProps<typeof ModelControls>> = {}) =>
+  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} {...props} />);
+const openMenu = () => userEvent.click(screen.getByRole("button", { name: /^model:/i }));
+
+test("shows only the selected model until the dropdown is opened", () => {
+  setup();
+  expect(screen.getByRole("button", { name: "Model: GPT-5.4 mini" })).toBeInTheDocument();
+  expect(screen.queryByRole("radio")).toBeNull();
+});
+
+test("there is no engine choice: every request runs on LangChain", async () => {
+  setup();
+  await openMenu();
+  expect(screen.queryByText(/how it calls the model/i)).toBeNull();
+  expect(screen.queryByRole("radio", { name: /langchain|direct sdk/i })).toBeNull();
+});
+
+test("opening lists the models, marks the selected one and disables an offline model with a text reason", async () => {
+  setup();
+  await openMenu();
+  expect(await screen.findByRole("radio", { name: /^gpt-5\.4 mini/i })).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByRole("radio", { name: /gemma/i })).toBeDisabled();
   expect(screen.getByText("Offline")).toBeInTheDocument();
   expect(screen.getByText(/start kenneth-gemma-llm to use it/i)).toBeInTheDocument();
 });
 
-test("accessible names read naturally with spaces between label and blurb", () => {
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
-  expect(screen.getByRole("radio", { name: "GPT-5.4 mini Lowest cost via Elastic Inference Service" })).toBeInTheDocument();
+test("accessible names read naturally with spaces between label and blurb", async () => {
+  setup();
+  await openMenu();
+  expect(await screen.findByRole("radio", { name: "GPT-5.4 mini Lowest cost via Elastic Inference Service" })).toBeInTheDocument();
   expect(screen.getByRole("radio", { name: "Gemini 3.5 Flash Higher quality, more reasoning via Elastic Inference Service" })).toBeInTheDocument();
   expect(screen.getByRole("radio", { name: /^Gemma 4 31B \(self-hosted\) Self-hosted on a GPU VM Offline Start kenneth-gemma-llm to use it$/ })).toBeInTheDocument();
 });
 
-test("choosing an available model and switching the engine call the handlers", async () => {
+test("choosing an available model calls the handlers and closes the dropdown", async () => {
   const onModel = vi.fn();
-  const onEngine = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={onEngine} />);
-  await userEvent.click(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher quality/i }));
+  const onModelPicked = vi.fn();
+  setup({ onModel, onModelPicked });
+  await openMenu();
+  await userEvent.click(await screen.findByRole("radio", { name: /^gemini 3\.5 flash higher/i }));
   expect(onModel).toHaveBeenCalledWith("eis-gemini-flash");
-  await userEvent.click(screen.getByRole("radio", { name: /langchain/i }));
-  expect(onEngine).toHaveBeenCalledWith("langchain");
+  expect(onModelPicked).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("radio")).toBeNull();
 });
 
 test("clicking the offline model does nothing", async () => {
   const onModel = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
-  await userEvent.click(screen.getByRole("radio", { name: /gemma/i }));
+  setup({ onModel });
+  await openMenu();
+  await userEvent.click(await screen.findByRole("radio", { name: /gemma/i }));
   expect(onModel).not.toHaveBeenCalled();
 });
 
-test("the engine toggle is operable by keyboard", async () => {
-  const onEngine = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={onEngine} />);
-  await userEvent.tab(); // selected model radio
-  await userEvent.tab(); // engine group
-  expect(screen.getByRole("radio", { name: "Direct SDK" })).toHaveFocus();
-  await userEvent.keyboard("{ArrowRight}");
-  expect(screen.getByRole("radio", { name: "LangChain" })).toHaveFocus();
-  await userEvent.keyboard(" ");
-  expect(onEngine).toHaveBeenCalledWith("langchain");
-});
-
-test("disabled disables every control", () => {
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} disabled />);
-  for (const r of screen.getAllByRole("radio")) expect(r).toBeDisabled();
+test("disabled disables the dropdown trigger", () => {
+  setup({ disabled: true });
+  expect(screen.getByRole("button", { name: /^model:/i })).toBeDisabled();
 });
 
 test("shows a skeleton while models have not loaded", () => {
-  render(<ModelControls models={[]} selectedModel="" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
+  setup({ models: [], selectedModel: "" });
   expect(screen.getByTestId("model-skeleton")).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Loading models");
 });
 
 test("has no obvious accessibility violations", async () => {
-  const { container } = render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
+  const { container } = setup();
   expect(await axe(container)).toHaveNoViolations();
 });
 
-const four: ModelInfo[] = [
-  models[0],
-  { ...models[2], key: "gemma", available: false },
-  models[1],
-];
-
-test("model radios use a roving tabindex: Tab enters on the selected radio only", async () => {
-  render(<ModelControls models={models} selectedModel="eis-gemini-flash" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
-  expect(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher/i })).toHaveAttribute("tabindex", "0");
-  expect(screen.getByRole("radio", { name: /^gpt-5\.4 mini/i })).toHaveAttribute("tabindex", "-1");
-  await userEvent.tab();
-  expect(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher/i })).toHaveFocus();
-});
-
-test("a selected but offline model leaves the first available radio tabbable", () => {
-  render(<ModelControls models={models} selectedModel="gemma" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
-  expect(screen.getByRole("radio", { name: /^gpt-5\.4 mini/i })).toHaveAttribute("tabindex", "0");
-  expect(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher/i })).toHaveAttribute("tabindex", "-1");
-});
-
-test("arrows move focus and select the next available model, wrapping", async () => {
+test("the selected model radio is the tab stop and arrows move through available models, wrapping", async () => {
   const onModel = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
-  await userEvent.tab();
-  await userEvent.keyboard("{ArrowDown}");
-  expect(onModel).toHaveBeenLastCalledWith("eis-gemini-flash");
-  expect(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher/i })).toHaveFocus();
-  await userEvent.keyboard("{ArrowRight}");
-  expect(onModel).toHaveBeenLastCalledWith("eis-gpt-mini");
-  await userEvent.keyboard("{ArrowUp}");
-  expect(onModel).toHaveBeenLastCalledWith("eis-gemini-flash");
-});
-
-test("arrows skip the offline model", async () => {
-  const onModel = vi.fn();
-  render(<ModelControls models={four} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
-  await userEvent.tab();
+  setup({ onModel });
+  await openMenu();
+  const gpt = await screen.findByRole("radio", { name: /^gpt-5\.4 mini/i });
+  expect(gpt).toHaveAttribute("tabindex", "0");
+  gpt.focus();
   await userEvent.keyboard("{ArrowDown}");
   expect(onModel).toHaveBeenLastCalledWith("eis-gemini-flash");
   expect(onModel).not.toHaveBeenCalledWith("gemma");
+  await userEvent.keyboard("{ArrowDown}");
+  expect(onModel).toHaveBeenLastCalledWith("eis-gpt-mini");
 });
 
 test("Home and End jump to the first and last available models", async () => {
   const onModel = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={vi.fn()} />);
-  await userEvent.tab();
+  setup({ onModel });
+  await openMenu();
+  (await screen.findByRole("radio", { name: /^gpt-5\.4 mini/i })).focus();
   await userEvent.keyboard("{End}");
   expect(onModel).toHaveBeenLastCalledWith("eis-gemini-flash");
   await userEvent.keyboard("{Home}");
   expect(onModel).toHaveBeenLastCalledWith("eis-gpt-mini");
 });
 
-test("arrows do nothing when disabled", async () => {
-  const onModel = vi.fn();
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={onModel} engine="sdk" onEngine={vi.fn()} disabled />);
-  screen.getByRole("radio", { name: /^gpt-5\.4 mini/i }).focus();
-  await userEvent.keyboard("{ArrowDown}");
-  expect(onModel).not.toHaveBeenCalled();
+test("a selected but offline model leaves the first available radio tabbable", async () => {
+  setup({ selectedModel: "gemma" });
+  await openMenu();
+  expect(await screen.findByRole("radio", { name: /^gpt-5\.4 mini/i })).toHaveAttribute("tabindex", "0");
+  expect(screen.getByRole("radio", { name: /^gemini 3\.5 flash higher/i })).toHaveAttribute("tabindex", "-1");
 });
 
-test("the selected engine segment is marked by fill and border, not text colour alone", () => {
-  render(<ModelControls models={[]} selectedModel="" onModel={vi.fn()} engine="langchain" onEngine={vi.fn()} />);
-  const on = screen.getByRole("radio", { name: "LangChain" });
-  const off = screen.getByRole("radio", { name: "Direct SDK" });
-  expect(on).toHaveAttribute("data-state", "on");
-  expect(on.className).toContain("data-[state=on]:bg-blue-soft");
-  expect(on.className).toContain("data-[state=on]:border-blue");
-  expect(on.className).toContain("data-[state=on]:text-blue-strong");
-  expect(off).toHaveAttribute("data-state", "off");
-});
-
-test("EIS models carry the provider badge and the self-hosted model does not", () => {
-  render(<ModelControls models={models} selectedModel="eis-gpt-mini" onModel={vi.fn()} engine="sdk" onEngine={vi.fn()} />);
-  expect(screen.getAllByText("via Elastic Inference Service")).toHaveLength(2);
+test("EIS models carry the provider badge and the self-hosted model does not", async () => {
+  setup();
+  await openMenu();
+  expect(await screen.findAllByText("via Elastic Inference Service")).toHaveLength(2);
 });

@@ -1,6 +1,6 @@
-import { useRef } from "react";
-import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { Cpu, Lightning, Plugs } from "@phosphor-icons/react";
+import { useRef, useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import { CaretDown, Cpu, Lightning, Plugs } from "@phosphor-icons/react";
 import type { Engine, ModelInfo } from "../lib/types";
 
 const BLURB: Record<string, string> = {
@@ -12,17 +12,20 @@ const BLURB: Record<string, string> = {
 
 type Props = {
   models: ModelInfo[]; selectedModel: string; onModel: (key: string) => void;
-  engine: Engine; onEngine: (e: Engine) => void; disabled?: boolean;
+  /** Kept for callers that still pass them: every request runs on LangChain, so there is nothing to choose. */
+  engine?: Engine; onEngine?: (e: Engine) => void; disabled?: boolean;
   /** called only when a model is chosen by click (not while arrowing), so a parent can collapse its panel */
   onModelPicked?: () => void;
 };
 
 const NAV_KEYS = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
 
-export function ModelControls({ models, selectedModel, onModel, engine, onEngine, disabled, onModelPicked }: Props) {
+export function ModelControls({ models, selectedModel, onModel, disabled, onModelPicked }: Props) {
+  const [open, setOpen] = useState(false);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const availableIdx = models.map((m, i) => (m.available ? i : -1)).filter((i) => i >= 0);
   const selectedIdx = models.findIndex((m) => m.key === selectedModel && m.available);
+  const selected = models.find((m) => m.key === selectedModel);
   const tabbableIdx = selectedIdx >= 0 ? selectedIdx : (availableIdx[0] ?? -1);
 
   function onKeyDown(e: React.KeyboardEvent, index: number) {
@@ -52,56 +55,59 @@ export function ModelControls({ models, selectedModel, onModel, engine, onEngine
           </div>
         </div>
       ) : (
-        <div role="radiogroup" aria-labelledby="model-h" className="mt-3 grid gap-2">
-          {models.map((m, i) => {
-            const active = m.key === selectedModel;
-            const off = !m.available;
-            return (
-              <button
-                key={m.key} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={active}
-                tabIndex={i === tabbableIdx ? 0 : -1} disabled={off || disabled}
-                onClick={() => { if (off) return; onModel(m.key); onModelPicked?.(); }} onKeyDown={(e) => onKeyDown(e, i)}
-                className={`flex items-start gap-3 rounded-control border p-3 text-left transition active:scale-[0.99] disabled:cursor-not-allowed ${
-                  active ? "border-blue bg-blue-soft/50" : "border-line bg-surface hover:border-blue/50"
-                } ${off ? "" : "disabled:opacity-60"}`}
-              >
-                {m.provider === "gemma" ? <Cpu size={20} className={`mt-0.5 text-muted ${off ? "opacity-70" : ""}`} aria-hidden /> : <Lightning size={20} className="mt-0.5 text-blue" aria-hidden />}
-                <span className="min-w-0">
-                  <span className={`block font-medium text-ink ${off ? "opacity-70" : ""}`}>{m.label}</span>{" "}
-                  <span className="block text-sm text-muted">{BLURB[m.key] ?? m.model_id}</span>
-                  {m.provider === "eis" && <>{" "}<span className="mt-1 block text-xs text-muted">via Elastic Inference Service</span></>}
-                  {off && (
-                    <>
-                      {" "}
-                      <span className="mt-1 flex items-center gap-1 text-xs text-flag-ink">
-                        <Plugs size={14} aria-hidden /> <span className="font-medium">Offline</span>{" "}
-                        <span className="text-muted">Start kenneth-gemma-llm to use it</span>
-                      </span>
-                    </>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <h2 id="engine-h" className="mt-5 text-sm font-semibold text-ink">How it calls the model</h2>
-      <ToggleGroup.Root
-        type="single" value={engine} aria-labelledby="engine-h" disabled={disabled}
-        onValueChange={(v) => v && onEngine(v as Engine)}
-        className="mt-3 grid grid-cols-2 gap-1 rounded-control border border-line bg-canvas p-1"
-      >
-        {/* 8px is the concentric radius inside the 10px container (10px minus 4px padding is rounded up for optical balance) */}
-        {([["sdk", "Direct SDK"], ["langchain", "LangChain"]] as const).map(([value, label]) => (
-          <ToggleGroup.Item
-            key={value} value={value}
-            className="min-h-10 rounded-[8px] border border-transparent px-3 py-2 text-sm font-medium text-muted transition disabled:opacity-60 data-[state=on]:border-blue data-[state=on]:bg-blue-soft data-[state=on]:text-blue-strong"
+        <Popover.Root open={open} onOpenChange={setOpen}>
+          <Popover.Trigger
+            disabled={disabled} aria-label={`Model: ${selected?.label ?? "none"}`}
+            className="mt-3 flex w-full items-center gap-3 rounded-control border border-field bg-surface p-3 text-left transition hover:border-blue/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:opacity-60"
           >
-            {label}
-          </ToggleGroup.Item>
-        ))}
-      </ToggleGroup.Root>
+            {selected?.provider === "gemma" ? <Cpu size={20} className="text-muted" aria-hidden /> : <Lightning size={20} className="text-blue" aria-hidden />}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium text-ink">{selected?.label ?? "Choose a model"}</span>
+              {selected && <span className="block truncate text-sm text-muted">{BLURB[selected.key] ?? selected.model_id}</span>}
+            </span>
+            <CaretDown size={16} className="shrink-0 text-muted" aria-hidden />
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="start" sideOffset={6} collisionPadding={12}
+              className="z-30 w-[var(--radix-popover-trigger-width)] min-w-64 rounded-card border border-line bg-surface p-2 shadow-[0_16px_48px_-16px_rgba(14,27,53,0.35)]"
+            >
+              <div role="radiogroup" aria-label="Model" className="grid gap-1">
+                {models.map((m, i) => {
+                  const active = m.key === selectedModel;
+                  const off = !m.available;
+                  return (
+                    <button
+                      key={m.key} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={active}
+                      tabIndex={i === tabbableIdx ? 0 : -1} disabled={off || disabled}
+                      onClick={() => { if (off) return; onModel(m.key); setOpen(false); onModelPicked?.(); }} onKeyDown={(e) => onKeyDown(e, i)}
+                      className={`flex items-start gap-3 rounded-control border p-3 text-left transition active:scale-[0.99] disabled:cursor-not-allowed ${
+                        active ? "border-blue bg-blue-soft/50" : "border-transparent hover:bg-canvas"
+                      } ${off ? "" : "disabled:opacity-60"}`}
+                    >
+                      {m.provider === "gemma" ? <Cpu size={20} className={`mt-0.5 text-muted ${off ? "opacity-70" : ""}`} aria-hidden /> : <Lightning size={20} className="mt-0.5 text-blue" aria-hidden />}
+                      <span className="min-w-0">
+                        <span className={`block font-medium text-ink ${off ? "opacity-70" : ""}`}>{m.label}</span>{" "}
+                        <span className="block text-sm text-muted">{BLURB[m.key] ?? m.model_id}</span>
+                        {m.provider === "eis" && <>{" "}<span className="mt-1 block text-xs text-muted">via Elastic Inference Service</span></>}
+                        {off && (
+                          <>
+                            {" "}
+                            <span className="mt-1 flex items-center gap-1 text-xs text-flag-ink">
+                              <Plugs size={14} aria-hidden /> <span className="font-medium">Offline</span>{" "}
+                              <span className="text-muted">Start kenneth-gemma-llm to use it</span>
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      )}
     </div>
   );
 }
