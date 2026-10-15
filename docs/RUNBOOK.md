@@ -88,7 +88,7 @@ Leave the CronJob suspended between demos. The traffic generator is the only par
 | Traffic generator (every 5 minutes, 07:00 to 22:00 SGT) | about $0.0005 to $0.002 per request on the EIS mix (re-measure after the EIS deploy) | `demo_down.sh` (suspend) |
 | LLM calls (EIS, per million tokens, billed by Elastic) | GPT-5.4 mini is the default and cheapest; see `backend/prices.yaml` for the assumed rates | `demo_down.sh` (suspend the generator) |
 | Gemma VM (A100) | about $5 to $6 per hour while running, about $2 for the 23 minute test. A stopped VM that keeps its Local SSD may still incur Local SSD storage charges (a Preview feature) | `demo_down.sh`, auto stop after 180 minutes. Check charges in Cloud Billing, filtering SKUs on Compute Engine for project `elastic-sa`, or run `gcloud compute instances describe kenneth-gemma-llm --zone=asia-southeast1-c --format='value(disks)'` to see the Local SSD. `GEMMA_DISCARD_SSD=1 deploy/scripts/gemma.sh stop` discards the SSD to avoid that charge, at the price of a slower next boot and loss of its data. Default is to keep it |
-| Pods, Elastic ingest | negligible | `teardown.sh` scales the app to 0 |
+| Pods, the app's own Elastic ingest | negligible (the app and feeder are under 1 percent of the Observability project's ingest; see "Usage and billing alerts" for what dominates) | `teardown.sh` scales the app to 0 |
 | Static IP `glassbox-ip` | free while attached to the load balancer; about $7 per month once unattached (after `--teardown`) | release with `gcloud compute addresses delete glassbox-ip --global --project=elastic-sa` only if you will not redeploy (a new IP changes the host name) |
 
 Safety net: the traffic generator has `concurrencyPolicy: Forbid`, a run deadline, a hard cap of 5 requests per run, and the cost alert fires above 0.25 USD per hour.
@@ -147,3 +147,25 @@ with TAGGED synthetic data (`tags: synthetic`). Details, key creation and the ex
 * Job fails with "FEEDER_KEY is not set": run `deploy/scripts/create_secrets.sh` after adding `OBSERVABILITY_FEEDER_API_KEY` to elasticsearch.txt.
 * Coverage: `cd backend && python -m feeder coverage --group all -v`. Disclose that this data is synthetic in demos.
 
+
+## Usage and billing alerts
+A project API key cannot read billing (that needs an Elastic Cloud API key), so seven general rules in `elastic/rules/usage_alerts.py` watch the sources of the bill in **all three serverless projects** (Observability, Security, Search) and email kenneth.foo@elastic.co (connector `Elastic-Cloud-SMTP`, once per 24 hours while active). They are not specific to this app. Apply with `python -m elastic.apply --project all --usage-alerts-only` (or one project; Search only ever gets these rules). Lower a threshold with `--alert-override usage-ai-tokens-day=1000`. The queries use `unmapped_fields="nullify"`, so a project with no AI usage yet returns no rows instead of an error and starts alerting when usage appears.
+
+| Rule id | Fires when |
+|---|---|
+| `usage-ai-tokens-day` | AI tokens over 50M in 24h (`.kibana-inference-token-usage*`, every Elastic managed inference call) |
+| `usage-ai-tokens-burst` | one model and feature over 10M tokens in 1h |
+| `usage-ai-calls-burst` | one feature over 2000 AI calls in 1h (a runaway loop, even on a cheap model) |
+| `usage-ai-new-model` | a model id first seen in the last hour (catches a changed default connector) |
+| `usage-workflow-runs` | one workflow over 1000 executions in 24h (billed per execution) |
+| `usage-ingest-total` | over 100M documents in 24h across all non-hidden indices |
+| `usage-ingest-dataset` | one data stream over 20M documents in 24h |
+
+Where the 2026-10 bill came from: a scheduled workflow (an Agent Builder agent every 5 minutes on Opus) plus a 1 minute workflow, both stopped; Kibana only, not in this repo. For dollars, also set a budget alert in the Elastic Cloud console under Billing.
+
+### Findings from the 2026-10 billing review
+* **LLM tokens were about three quarters of the bill.** Cause: a scheduled workflow (`build-topologies`, an Agent Builder agent every 5 minutes on Opus, looping into `identify-entity-by-service-name`) and a 1 minute case auto-close workflow. Both were stopped or deleted in Kibana (not in this repo); definitions were backed up locally. Check recent usage any time: `FROM .kibana-inference-token-usage* | WHERE @timestamp > NOW() - 1 hour | STATS calls = COUNT(*), tokens = SUM(token_usage.total_tokens) BY model = model.model_id, feature = inference.feature_id`.
+* **Workflows are listed and edited through the Kibana API** (`GET /api/workflows`, `PUT` or `DELETE /api/workflows/workflow/{id}`).
+* **Syslog flood from `kenneth-defend-ubuntu` (16M documents a day, about a third of ingest):** the host runs an OSPF containerlab lab; the lab's OTel collector had a `debug` exporter at `verbosity: detailed` and Docker had no log cap, so its json log reached 23.5 GB, the 39 GB disk filled, and `dockerd` then logged every failed write into syslog. Fixed by truncating the log, setting `verbosity: basic` (log now about 12 MB a day), and writing `/etc/docker/daemon.json` (active only after a Docker restart). Backup of the changed config sits next to it as `otel-collector.yml.bak-before-basic`.
+* **Remaining ingest is the `kenneth-gke` cluster** (Kubernetes and hostmetrics collectors overlap) **and the OTel demo**; options are listed under Pending in `README.md`.
+* **Alert instance ids:** a rule row needs a stable `BY` key, otherwise every run is a new alert and the daily throttle is bypassed (fixed with a constant `scope` column).

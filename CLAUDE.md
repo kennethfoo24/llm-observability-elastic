@@ -12,6 +12,7 @@ Demo RAG chatbot "Foo Corp HR Assistant" (product name LLM Observability) showin
 - Backend tests: `cd backend && pytest -q` (feeder volume tests are slow; they carry `@pytest.mark.timeout(240)`).
 - Elastic and deploy tests: `pytest -q elastic deploy`. Frontend: `cd frontend && npm ci && npm run typecheck && npm test`.
 - Deploy: build runs in GitHub Actions; deploy by digest with `IMAGE=docker.io/kennethfoo24/glassbox@sha256:<64 hex> bash deploy/scripts/deploy.sh` (it applies the traffic generator CronJob unsuspended, so deploy means traffic on). Wait for CI success before deploying; never deploy with an empty digest.
+- Usage alerts (AI tokens, workflows, ingest; email, all three projects): `python -m elastic.apply --project all --usage-alerts-only`. The Search project only ever gets these rules. Billing is not readable with a project key.
 - Feeder: `cd backend && python -m feeder coverage --group all`; ticks run via the `synthetic-data-feeder` CronJob. Uses a narrow API key named `synthetic-data-feeder`.
 
 ## Feeder rules (`backend/feeder`)

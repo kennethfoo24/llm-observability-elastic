@@ -11,7 +11,7 @@ Internal ids keep the old `glassbox-` prefix (service name, dashboards, k8s obje
 - **Tracing:** OpenTelemetry GenAI spans (prompt and response content captured) for guardrail, retrieval, prompt build, LLM and cost steps, visible in Kibana APM.
 - **Guardrails:** inline check in the app plus an ingest pipeline running eland models (prompt-injection DeBERTa, NER DistilBERT, sentiment, zero-shot, language ID), a canary token, and an LLM-as-judge via the EIS `inference` processor. A detection rule in the Security project alerts on flagged prompts.
 - **Conversation quality:** negative/positive sentiment, failure to answer, language mismatch and topic relevance scored per exchange.
-- **Cost:** per-request cost on the root span (`prices.yaml`), a spend dashboard and an hourly spend alert.
+- **Cost:** per-request cost on the root span (`prices.yaml`), a spend dashboard and an hourly spend alert. General usage alerts (AI tokens and calls, workflow executions, ingested documents) email on budget breaches in all three serverless projects (`docs/RUNBOOK.md`, "Usage and billing alerts").
 - **OWASP LLM Top 10:** strong coverage LLM01/02/08/10, partial 04/05/07/09, visibility only 03/06 (see `docs/DEMO.md`).
 - **Synthetic data feeder:** a CronJob (every 5 minutes) that backfills and keeps filling the out-of-the-box integration dashboards. All documents are tagged `synthetic` and `synthetic-data-feeder` so they filter out easily. See `docs/feeder.md`.
 
@@ -23,7 +23,7 @@ Internal ids keep the old `glassbox-` prefix (service name, dashboards, k8s obje
 | `backend/feeder` | Synthetic data feeder (framework, generators per integration group, coverage tool) |
 | `backend/trafficgen` | Chat traffic generator CronJob |
 | `frontend` | React UI |
-| `elastic` | Dashboards, rules, templates and `python -m elastic.apply --project observability\|security` |
+| `elastic` | Dashboards, rules, templates and `python -m elastic.apply --project observability\|security\|search\|all` (`--usage-alerts-only` for just the usage alerts) |
 | `deploy` | k8s manifests and scripts (`deploy.sh`, `demo_up.sh`, `demo_down.sh`, `gemma.sh`, secrets) |
 | `scripts` | Seeding, key minting, model import, pipeline install, poison demo |
 | `docs` | `RUNBOOK.md`, `DEMO.md`, `feeder.md`, verification notes |
@@ -56,4 +56,8 @@ Check any time: `cd backend && python -m feeder coverage --group all` (reports E
 - **Friendly hostname:** still the sslip.io address; DuckDNS or an own domain would give a nicer name at no cost.
 - **Real AI integration accounts:** the feeder fakes them; decide which have real accounts (Claude Code telemetry is free to wire up).
 - **Gemma:** decide on Local SSD (`GEMMA_DISCARD_SSD`) and whether `prices.yaml` should use measured throughput. VM is stopped and its `/metrics` is locked.
+- **Ingest is the main remaining cost:** about 100 GB a day (estimate) comes from the `kenneth-gke` cluster (Kubernetes and hostmetrics collectors overlap, about 40 to 55 GB) and the OpenTelemetry demo on it (about 28 GB). Decide: scale the demo to 0 when idle, raise collection periods to 60s, drop the netflow input, set 1 to 3 day retention on noisy streams.
+- **Docker log cap on `kenneth-defend-ubuntu`:** `/etc/docker/daemon.json` is written (`max-size` 50m, 3 files) but only applies after a Docker restart or lab redeploy (live-restore is off, so a restart bounces all lab containers). Also consider a disk alert (`system.filesystem.used.pct` above 0.85).
+- **Cloud billing alert:** project API keys cannot read billing; set a budget alert in the Elastic Cloud console, or provide a Cloud API key to pull ECU numbers.
+- **Rotate exposed credentials:** the project API keys and the lab Fleet enrollment token were printed in a session transcript; rotate them.
 - **Visual checks in Kibana** not yet done: Lens panel rendering, the new Discover and Dev Tools links, Dev Tools console URL format.

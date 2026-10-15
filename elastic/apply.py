@@ -19,7 +19,7 @@ from elastic.dashboards.panels import DASHBOARDS  # noqa: E402
 from app.doc_scan_pipeline import PIPELINE_ID as DOC_SCAN_PIPELINE_ID  # noqa: E402
 from app.doc_scan_pipeline import STAGING_INDEX, build_doc_scan_pipeline, index_body  # noqa: E402
 
-from elastic.rules import cost_alert, doc_integrity, guardrail_detection, owasp_detections, quality_alerts  # noqa: E402
+from elastic.rules import cost_alert, doc_integrity, guardrail_detection, owasp_detections, quality_alerts, usage_alerts  # noqa: E402
 from elastic.templates import (  # noqa: E402
     COMPONENT_NAME, DEFAULT_TEMPLATE, INDEX_TEMPLATE_NAME, build_component, build_index_template)
 
@@ -162,22 +162,48 @@ def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality
         _upsert_detection(p, dry_run)
 
 
+def _delete_rule(p: Project, rule_id: str, dry: bool) -> None:
+    path = f"/api/alerting/rule/{rule_id}"
+    status, _ = p.kb("GET", path)
+    if status != 200:
+        return
+    _say(f"[{p.name}] rule {rule_id}: delete (retired)", dry)
+    if not dry:
+        status, resp = p.kb("DELETE", path)
+        if status not in (200, 204):
+            _fail("rule delete", status, resp)
+
+
+def apply_usage_alerts(p: Project, dry_run: bool, overrides: dict[str, float] | None = None) -> None:
+    """General usage alerts: the same rules in every serverless project (Observability, Security, Search)."""
+    for rid in usage_alerts.RETIRED_IDS:
+        _delete_rule(p, rid, dry_run)
+    for rid, body in usage_alerts.all_rules(overrides).items():
+        _upsert_rule(p, rid, body, dry_run)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--project", choices=["observability", "security", "all"], required=True)
+    ap.add_argument("--project", choices=["observability", "security", "search", "all"], required=True)
     ap.add_argument("--cost-threshold", type=float, default=0.25)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only-quality", action="store_true",
                     help="only the genai-quality templates, pipeline and logs@custom hook (no rules or dashboards)")
+    ap.add_argument("--usage-alerts-only", action="store_true",
+                    help="only the general usage alert rules (the only thing applied to the search project)")
     ap.add_argument("--alert-override", action="append", default=[], metavar="RULE_ID=VALUE",
                     help="proof only: temporarily set one quality alert threshold (re-run without it to restore)")
     a = ap.parse_args()
     overrides = {k: float(v) for k, v in (x.split("=", 1) for x in a.alert_override)}
-    unknown = set(overrides) - set(quality_alerts.BY_ID)
+    unknown = set(overrides) - set(quality_alerts.BY_ID) - set(usage_alerts.BY_ID)
     if unknown:
         raise SystemExit(f"unknown alert id: {sorted(unknown)}")
-    for name in (["observability", "security"] if a.project == "all" else [a.project]):
-        apply_project(Project(name), a.cost_threshold, a.dry_run, a.only_quality, overrides)
+    for name in (list(usage_alerts.PROJECTS) if a.project == "all" else [a.project]):
+        p = Project(name)
+        if name != "search" and not a.usage_alerts_only:
+            apply_project(p, a.cost_threshold, a.dry_run, a.only_quality, overrides)
+        if not a.only_quality:
+            apply_usage_alerts(p, a.dry_run, overrides)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ prompts score NEGATIVE), so alerts use `user_sentiment`.
 Limit: `hidden_count` counts catalog matches (RRF top 8), not relevance, so it only means something together with `answered == false`.
 Rules have no actions (they fire silently and show in Kibana).
 
+The general usage alert rules (`rules/usage_alerts.py`, ids `usage-*`) are different: they are not app specific, exist in all three projects (Observability, Security, Search) and email once per day while active. See `docs/RUNBOOK.md`, "Usage and billing alerts".
+
 ## Security detection rules (KQL on `logs-genai_response*`, every 1m)
 
 | Rule id | Query | Severity | OWASP |
