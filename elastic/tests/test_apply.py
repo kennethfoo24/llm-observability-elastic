@@ -185,3 +185,59 @@ def test_install_pipeline_security_without_sec_env_fails_clearly(tmp_path):
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "install_pipeline.py"), "--project", "security"],
                        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
     assert r.returncode != 0 and "SEC_ES_URL" in r.stderr and "Traceback" not in r.stderr.split("SEC_ES_URL")[0][-200:]
+
+
+HANDMADE_IDS = {"ea67e371-a99e-43ab-b3a8-eb577af00c58", "c594777c-8647-4005-8b0c-b1fc7f14dbf1"}
+
+
+def test_handmade_dashboard_export_is_in_the_repo_and_holds_exactly_the_two_linked_dashboards():
+    from elastic.apply import DASH_DIR
+
+    objs = [json.loads(line) for line in (DASH_DIR / "handmade.ndjson").read_text().splitlines() if line.strip()]
+    assert {o["id"] for o in objs if o["type"] == "dashboard"} == HANDMADE_IDS
+    text = (DASH_DIR / "handmade.ndjson").read_text().lower()
+    assert not any(w in text for w in ("api_key", "apikey", "authorization", "password"))
+
+
+def test_apply_imports_the_handmade_dashboards_into_observability_only():
+    imported = {"observability": [], "security": []}
+
+    def make(name):
+        def handler(req):
+            if req.url.path == "/api/saved_objects/_import":
+                imported[name].append(req.content.decode(errors="ignore"))
+                return httpx.Response(200, json={"success": True, "successCount": 1})
+            return httpx.Response(200, json={"acknowledged": True})
+        return handler
+
+    apply_project(_project(make("observability")), cost_threshold=0.25, dry_run=False)
+    apply_project(_project(make("security"), "security"), cost_threshold=0.25, dry_run=False)
+    assert any(all(i in body for i in HANDMADE_IDS) for body in imported["observability"])
+    assert not any(i in body for body in imported["security"] for i in HANDMADE_IDS)
+
+
+def test_dry_run_reports_the_handmade_dashboards_without_importing(capsys):
+    writes = []
+
+    def handler(req):
+        if req.method != "GET":
+            writes.append(req.url.path)
+        return httpx.Response(404, json={})
+
+    apply_project(_project(handler), cost_threshold=0.25, dry_run=True)
+    assert writes == []
+    assert "handmade" in capsys.readouterr().out
+
+
+def test_handmade_dashboard_import_failure_is_detected():
+    import pytest
+
+    def handler(req):
+        if req.url.path == "/api/saved_objects/_import":
+            body = req.content.decode(errors="ignore")
+            ok = not any(i in body for i in HANDMADE_IDS)
+            return httpx.Response(200, json={"success": ok, "errors": [{"id": "ea67e371-a99e-43ab-b3a8-eb577af00c58"}]})
+        return httpx.Response(200, json={"acknowledged": True})
+
+    with pytest.raises(SystemExit):
+        apply_project(_project(handler), cost_threshold=0.25, dry_run=False)

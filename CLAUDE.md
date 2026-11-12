@@ -5,10 +5,12 @@ Demo RAG chatbot "Foo Corp HR Assistant" (product name LLM Observability) showin
 ## Conventions
 - Internal ids keep the `glassbox-` prefix (service name, dashboards, k8s objects, images). Do not rename them.
 - Elastic Serverless: Observability project (GCP) holds everything; Security project (AWS) holds the detection rule. `python -m elastic.apply` needs `--project observability|security`.
+- The app links to two hand-made Kibana dashboards (OWASP Top 10 `ea67e371-a99e-43ab-b3a8-eb577af00c58`, Conversation Quality `c594777c-8647-4005-8b0c-b1fc7f14dbf1`); they live in `elastic/dashboards/handmade.ndjson` and are imported by `elastic.apply` (Observability only). Conversation history is browser-only (`localStorage`), never server-side.
 - Never commit secrets: `elasticsearch.txt`, `backend/secrets/`, `*.env` are gitignored. `.superpowers/` is gitignored scratch; never add it.
 - Never print the demo password or any API key in output.
 
 ## Commands
+- UI development: `python scripts/dev_stub_server.py` (offline backend on :8000, no Elastic or EIS) plus `cd frontend && npm run dev`. The UI bundles its fonts, icons, logos and photos; never add runtime calls to third-party hosts.
 - Backend tests: `cd backend && pytest -q` (feeder volume tests are slow; they carry `@pytest.mark.timeout(240)`).
 - Elastic and deploy tests: `pytest -q elastic deploy`. Frontend: `cd frontend && npm ci && npm run typecheck && npm test`.
 - Deploy: build runs in GitHub Actions; deploy by digest with `IMAGE=docker.io/kennethfoo24/glassbox@sha256:<64 hex> bash deploy/scripts/deploy.sh` (it applies the traffic generator CronJob unsuspended, so deploy means traffic on). Wait for CI success before deploying; never deploy with an empty digest.

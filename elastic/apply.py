@@ -145,6 +145,17 @@ def _import_dashboards(p: Project, dry: bool) -> None:
                 _fail("dashboard import", status, errors)
 
 
+def _import_handmade_dashboards(p: Project, dry: bool) -> None:
+    """The hand-made OWASP Top 10 and Conversation Quality dashboards the app links to (exported from Kibana, saved as-is)."""
+    ndjson = (DASH_DIR / "handmade.ndjson").read_text()
+    _say(f"[{p.name}] handmade dashboards (OWASP Top 10, Conversation Quality): import overwrite", dry)
+    if not dry:
+        status, result = p.kb_import(ndjson)
+        if status != 200 or not isinstance(result, dict) or result.get("success") is not True:
+            errors = result.get("errors") if isinstance(result, dict) else result
+            _fail("handmade dashboard import", status, errors)
+
+
 def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality: bool = False,
                   alert_overrides: dict[str, float] | None = None) -> None:
     _put_templates(p, dry_run)
@@ -158,6 +169,7 @@ def apply_project(p: Project, cost_threshold: float, dry_run: bool, only_quality
         _put_doc_scan(p, dry_run)
         _upsert_rule(p, doc_integrity.RULE_ID, doc_integrity.rule_body(), dry_run)
         _import_dashboards(p, dry_run)
+        _import_handmade_dashboards(p, dry_run)
     if p.name == "security":
         _upsert_detection(p, dry_run)
 

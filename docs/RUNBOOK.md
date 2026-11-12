@@ -120,7 +120,7 @@ Current state at the time of writing: the CronJob is suspended and the Gemma VM 
 3. `python -m elastic.apply --project observability` and `--project security` (use `--dry-run` first). This installs the typed template, the `genai-quality` pipeline (with the canary as a pipeline parameter), the `logs@custom` hook, the six quality alert rules, the three Security detection rules and the three dashboards. Mapping changes reach NEW backing indices only: after changing the typed fields run `POST logs-genai_response.otel-default/_rollover` once.
 4. Doc scan demo: `python scripts/poison_demo.py` and, when done, `python scripts/poison_demo.py --cleanup` (the document integrity alert stays active until the poisoned staging documents are removed).
 
-**Personas.** Two: Maya (employee) and Priya (manager). Restricted documents are hidden from Maya by document level security; hidden matches only show up as `quality.hidden_count`.
+**Personas.** Two: Maya Lim (employee) and Daniel Ong (manager). Restricted documents are hidden from Maya by document level security; hidden matches only show up as `quality.hidden_count`.
 
 **What runs where.** The app emits one `genai_response` log per answered request. Ingest pipeline `genai-quality` scores it: language (`lang_ident_model_1`), eland sentiment (raw, binary) and zero-shot topic (raw), NER and regex PII, markup and canary checks, and an LLM judge (faithfulness, relevance, answered, 3 class user sentiment, `on_topic`). Security gets the deterministic subset only. Rules: `elastic/README.md` lists every alert, detection rule and dashboard with its OWASP id.
 

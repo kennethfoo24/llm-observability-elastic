@@ -41,6 +41,10 @@ The general usage alert rules (`rules/usage_alerts.py`, ids `usage-*`) are diffe
 | glassbox-overview | LLM Observability: Overview | cost, tokens, guardrail verdicts, latency |
 | glassbox-quality | LLM Observability: Conversation quality | two full width list tables first (answered prompts, responses and flags; blocked and flagged guardrail prompts), then answered rate, top unanswered prompts, sentiment, language mismatch, topics, off topic rate, faithfulness, relevance, flagged reasons |
 | glassbox-owasp | LLM Observability: OWASP LLM Top 10 coverage | live evidence per risk (LLM01, 02, 05, 07, 08, 09, 10), model usage for LLM03 and LLM06 (visibility only), risk to control table |
+| ea67e371-a99e-43ab-b3a8-eb577af00c58 | LLM Observability: OWASP LLM Top 10 coverage (hand-made) | linked from the app's Security section header |
+| c594777c-8647-4005-8b0c-b1fc7f14dbf1 | LLM Observability: Conversation Quality (hand-made) | linked from the app's Quality section header |
+
+The two hand-made dashboards were built in Kibana and exported to `dashboards/handmade.ndjson` (saved objects export, panels embedded, no secrets); `apply` imports that file with overwrite into the Observability project only. To refresh after editing them in Kibana, re-export both dashboard ids with `POST /api/saved_objects/_export` (`includeReferencesDeep: true`, `excludeExportDetails: true`) and replace the file. The app links to these two; the generated `glassbox-owasp` and `glassbox-quality` are no longer linked from the UI.
 
 ## Document scan demo (LLM04, indirect LLM01)
 

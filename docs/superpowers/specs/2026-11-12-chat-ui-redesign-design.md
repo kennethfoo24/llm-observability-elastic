@@ -181,4 +181,4 @@ No new mock mode is needed.
 
 ## Pending (add to README "Pending" when this lands)
 
-- The OWASP Top 10 and quality dashboards the panel now links to (`ea67e371…`, `c594777c…`) were made by hand in Kibana and are not in `elastic/`. A rebuilt Observability project would break those links until the dashboards are exported into `elastic/dashboards` and applied by `python -m elastic.apply`. Decide whether they supersede `glassbox-owasp` and `glassbox-quality`.
+- The OWASP Top 10 and quality dashboards the panel now links to (`ea67e371…`, `c594777c…`) were made by hand in Kibana. Resolved after this spec: they are exported to `elastic/dashboards/handmade.ndjson` and imported by `python -m elastic.apply`. Still open: whether they supersede `glassbox-owasp` and `glassbox-quality`.

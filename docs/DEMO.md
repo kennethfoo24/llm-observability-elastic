@@ -49,7 +49,7 @@ Open the Red team menu (the pink shield icon next to the Send button; sections S
 | Language mismatch demo: open any English answer's "Try it in Dev Tools" and edit `genai.response_text` to a French or Spanish sentence of 30 or more characters. | "If the assistant ever answers in a different language than the question, this flags it." | `quality.lang_mismatch` true. |
 | Red team, Quality: "Rude and negative", then "Positive feedback". | "User sentiment is read by the LLM judge on three classes; the eland model's binary label is kept as the raw signal." | `quality.user_sentiment` negative, then positive. `quality.sentiment_label` is the raw binary signal (neutral prompts read NEGATIVE), so alerts use `user_sentiment`. |
 | Red team, Quality: "Unanswerable" (CEO's favourite colour). | "Failures to answer are tracked too." | `quality.answered` is false. |
-| In View More, click "Quality dashboard" (Quality header), then "OWASP Top 10 dashboard" (Security header). | "Every answer rolls up here: sentiment, language, topic, answered, and each OWASP risk." | The hand-made quality and OWASP Top 10 dashboards (not in `elastic/`, see README Pending). Allow a minute for the latest answers to appear. |
+| In View More, click "Quality dashboard" (Quality header), then "OWASP Top 10 dashboard" (Security header). | "Every answer rolls up here: sentiment, language, topic, answered, and each OWASP risk." | The hand-made quality and OWASP Top 10 dashboards (saved in `elastic/dashboards/handmade.ndjson`). Allow a minute for the latest answers to appear. |
 
 Exact findings depend on the live model answers, so treat the Expect column as what to look for.
 
