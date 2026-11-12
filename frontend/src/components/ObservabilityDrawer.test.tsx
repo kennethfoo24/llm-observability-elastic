@@ -65,3 +65,15 @@ test("has no axe violations open or closed", async () => {
   await screen.findByRole("complementary");
   expect(await axe(open.container)).toHaveNoViolations();
 });
+
+test("Escape that a popover already handled does not close the drawer", async () => {
+  desktop(true);
+  const onClose = vi.fn();
+  render(<ObservabilityDrawer open onClose={onClose}><a href="#x">inside</a></ObservabilityDrawer>);
+  await screen.findByRole("complementary");
+  const eat = (e: KeyboardEvent) => e.preventDefault();
+  document.addEventListener("keydown", eat, true);
+  await userEvent.keyboard("{Escape}");
+  document.removeEventListener("keydown", eat, true);
+  expect(onClose).not.toHaveBeenCalled();
+});

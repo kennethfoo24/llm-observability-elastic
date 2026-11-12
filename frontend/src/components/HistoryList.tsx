@@ -28,7 +28,7 @@ export function HistoryList({ conversations, activeId, pending, query, onOpen, o
     <>
       <div className="flex items-center justify-between border-b border-line px-6 pb-3 pt-4 text-[13px] text-muted">
         <h2 className="font-normal">Your conversations</h2>
-        <button type="button" disabled={conversations.length === 0} onClick={() => setConfirmAll(true)} className="font-medium text-blue hover:underline disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="button" disabled={conversations.length === 0 || pending} onClick={() => setConfirmAll(true)} className="font-medium text-blue hover:underline disabled:cursor-not-allowed disabled:opacity-40">
           Clear All
         </button>
       </div>
@@ -36,7 +36,7 @@ export function HistoryList({ conversations, activeId, pending, query, onOpen, o
         <div role="alertdialog" aria-label="Clear all conversations" className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-2xl bg-flag-soft px-4 py-2 text-[13px] text-flag-ink">
           <span>Delete all conversations?</span>
           <span className="flex gap-1">
-            <button type="button" onClick={() => { setConfirmAll(false); onClearAll(); }} className="rounded-full bg-flag-ink px-3 py-1 font-medium text-white">Yes, clear all</button>
+            <button type="button" disabled={pending} onClick={() => { setConfirmAll(false); onClearAll(); }} className="rounded-full bg-flag-ink px-3 py-1 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">Yes, clear all</button>
             <button type="button" onClick={() => setConfirmAll(false)} className="rounded-full px-3 py-1 font-medium">Cancel</button>
           </span>
         </div>
@@ -55,7 +55,7 @@ export function HistoryList({ conversations, activeId, pending, query, onOpen, o
                     {renamingId === c.id ? (
                       <input
                         autoFocus aria-label="Rename conversation" value={draft} onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") commitRename(c.id); if (e.key === "Escape") setRenamingId(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") commitRename(c.id); if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); } }}
                         onBlur={() => setRenamingId(null)}
                         className="m-1 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-[15px] text-ink outline-none focus:border-blue"
                       />
@@ -71,7 +71,7 @@ export function HistoryList({ conversations, activeId, pending, query, onOpen, o
                     )}
                     {confirmId === c.id ? (
                       <span className="flex shrink-0 gap-1 text-xs">
-                        <button type="button" onClick={() => { setConfirmId(null); onDelete(c.id); }} className="rounded-full bg-flag-ink px-2 py-1 font-medium text-white">Confirm delete</button>
+                        <button type="button" disabled={pending} onClick={() => { setConfirmId(null); onDelete(c.id); }} className="rounded-full bg-flag-ink px-2 py-1 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">Confirm delete</button>
                         <button type="button" onClick={() => setConfirmId(null)} className="rounded-full px-2 py-1 font-medium text-ink">Cancel</button>
                       </span>
                     ) : (

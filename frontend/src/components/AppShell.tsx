@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { CloseCircleIcon } from "./icons";
 import { MeshBackground } from "./MeshBackground";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
@@ -22,10 +23,25 @@ export function AppShell({ sidebar, thread, composer, cost, menuButton, drawer, 
     if (!open) return;
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panel.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseRef.current(); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { if (!e.defaultPrevented) onCloseRef.current(); return; }
+      if (e.key !== "Tab") return;
+      // keep Tab inside the dialog: aria-modal says the page behind is inert
+      const nodes = Array.from(panel.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []);
+      if (nodes.length === 0) return e.preventDefault();
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement;
+      const inside = panel.current?.contains(active) ?? false;
+      if (!inside || (!e.shiftKey && active === last)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && (active === first || active === panel.current)) { e.preventDefault(); last.focus(); }
+    };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
       opener.current?.focus();
     };
   }, [open]);
@@ -48,6 +64,9 @@ export function AppShell({ sidebar, thread, composer, cost, menuButton, drawer, 
             <div data-testid="sidebar-scrim" className="fixed inset-0 z-40 bg-ink/50" onClick={onSidebarClose} aria-hidden />
             <div ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Conversation history" className="fixed inset-y-0 left-0 z-50 w-[min(320px,88vw)] p-3 outline-none">
               {sidebar}
+              <button type="button" onClick={onSidebarClose} aria-label="Close conversations" className="absolute right-6 top-6 grid size-9 place-items-center rounded-full bg-canvas text-ink transition hover:bg-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue">
+                <CloseCircleIcon size={20} />
+              </button>
             </div>
           </>
         )}

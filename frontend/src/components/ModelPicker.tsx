@@ -44,7 +44,7 @@ export function ModelPicker({ models, selected, onChange }: { models: ModelInfo[
         <ChevronUpIcon size={15} className="mr-2 shrink-0 text-muted" />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="top" align="center" sideOffset={8} collisionPadding={12} className="z-30 w-[var(--radix-popover-trigger-width)] rounded-[20px] bg-white p-2 shadow-[0_18px_50px_rgba(17,24,39,.16),0_0_0_1px_var(--color-line)]">
+        <Popover.Content aria-label="Choose a model" side="top" align="center" sideOffset={8} collisionPadding={12} className="z-30 w-[var(--radix-popover-trigger-width)] rounded-[20px] bg-white p-2 shadow-[0_18px_50px_rgba(17,24,39,.16),0_0_0_1px_var(--color-line)]">
           <div role="radiogroup" aria-label="Model" className="grid gap-0.5">
             {models.map((m, i) => {
               const active = m.key === selected;

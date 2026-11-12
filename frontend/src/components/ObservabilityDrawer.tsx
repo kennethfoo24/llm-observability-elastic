@@ -19,7 +19,8 @@ export function ObservabilityDrawer({ open, onClose, children }: { open: boolean
     if (!active) return;
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseRef.current(); };
+    // a popover that handled Escape has already prevented it, so the drawer stays open
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented) onCloseRef.current(); };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);

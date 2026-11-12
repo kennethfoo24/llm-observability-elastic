@@ -22,7 +22,7 @@ export function RedTeamMenu({ onPick, disabled }: { onPick: (text: string) => vo
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side="top" align="end" sideOffset={8} collisionPadding={12}
+          aria-label="Red team prompts" side="top" align="end" sideOffset={8} collisionPadding={12}
           className="z-30 max-h-[min(34rem,var(--radix-popover-content-available-height))] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto overscroll-contain rounded-card border border-line bg-surface p-3 shadow-[0_16px_48px_-16px_rgba(14,27,53,0.35)]"
         >
           {sections.map((section) => (

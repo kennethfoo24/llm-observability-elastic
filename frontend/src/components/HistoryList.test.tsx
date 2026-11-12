@@ -90,3 +90,30 @@ test("shows an empty hint when there is no history", () => {
   expect(screen.getByText(/conversations you start will appear here/i)).toBeInTheDocument();
   expect(within(screen.getByRole("button", { name: "Clear All" }).parentElement!).getByRole("button", { name: "Clear All" })).toBeDisabled();
 });
+
+test("while a request is pending Clear All is disabled", () => {
+  render(<HistoryList {...base} pending />);
+  expect(screen.getByRole("button", { name: "Clear All" })).toBeDisabled();
+});
+
+test("a confirmation opened before a request started cannot be confirmed while it is pending", async () => {
+  const onDelete = vi.fn();
+  const onClearAll = vi.fn();
+  const { rerender } = render(<HistoryList {...base} onDelete={onDelete} onClearAll={onClearAll} />);
+  await userEvent.click(screen.getByRole("button", { name: "Delete Old question" }));
+  await userEvent.click(screen.getByRole("button", { name: "Clear All" }));
+  rerender(<HistoryList {...base} pending onDelete={onDelete} onClearAll={onClearAll} />);
+  expect(screen.getByRole("button", { name: "Confirm delete" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Yes, clear all" })).toBeDisabled();
+});
+
+test("Escape while renaming is consumed so it does not also close a panel", async () => {
+  render(<HistoryList {...base} />);
+  await userEvent.click(screen.getByRole("button", { name: "Rename Old question" }));
+  const seen: boolean[] = [];
+  const spy = (e: KeyboardEvent) => seen.push(e.defaultPrevented);
+  window.addEventListener("keydown", spy);
+  await userEvent.keyboard("{Escape}");
+  window.removeEventListener("keydown", spy);
+  expect(seen).toEqual([true]);
+});

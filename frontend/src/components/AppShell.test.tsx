@@ -56,3 +56,40 @@ test("pins the chat column track so long thread content cannot widen the page", 
   render(<AppShell {...slots} />);
   expect(screen.getByRole("main").className).toContain("min-w-0");
 });
+
+test("the off-canvas sidebar has a labelled close button, locks scroll and releases it", async () => {
+  media(false);
+  const onSidebarClose = vi.fn();
+  document.body.style.overflow = "";
+  const { rerender } = render(<AppShell {...slots} sidebarOpen onSidebarClose={onSidebarClose} />);
+  expect(document.body.style.overflow).toBe("hidden");
+  await userEvent.click(screen.getByRole("button", { name: "Close conversations" }));
+  expect(onSidebarClose).toHaveBeenCalledTimes(1);
+  rerender(<AppShell {...slots} onSidebarClose={onSidebarClose} />);
+  expect(document.body.style.overflow).toBe("");
+});
+
+test("Tab wraps inside the open off-canvas sidebar instead of escaping to the page", async () => {
+  media(false);
+  render(<AppShell {...slots} sidebarOpen />);
+  const dialog = screen.getByRole("dialog", { name: "Conversation history" });
+  const close = screen.getByRole("button", { name: "Close conversations" });
+  const side = screen.getByRole("button", { name: "side action" });
+  side.focus();
+  await userEvent.tab();
+  expect(dialog).toContainElement(document.activeElement as HTMLElement);
+  expect(document.activeElement).toBe(close);
+  await userEvent.tab({ shift: true });
+  expect(document.activeElement).toBe(side);
+});
+
+test("Escape that something else already handled does not close the sidebar", async () => {
+  media(false);
+  const onSidebarClose = vi.fn();
+  render(<AppShell {...slots} sidebarOpen onSidebarClose={onSidebarClose} />);
+  const eat = (e: KeyboardEvent) => e.preventDefault();
+  document.addEventListener("keydown", eat, true);
+  await userEvent.keyboard("{Escape}");
+  document.removeEventListener("keydown", eat, true);
+  expect(onSidebarClose).not.toHaveBeenCalled();
+});

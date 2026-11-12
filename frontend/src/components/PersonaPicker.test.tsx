@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 import { PersonaPicker } from "./PersonaPicker";
 import type { Persona } from "../lib/types";
 
@@ -49,4 +50,31 @@ test("an unknown persona id gets an initials avatar and does not crash", () => {
 test("renders nothing harmful while personas are still loading", () => {
   render(<PersonaPicker personas={[]} selected="" onChange={vi.fn()} />);
   expect(screen.getByTestId("persona-skeleton")).toBeInTheDocument();
+});
+
+test("roving tabindex: only the selected person is tabbable", async () => {
+  render(<PersonaPicker personas={people} selected="manager" onChange={vi.fn()} />);
+  await userEvent.click(screen.getByRole("button", { name: /Asking as/ }));
+  expect(screen.getByRole("radio", { name: /daniel ong/i })).toHaveAttribute("tabindex", "0");
+  expect(screen.getByRole("radio", { name: /maya lim/i })).toHaveAttribute("tabindex", "-1");
+});
+
+test("ArrowUp wraps to the last person and Home and End jump to the ends", async () => {
+  const onChange = vi.fn();
+  render(<PersonaPicker personas={people} selected="employee" onChange={onChange} />);
+  await userEvent.click(screen.getByRole("button", { name: /Asking as/ }));
+  screen.getByRole("radio", { name: /maya lim/i }).focus();
+  await userEvent.keyboard("{ArrowUp}");
+  expect(onChange).toHaveBeenLastCalledWith("manager");
+  await userEvent.keyboard("{Home}");
+  expect(onChange).toHaveBeenLastCalledWith("employee");
+  await userEvent.keyboard("{End}");
+  expect(onChange).toHaveBeenLastCalledWith("manager");
+});
+
+test("has no axe violations closed or with the menu open", async () => {
+  const { container, baseElement } = render(<PersonaPicker personas={people} selected="employee" onChange={vi.fn()} />);
+  expect(await axe(container)).toHaveNoViolations();
+  await userEvent.click(screen.getByRole("button", { name: /Asking as/ }));
+  expect(await axe(baseElement)).toHaveNoViolations();
 });

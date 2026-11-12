@@ -38,7 +38,7 @@ export function PersonaPicker({ personas, selected, onChange, disabled }: { pers
         <ChevronUpIcon size={15} className="mr-2 shrink-0 text-muted" />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="top" align="center" sideOffset={8} collisionPadding={12} className="z-30 w-[var(--radix-popover-trigger-width)] rounded-[20px] bg-white p-2 shadow-[0_18px_50px_rgba(17,24,39,.16),0_0_0_1px_var(--color-line)]">
+        <Popover.Content aria-label="Choose who is asking" side="top" align="center" sideOffset={8} collisionPadding={12} className="z-30 w-[var(--radix-popover-trigger-width)] rounded-[20px] bg-white p-2 shadow-[0_18px_50px_rgba(17,24,39,.16),0_0_0_1px_var(--color-line)]">
           <p id="who-asks" className="px-2.5 pb-1 pt-2 text-xs font-medium text-muted">Who is asking</p>
           <div role="radiogroup" aria-labelledby="who-asks" className="grid gap-0.5">
             {personas.map((p, i) => {

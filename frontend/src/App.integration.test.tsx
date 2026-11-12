@@ -233,3 +233,28 @@ test("on a phone the sidebar is off-canvas: the menu opens it, choosing New chat
   await userEvent.click(screen.getByRole("button", { name: "View More" }));
   expect(await screen.findByRole("dialog", { name: "LLM Observability" })).toHaveAttribute("aria-modal", "true");
 });
+
+test("Escape inside the model picker closes only the picker, not the open observability panel", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "View More" }));
+  await screen.findByRole("complementary", { name: "LLM Observability" });
+  await userEvent.click(screen.getByRole("button", { name: /^model:/i }));
+  expect(await screen.findByRole("radiogroup", { name: "Model" })).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("radiogroup", { name: "Model" })).toBeNull());
+  expect(screen.getByRole("complementary", { name: "LLM Observability" })).toBeInTheDocument();
+});
+
+test("clearing all conversations is not possible while a request is pending", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValueOnce(answer({}));
+  render(<App />);
+  await askPto();
+  let release!: (r: ChatResponse) => void;
+  vi.spyOn(apiMod.api, "chat").mockReturnValueOnce(new Promise((r) => { release = r; }));
+  await userEvent.type(screen.getByRole("textbox", { name: /your question/i }), "second{Enter}");
+  expect(screen.getByRole("button", { name: "Clear All" })).toBeDisabled();
+  release(answer({}));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Clear All" })).toBeEnabled());
+});
