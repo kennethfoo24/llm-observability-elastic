@@ -6,7 +6,7 @@ import { Composer, MAX_CHARS } from "./Composer";
 
 function Harness(props: { onSend: (t: string) => void; pending?: boolean; initial?: string }) {
   const [v, setV] = useState(props.initial ?? "");
-  return <Composer value={v} onChange={setV} onSend={props.onSend} asking="Maya Lim" pending={props.pending ?? false} />;
+  return <Composer value={v} onChange={setV} onSend={props.onSend} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={props.pending ?? false} />;
 }
 
 test("Enter sends once and Shift+Enter inserts a newline", async () => {
@@ -71,9 +71,9 @@ test("while a request is pending nothing can be sent (no double submit)", async 
 
 test("over the limit shows an error and blocks sending, near the limit shows a counter", async () => {
   const onSend = vi.fn();
-  const { rerender } = render(<Composer value={"x".repeat(MAX_CHARS - 100)} onChange={vi.fn()} onSend={onSend} asking="Maya Lim" pending={false} />);
+  const { rerender } = render(<Composer value={"x".repeat(MAX_CHARS - 100)} onChange={vi.fn()} onSend={onSend} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} />);
   expect(screen.getByText(`${MAX_CHARS - 100} / ${MAX_CHARS}`)).toBeInTheDocument();
-  rerender(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={onSend} asking="Maya Lim" pending={false} />);
+  rerender(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={onSend} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} />);
   expect(screen.getByRole("alert")).toHaveTextContent(/too long/i);
   expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
   fireEvent.keyDown(screen.getByRole("textbox", { name: /your question/i }), { key: "Enter" });
@@ -81,14 +81,14 @@ test("over the limit shows an error and blocks sending, near the limit shows a c
 });
 
 test("exactly the limit is allowed and no counter shows below 3500", () => {
-  const { rerender } = render(<Composer value={"x".repeat(MAX_CHARS)} onChange={vi.fn()} onSend={vi.fn()} asking="Maya Lim" pending={false} />);
+  const { rerender } = render(<Composer value={"x".repeat(MAX_CHARS)} onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} />);
   expect(screen.getByRole("button", { name: /send/i })).toBeEnabled();
-  rerender(<Composer value={"x".repeat(3499)} onChange={vi.fn()} onSend={vi.fn()} asking="Maya Lim" pending={false} />);
+  rerender(<Composer value={"x".repeat(3499)} onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} />);
   expect(screen.queryByText(/ \/ /)).not.toBeInTheDocument();
 });
 
 test("shows who is asking and renders the extra slot", () => {
-  render(<Composer value="" onChange={vi.fn()} onSend={vi.fn()} asking="Maya Lim" pending={false} extra={<span>slot</span>} />);
+  render(<Composer value="" onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} extra={<span>slot</span>} />);
   expect(screen.getByText(/asking as/i)).toHaveTextContent("Asking as Maya Lim");
   expect(screen.getByText("slot")).toBeInTheDocument();
 });
@@ -124,13 +124,13 @@ test("disabled Send explains why (empty and pending)", () => {
 });
 
 test("over-limit shows the too-long alert and describes Send as too long", () => {
-  render(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
+  render(<Composer value={"x".repeat(MAX_CHARS + 1)} onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "A", personaId: "employee" }} pending={false} />);
   expect(screen.getByRole("button", { name: /send/i })).toHaveAccessibleDescription("Question is too long");
   expect(screen.getByRole("alert")).toHaveTextContent(/too long/i);
 });
 
 test("near-limit counter is a polite live region", () => {
-  render(<Composer value={"x".repeat(3600)} onChange={vi.fn()} onSend={vi.fn()} asking="A" pending={false} />);
+  render(<Composer value={"x".repeat(3600)} onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "A", personaId: "employee" }} pending={false} />);
   expect(screen.getByText("3600 / 4000")).toHaveAttribute("aria-live", "polite");
 });
 
@@ -154,4 +154,11 @@ test("same-task: two Send clicks inside one act send exactly once", () => {
     fireEvent.click(btn);
   });
   expect(onSend).toHaveBeenCalledTimes(1);
+});
+
+test("the prompt bar has the new placeholder, a labelled Send button and a photo of who is asking", () => {
+  const { container } = render(<Composer value="" onChange={vi.fn()} onSend={vi.fn()} askingAs={{ name: "Maya Lim", personaId: "employee" }} pending={false} />);
+  expect(screen.getByPlaceholderText("What's on your mind? Ask about HR policy…")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+  expect(container.querySelector("img")).not.toBeNull();
 });

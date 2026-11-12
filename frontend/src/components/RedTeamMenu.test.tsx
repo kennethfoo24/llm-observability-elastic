@@ -47,3 +47,11 @@ test("output risk and quality prompts sit in the right section and describe what
   expect(within(quality).getByRole("button", { name: "Off topic" })).toHaveAccessibleDescription(/topic relevancy/i);
   expect(within(quality).queryByRole("button", { name: "System prompt extraction" })).toBeNull();
 });
+
+test("the trigger is an icon only button named Red team prompts, with no visible text", () => {
+  render(<RedTeamMenu onPick={vi.fn()} />);
+  const trigger = screen.getByRole("button", { name: "Red team prompts" });
+  expect(trigger).toHaveAttribute("title", "Red team prompts");
+  expect(trigger.textContent).toBe("");
+  expect(trigger.querySelector("svg")).not.toBeNull();
+});

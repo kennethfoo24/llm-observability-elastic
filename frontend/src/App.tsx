@@ -29,7 +29,6 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
   const xrayInline = useMediaQuery("(min-width: 80rem)");
   const closeXray = () => setXrayOpen(false);
   useEffect(() => { if (xrayInline) setXrayOpen(false); }, [xrayInline]);
-  const asking = personaObj ? personaLabel(personaObj) : "";
   const hasMessages = state.messages.length > 0;
 
   return (
@@ -59,7 +58,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
           <EmptyState persona={personaObj} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
         )
       }
-      composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}
+      composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} askingAs={{ name: personaObj?.name ?? "", personaId: personaObj?.id ?? "" }} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}
       xray={<XRayDrawer msg={current} persona={personaObj} question={question} kibanaUrl={config?.kibana_url} securityKibanaUrl={config?.security_kibana_url} guardrailConfig={config?.guardrail_models && config.guardrail_pipeline ? { models: config.guardrail_models, pipeline: config.guardrail_pipeline } : undefined} qualityPipeline={config?.quality_pipeline} highlightDocId={highlightDocId} />}
       xrayOpen={xrayOpen}
       onXrayClose={closeXray}

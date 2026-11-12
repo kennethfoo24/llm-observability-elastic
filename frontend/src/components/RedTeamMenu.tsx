@@ -1,5 +1,5 @@
 import * as Popover from "@radix-ui/react-popover";
-import { Crosshair } from "@phosphor-icons/react";
+import { ShieldIcon } from "./icons";
 import { RED_TEAM, RED_TEAM_GROUPS, type RedTeamPrompt } from "../lib/prompts";
 
 const hint = (r: RedTeamPrompt) => [r.owasp, r.lookFor].filter(Boolean).join(": ");
@@ -15,10 +15,10 @@ export function RedTeamMenu({ onPick, disabled }: { onPick: (text: string) => vo
   return (
     <Popover.Root>
       <Popover.Trigger
-        disabled={disabled}
-        className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-control border border-field px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:opacity-50"
+        disabled={disabled} aria-label="Red team prompts" title="Red team prompts"
+        className="grid size-[42px] shrink-0 place-items-center rounded-full bg-[#fdeef5] text-flag transition hover:bg-[#fbdbe9] data-[state=open]:bg-[#fbdbe9] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
       >
-        <Crosshair size={16} weight="regular" aria-hidden /> Red team
+        <ShieldIcon size={20} />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
