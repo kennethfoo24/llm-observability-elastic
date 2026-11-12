@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldWarning, ShieldSlash } from "@phosphor-icons/react";
+import { ShieldCrossIcon, ShieldIcon, ShieldTickIcon } from "../icons";
 import { formatMs } from "../../lib/format";
 import { alertsUrl, devToolsUrl, traceUrl, type GuardrailConfig } from "../../lib/kibanaLinks";
 import { DETECTION_INTERVAL_MINUTES, DEVTOOLS_HELP } from "../../lib/copy";
@@ -11,14 +11,14 @@ export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl, prompt, guardr
   const scored = typeof g.injection_score === "number" && Number.isFinite(g.injection_score);
   // an unscored non-flagged verdict is not "Clean": only the regex checks ran
   const patternsOnly = !flagged && !scored;
-  const Icon = r.blocked || flagged ? ShieldWarning : patternsOnly || g.verdict === "UNKNOWN" ? ShieldSlash : ShieldCheck;
+  const Icon = r.blocked || flagged ? ShieldCrossIcon : patternsOnly || g.verdict === "UNKNOWN" ? ShieldIcon : ShieldTickIcon;
   const word = r.blocked ? "Blocked" : flagged ? "Flagged" : patternsOnly ? "Patterns only" : g.verdict === "UNKNOWN" ? "Unscored" : "Clean";
   const tone = r.blocked || flagged ? "text-flag" : patternsOnly || g.verdict === "UNKNOWN" ? "text-on-ink-muted" : "text-clean";
   const devTools = kibanaUrl && prompt && guardrailConfig ? devToolsUrl(kibanaUrl, prompt, guardrailConfig) : null;
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
-        <span className={`flex items-center gap-2 text-lg font-semibold ${tone}`}><Icon size={22} weight="regular" aria-hidden /> {word}</span>
+        <span className={`flex items-center gap-2 text-lg font-semibold ${tone}`}><Icon size={22} /> {word}</span>
         {g.status === "degraded" && <span className="rounded-full border border-ink-line px-2 py-0.5 text-xs font-medium text-on-ink-muted">Degraded</span>}
         <span className="num ml-auto text-xs text-on-ink-muted">{formatMs(g.latency_ms)}</span>
       </div>

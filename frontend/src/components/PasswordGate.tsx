@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LockKey } from "@phosphor-icons/react";
+import { LockIcon } from "./icons";
 
 export function PasswordGate({ onSubmit }: { onSubmit: (pw: string) => Promise<boolean> }) {
   const [value, setValue] = useState("");
@@ -24,7 +24,7 @@ export function PasswordGate({ onSubmit }: { onSubmit: (pw: string) => Promise<b
   return (
     <main className="min-h-[100dvh] grid place-items-center px-4">
       <form onSubmit={submit} aria-busy={busy} className="w-full max-w-sm rounded-card border border-line bg-surface p-8 shadow-[0_12px_40px_-16px_rgba(14,27,53,0.25)]">
-        <LockKey size={28} weight="regular" className="text-blue" aria-hidden />
+        <LockIcon size={28} className="text-blue" />
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">Foo Corp HR Assistant</h1>
         <p className="mt-1 text-sm text-muted">Enter the demo password to continue.</p>
         <label htmlFor="pw" className="mt-6 block text-sm font-medium text-ink">Demo password</label>
