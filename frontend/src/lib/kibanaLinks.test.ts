@@ -86,9 +86,9 @@ const QI: QualityInput = { prompt: "How many PTO days?", response: "25 days [pto
   citedIds: ["pto-policy"], retrievedIds: ["pto-policy"], topScore: 3.2, hiddenCount: 1, answered: true, persona: "employee" };
 const jsonBody = (t: string) => JSON.parse(t.split("\n").filter((l) => !l.startsWith("#") && !/^POST /.test(l)).join("\n"));
 
-test("dashboard links open the quality and OWASP dashboards", () => {
-  expect(qualityDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/glassbox-quality");
-  expect(owaspDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/glassbox-owasp");
+test("dashboard links open the hand-made quality and OWASP Top 10 dashboards", () => {
+  expect(qualityDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/c594777c-8647-4005-8b0c-b1fc7f14dbf1?_g=(filters:!())");
+  expect(owaspDashboardUrl("https://kb")).toBe("https://kb/app/dashboards#/view/ea67e371-a99e-43ab-b3a8-eb577af00c58?_g=(filters:!())");
 });
 
 test("responseLogUrl builds an ES|QL Discover link on the genai_response logs by trace id", () => {

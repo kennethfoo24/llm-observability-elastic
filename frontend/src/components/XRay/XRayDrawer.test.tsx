@@ -321,10 +321,10 @@ test("an answered response shows Quality with its links and no checklist of untr
   const text = decompressFromEncodedURIComponent(dev.getAttribute("href")!.split("load_from=data:text/plain,")[1])!;
   expect(text).toContain("POST _ingest/pipeline/genai-quality/_simulate");
   expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
-  expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-quality");
+  expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/c594777c-8647-4005-8b0c-b1fc7f14dbf1?_g=(filters:!())");
   expect(within(q).queryByText("What Elastic checks on this answer")).toBeNull();
   expect(within(q).queryByRole("list")).toBeNull();
-  expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-owasp");
+  expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/ea67e371-a99e-43ab-b3a8-eb577af00c58?_g=(filters:!())");
   expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
 });
 

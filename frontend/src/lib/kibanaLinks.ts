@@ -77,16 +77,14 @@ export function devToolsUrl(base: string, prompt: string, g: GuardrailConfig): s
   return url;
 }
 
-export const QUALITY_DASHBOARD_ID = "glassbox-quality";
-export const OWASP_DASHBOARD_ID = "glassbox-owasp";
+/* Hand-made dashboards (not in elastic/); they replace the repo-managed glassbox-quality and glassbox-owasp links. */
+export const QUALITY_DASHBOARD_ID = "c594777c-8647-4005-8b0c-b1fc7f14dbf1";
+export const OWASP_DASHBOARD_ID = "ea67e371-a99e-43ab-b3a8-eb577af00c58";
 
-export function qualityDashboardUrl(base: string): string {
-  return `${base}/app/dashboards#/view/${QUALITY_DASHBOARD_ID}`;
-}
+const dashboardUrl = (base: string, id: string) => `${base}/app/dashboards#/view/${id}?_g=(filters:!())`;
 
-export function owaspDashboardUrl(base: string): string {
-  return `${base}/app/dashboards#/view/${OWASP_DASHBOARD_ID}`;
-}
+export const qualityDashboardUrl = (base: string): string => dashboardUrl(base, QUALITY_DASHBOARD_ID);
+export const owaspDashboardUrl = (base: string): string => dashboardUrl(base, OWASP_DASHBOARD_ID);
 
 /** Discover (ES|QL) on the Observability project: the genai_response log written for one trace. */
 export function responseLogUrl(base: string, traceId: string): string {

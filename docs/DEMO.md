@@ -89,3 +89,7 @@ Run `deploy/scripts/demo_down.sh` (add `--teardown` to remove the load balancer 
 - Flagged or blocked prompt: in the Guardrail section click "See where it was blocked" (APM trace, span `guardrail.check`) and "View detection in Elastic Security" (Alerts filtered to rule `glassbox-flagged-prompts`). The alert can take a few minutes to appear.
 - Retrieval: click a document title to open it in Kibana Discover (Kibana login needed; your Kibana role applies, not the persona). Hidden cards have no link.
 - Model and cost: "Open cost dashboard" opens `LLM Observability: Overview`.
+
+## Credits
+
+Persona photos are from Unsplash, used under the Unsplash License: Maya Lim (https://unsplash.com/photos/s3aDHKxHZSc) and Daniel Ong (https://unsplash.com/photos/hr_feH2URs0). Source logos are from Simple Icons (CC0); interface icons are from Iconsax (MIT).
