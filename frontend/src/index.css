@@ -1,10 +1,10 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/figtree";
 @import "@fontsource/space-mono/400.css";
 @import "@fontsource/space-mono/700.css";
 
 @theme static {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, "SF Mono", monospace;
 
   --color-ink: #0e1b35;
@@ -19,6 +19,7 @@
   --color-blue-soft: #e8f0fc;
   --color-blue-bright: #4a90f2;
 
+  --color-page: #cfdaf0;
   --color-canvas: #f5f7fa;
   --color-surface: #ffffff;
   --color-line: #d4dae5;
@@ -40,7 +41,7 @@
 
 @layer base {
   html {
-    background: var(--color-canvas);
+    background: var(--color-page);
     color: var(--color-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -57,3 +58,16 @@
 
 /* Tabular figures for every telemetry number */
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Drifting colour behind the app frame */
+.mesh { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; background: #fbfbfe; }
+.mesh i { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .85; }
+.mesh .b0 { width: 30%; height: 50%; left: -6%; top: 10%; background: #dfe8fb; }
+.mesh .b1 { width: 46%; height: 60%; left: 2%; bottom: -14%; background: #f7c8e6; animation: drift1 26s ease-in-out infinite alternate; }
+.mesh .b2 { width: 44%; height: 52%; left: 36%; bottom: 2%; background: #d8cdf6; animation: drift2 32s ease-in-out infinite alternate; }
+.mesh .b3 { width: 38%; height: 50%; right: 4%; top: 30%; background: #c7dbfb; animation: drift3 28s ease-in-out infinite alternate; }
+.mesh .b4 { width: 34%; height: 36%; left: 18%; top: -10%; background: #f3eefc; }
+@keyframes drift1 { to { transform: translate(6%, -8%) scale(1.08); } }
+@keyframes drift2 { to { transform: translate(-8%, -6%) scale(1.1); } }
+@keyframes drift3 { to { transform: translate(-6%, 8%) scale(.94); } }
+@media (prefers-reduced-motion: reduce) { .mesh i { animation: none; } }
