@@ -1,10 +1,13 @@
-import { Lock } from "@phosphor-icons/react";
+import { SourceLogo } from "../BrandLogo";
+import { LockIcon } from "../icons";
+import { SOURCE_LABEL, sourceFor, type SourceKey } from "../../lib/sources";
 import { CLASSIFICATION_LABEL } from "../../lib/copy";
 import { formatScore } from "../../lib/format";
 import { docDiscoverUrl } from "../../lib/kibanaLinks";
 import { ExtLink } from "./ExtLink";
 import type { DocHit, Ghost } from "../../lib/types";
 
+const LEGEND: SourceKey[] = ["confluence", "sharepoint", "gdrive", "database"];
 const chip = "shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-xs text-on-ink-muted";
 
 export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl }: { docs: DocHit[]; hidden: Ghost[]; personaName: string; highlightDocId: string | null; kibanaUrl?: string }) {
@@ -21,7 +24,9 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl
                 key={d.id} data-highlighted={cited ? "true" : "false"}
                 className={`flex min-w-0 items-start justify-between gap-3 rounded-control border p-3 transition ${cited ? "border-blue-bright bg-ink-3 ring-2 ring-blue-bright" : "border-ink-line bg-ink-2"}`}
               >
-                <span className="min-w-0">
+                <span className="min-w-0 flex items-start gap-2.5">
+                  <span className="mt-0.5"><SourceLogo source={sourceFor(d.id)} size={15} onDark /></span>
+                  <span className="min-w-0">
                   {kibanaUrl ? (
                     <ExtLink href={docDiscoverUrl(kibanaUrl, d.id)} icon={false} className="block break-words text-sm font-medium underline decoration-ink-line underline-offset-2 hover:decoration-current">{d.title}</ExtLink>
                   ) : (
@@ -32,6 +37,7 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl
                     {cited && <span className="shrink-0 rounded-full bg-blue-bright px-2 py-0.5 text-xs font-semibold text-ink">Cited</span>}
                     <span className="num min-w-0 truncate text-xs text-on-ink-muted">{d.id}</span>
                   </span>
+                  </span>
                 </span>
                 <span className="num shrink-0 text-sm font-bold">{formatScore(d.score)}</span>
               </li>
@@ -40,6 +46,10 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl
         </ul>
       )}
       {kibanaUrl && docs.length > 0 && <p className="-mt-3 text-xs text-on-ink-muted">Opens in Kibana (your Kibana role applies, not the persona)</p>}
+
+      <div data-testid="source-legend" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-ink-muted">
+        {LEGEND.map((k) => <span key={k} className="inline-flex items-center gap-1.5"><SourceLogo source={k} size={13} onDark />{SOURCE_LABEL[k]}</span>)}
+      </div>
 
       <div>
         <h4 className="text-sm font-semibold">Hidden by DLS ({hidden.length})</h4>
@@ -51,7 +61,8 @@ export function Retrieval({ docs, hidden, personaName, highlightDocId, kibanaUrl
             <ul className="mt-2 grid gap-2">
               {hidden.map((g) => (
                 <li key={g.id} className="flex min-w-0 items-center gap-3 rounded-control border border-dashed border-ink-line p-3 text-on-ink-muted">
-                  <Lock size={18} weight="regular" aria-hidden className="shrink-0" />
+                  <LockIcon size={18} className="shrink-0" />
+                  <SourceLogo source={sourceFor(g.id)} size={15} onDark />
                   <span className="min-w-0">
                     <span className="block break-words text-sm">{g.title}</span>
                     <span className={`${chip} mt-1 inline-block`}>{CLASSIFICATION_LABEL[g.classification] ?? g.classification}</span>

@@ -1,7 +1,6 @@
 import { OUTPUT_FINDINGS, reasonLabel } from "../../lib/copy";
-import { alertsUrl, owaspDashboardUrl, responseLogUrl, traceUrl } from "../../lib/kibanaLinks";
+import { alertsUrl, responseLogUrl, traceUrl } from "../../lib/kibanaLinks";
 import { FindingPills, type Pill } from "./FindingPills";
-import { ExtLink } from "./ExtLink";
 import type { ChatResponse, Findings } from "../../lib/types";
 
 /** Security findings only: what the guardrail caught in the prompt, and what the output checks caught in the answer. */
@@ -17,7 +16,6 @@ export function SecurityPanel({ r, findings, kibanaUrl, securityKibanaUrl }: { r
       {pills.length > 0 ? <FindingPills pills={pills} tone="flag" label="Security findings" /> : !scoring && <p className="text-sm text-on-ink-muted">No security findings.</p>}
       {scoring && <p role="status" className="mt-2 text-xs text-on-ink-muted">Elastic is still scoring the answer, so output checks may add findings in a few seconds.</p>}
       {findings.status === "unavailable" && !r.blocked && <p className="mt-2 text-xs text-on-ink-muted">Output checks could not be read back. Open the response log in Kibana.</p>}
-      {kibanaUrl && <div className="mt-3 flex flex-wrap gap-2"><ExtLink href={owaspDashboardUrl(kibanaUrl)}>OWASP coverage dashboard</ExtLink></div>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { motion } from "motion/react";
 import { ExtLink } from "./ExtLink";
-import { traceUrl } from "../../lib/kibanaLinks";
+import { owaspDashboardUrl, qualityDashboardUrl, traceUrl } from "../../lib/kibanaLinks";
 import { CostPanel } from "./CostPanel";
 import { GuardrailStrip } from "./GuardrailStrip";
 import { QualityPanel } from "./QualityPanel";
@@ -15,11 +15,14 @@ import type { GuardrailConfig } from "../../lib/kibanaLinks";
 
 type Props = { msg: AssistantMsg | null; persona: Persona | undefined; question: string | undefined; kibanaUrl: string | undefined; securityKibanaUrl?: string | null; guardrailConfig?: GuardrailConfig; qualityPipeline?: string; highlightDocId: string | null };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: { label: string; href: string }; children: React.ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="min-w-0 border-t border-ink-line px-5 py-5 first:border-t-0">
-      <h3 id={id} className="mb-3 text-sm font-semibold">{title}</h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 id={id} className="text-sm font-semibold">{title}</h3>
+        {action && <ExtLink href={action.href} icon={false} className="text-xs font-medium text-blue-bright hover:underline">{action.label} ↗</ExtLink>}
+      </div>
       {children}
     </section>
   );
@@ -40,10 +43,8 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
   const findings = useFindings(r?.trace_id, msg?.status === "done" && !!r && !r.blocked);
   return (
     <div className="min-w-0 pb-8">
-      <div className="px-5 pb-4 pt-5">
+      <div className="px-5 pb-4 pt-5 pr-14">
         <h2 className="text-lg font-semibold">LLM Observability</h2>
-        <p className="mt-1 text-sm text-on-ink-muted">What Elastic recorded for this answer.</p>
-        {question && <p className="mt-3 line-clamp-2 break-words rounded-control bg-ink-2 px-3 py-2 text-sm text-on-ink-muted">{question}</p>}
       </div>
 
       {!msg && (
@@ -62,8 +63,8 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
       {msg?.status === "done" && r && (
         <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 140, damping: 20 }}>
           <Section title="Guardrail"><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} prompt={question} guardrailConfig={guardrailConfig} /></Section>
-          <Section title="Security"><SecurityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
-          <Section title="Quality"><QualityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} prompt={question} qualityPipeline={qualityPipeline} /></Section>
+          <Section title="Security" action={kibanaUrl ? { label: "OWASP Top 10 dashboard", href: owaspDashboardUrl(kibanaUrl) } : undefined}><SecurityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
+          <Section title="Quality" action={kibanaUrl ? { label: "Quality dashboard", href: qualityDashboardUrl(kibanaUrl) } : undefined}><QualityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} prompt={question} qualityPipeline={qualityPipeline} /></Section>
           <Section title="Trace">
             <Waterfall stages={r.stages} verdict={r.guardrail.verdict} scored={r.guardrail.injection_score !== null} />
             {kibanaUrl && r.trace_id ? (

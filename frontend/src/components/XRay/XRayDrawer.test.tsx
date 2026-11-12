@@ -321,10 +321,10 @@ test("an answered response shows Quality with its links and no checklist of untr
   const text = decompressFromEncodedURIComponent(dev.getAttribute("href")!.split("load_from=data:text/plain,")[1])!;
   expect(text).toContain("POST _ingest/pipeline/genai-quality/_simulate");
   expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
-  expect(within(q).getByRole("link", { name: /conversation quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/c594777c-8647-4005-8b0c-b1fc7f14dbf1?_g=(filters:!())");
+  expect(within(q).getByRole("link", { name: /^quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/c594777c-8647-4005-8b0c-b1fc7f14dbf1?_g=(filters:!())");
   expect(within(q).queryByText("What Elastic checks on this answer")).toBeNull();
   expect(within(q).queryByRole("list")).toBeNull();
-  expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /owasp coverage dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/ea67e371-a99e-43ab-b3a8-eb577af00c58?_g=(filters:!())");
+  expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /^owasp top 10 dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/ea67e371-a99e-43ab-b3a8-eb577af00c58?_g=(filters:!())");
   expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
 });
 
@@ -340,4 +340,45 @@ test("without a Kibana url the quality links are hidden; without the pipeline on
   rerender(<XRayDrawer {...props} msg={msg(response())} />);
   expect(within(q()).queryByRole("link", { name: /dev tools/i })).toBeNull();
   expect(within(q()).getAllByRole("link")).toHaveLength(2);
+});
+
+test("the Security and Quality headers hold the hand-made dashboard links and the old in-body links are gone", () => {
+  render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response())} />);
+  expect(screen.getAllByRole("link", { name: /^owasp top 10 dashboard/i })).toHaveLength(1);
+  expect(screen.getAllByRole("link", { name: /^quality dashboard/i })).toHaveLength(1);
+  expect(screen.queryByRole("link", { name: /owasp coverage|conversation quality/i })).toBeNull();
+});
+
+test("without a Kibana URL there are no dashboard header links", () => {
+  render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
+});
+
+test("both Try it in Dev Tools links still render when their inputs exist", () => {
+  const gr = { models: { injection: "inj", ner: "ner" }, pipeline: "genai-guardrail" };
+  render(<XRayDrawer {...props} guardrailConfig={gr} qualityPipeline="genai-quality" msg={msg(response())} />);
+  expect(screen.getAllByRole("link", { name: /try it in dev tools/i })).toHaveLength(2);
+});
+
+test("the header is the title alone: no subtitle paragraph and no question quote", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  expect(screen.queryByText(/what elastic recorded/i)).toBeNull();
+  expect(screen.queryByText("How many PTO days?")).toBeNull();
+});
+
+test("Retrieval puts a source logo before every shown and hidden document and a legend of the four systems, with no explanatory sentence", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  const retrieval = screen.getByRole("region", { name: "Retrieval" });
+  expect(within(retrieval).getByTestId("source-legend")).toHaveTextContent("ConfluenceSharePointGoogle DriveDatabase");
+  expect(retrieval.textContent).not.toMatch(/illustrative/i);
+  const rows = retrieval.querySelectorAll("li");
+  expect(rows.length).toBeGreaterThan(0);
+  rows.forEach((li) => expect(li.querySelector('[aria-hidden="true"]')).not.toBeNull());
+});
+
+test("a hidden document has a logo but no link", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  const hidden = screen.getByText(/project aurora/i).closest("li")!;
+  expect(hidden.querySelector("a")).toBeNull();
+  expect(hidden.querySelector('[aria-hidden="true"]')).not.toBeNull();
 });

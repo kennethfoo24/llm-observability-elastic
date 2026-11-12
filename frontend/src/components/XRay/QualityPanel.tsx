@@ -1,5 +1,5 @@
 import { QUALITY_FINDINGS, QUALITY_HELP } from "../../lib/copy";
-import { qualityDashboardUrl, qualityDevToolsUrl, responseLogUrl } from "../../lib/kibanaLinks";
+import { qualityDevToolsUrl, responseLogUrl } from "../../lib/kibanaLinks";
 import { isAnswered, qualityInput } from "../../lib/quality";
 import { FindingPills, type Pill } from "./FindingPills";
 import { ExtLink } from "./ExtLink";
@@ -23,7 +23,6 @@ export function QualityPanel({ r, findings, kibanaUrl, prompt, qualityPipeline }
         <div className="mt-3 flex flex-wrap gap-2">
           {devTools && <ExtLink href={devTools}>Try it in Dev Tools</ExtLink>}
           {r.trace_id && <ExtLink href={responseLogUrl(kibanaUrl, r.trace_id)}>Open the response log</ExtLink>}
-          <ExtLink href={qualityDashboardUrl(kibanaUrl)}>Conversation quality dashboard</ExtLink>
         </div>
       )}
       {kibanaUrl && <p className="mt-3 text-xs text-on-ink-muted">{QUALITY_HELP}</p>}
