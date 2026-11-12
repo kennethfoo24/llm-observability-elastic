@@ -19,7 +19,7 @@ export function ChatThread({ messages, models, personas, pending, selectedId, ki
   const nameOf = (id: string) => personas.find((p) => p.id === id)?.name ?? id;
 
   return (
-    <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto grid w-full min-w-0 max-w-[890px] gap-5 px-6 pb-44 pt-6">
+    <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto grid w-full min-w-0 max-w-[890px] 2xl:max-w-[1040px] gap-5 px-6 pb-44 pt-6">
       {messages.map((m) => {
         if (m.kind === "user") return <UserMessage key={m.id} text={m.text} name={nameOf(m.persona)} personaId={m.persona} onEdit={onEdit} />;
         if (m.kind === "assistant")

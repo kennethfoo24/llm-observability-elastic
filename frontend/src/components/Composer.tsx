@@ -37,7 +37,7 @@ export function Composer({ value, onChange, onSend, askingAs, pending, extra }: 
   }
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-3 md:px-0">
+    <div className="mx-auto w-full max-w-[720px] 2xl:max-w-[860px] px-3 md:px-0">
       <div className="flex items-end gap-2.5 rounded-[28px] bg-white p-2 pl-3.5 shadow-[0_14px_40px_rgba(17,24,39,.08)] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue">
         <span title={`Asking as ${askingAs.name}`} className="mb-[14px] shrink-0">
           <Avatar name={askingAs.name} personaId={askingAs.personaId} size={28} />

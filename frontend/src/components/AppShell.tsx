@@ -48,7 +48,7 @@ export function AppShell({ sidebar, thread, composer, cost, menuButton, drawer, 
 
   return (
     <div className="min-h-[100dvh] md:p-6">
-      <div className="relative isolate mx-auto grid h-[100dvh] max-w-[1440px] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden md:h-[calc(100dvh-3rem)] md:gap-4 md:rounded-[32px] md:p-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="relative isolate mx-auto grid h-[100dvh] w-full grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden md:h-[calc(100dvh-3rem)] md:gap-4 md:rounded-[32px] md:p-4 lg:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]">
         <MeshBackground />
         {lgUp && <div className="min-h-0">{sidebar}</div>}
         <main aria-label="Chat" className="relative flex min-h-0 min-w-0 flex-col">
