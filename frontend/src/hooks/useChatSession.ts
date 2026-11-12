@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import { initialState, lastUserQuestion, newId, pendingCount, reducer, userMessageFor, type AssistantMsg } from "../state/chatState";
+import { initialState, lastUserQuestion, newId, pendingCount, reducer, seedIds, userMessageFor, type AssistantMsg } from "../state/chatState";
 import { usePolling } from "./usePolling";
 import type { ModelInfo, Persona } from "../lib/types";
-import { personaLabel } from "../components/PersonaRail";
+import { personaLabel } from "../lib/persona";
+import type { Conversation } from "../lib/history";
 
 type DraftControl = readonly [string, (v: string) => void];
 
@@ -56,18 +57,25 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
     }
   }, []);
 
-  const send = useCallback(async (text: string) => {
+  /* Sends as `personaId`, switching to that persona first (with its divider) when it is not the current one. */
+  const askAs = useCallback(async (personaId: string, text: string) => {
     const t = text.trim();
     const s = stateRef.current;
     if (!t || pendingCount(s) > 0) return;
-    const req = { message: t, persona: s.persona, model: s.model, engine: s.engine };
+    if (personaId !== s.persona) {
+      const p = personas.find((x) => x.id === personaId);
+      if (p) dispatch({ type: "setPersona", persona: p.id, label: personaLabel(p) });
+    }
+    const req = { message: t, persona: personaId, model: s.model, engine: s.engine };
     const userId = newId();
     const assistantId = newId();
-    dispatch({ type: "send", text: t, userId, assistantId });
+    dispatch({ type: "send", text: t, userId, assistantId, persona: personaId });
     const ok = await run(assistantId, req);
     // only clear what was sent; text typed while waiting stays
     if (ok && draftRef.current.trim() === t) setDraftRef.current("");
-  }, [run]);
+  }, [run, personas]);
+
+  const send = useCallback((text: string) => askAs(stateRef.current.persona, text), [askAs]);
 
   /* `modelKey` re-asks with a different model (rebinding the message) when the original one is offline. */
   const retry = useCallback(async (id: string, modelKey?: string) => {
@@ -79,7 +87,32 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
     await run(id, { message: q.text, persona: a.persona, model: modelKey ?? a.model, engine: a.engine });
   }, [run]);
 
-  const askAgain = useCallback((text: string) => { void send(text); }, [send]);
+  const otherPersonaFor = useCallback((assistantId: string): Persona | undefined => {
+    const a = stateRef.current.messages.find((m) => m.kind === "assistant" && m.id === assistantId) as AssistantMsg | undefined;
+    return a ? personas.find((p) => p.id !== a.persona) : undefined;
+  }, [personas]);
+
+  /* Re-asks the answer's question as the persona who did not ask it, and stays on that persona. */
+  const askAgain = useCallback((assistantId: string) => {
+    const q = userMessageFor(stateRef.current, assistantId);
+    const other = otherPersonaFor(assistantId);
+    if (q && other) void askAs(other.id, q.text);
+  }, [askAs, otherPersonaFor]);
+
+  /* Re-asks the answer's question as its own persona with the currently selected model. */
+  const regenerate = useCallback((assistantId: string) => {
+    const s = stateRef.current;
+    const a = s.messages.find((m) => m.kind === "assistant" && m.id === assistantId) as AssistantMsg | undefined;
+    const q = userMessageFor(s, assistantId);
+    if (a && q) void askAs(a.persona, q.text);
+  }, [askAs]);
+
+  const newChat = useCallback(() => { dispatch({ type: "reset" }); setDraftRef.current(""); }, []);
+  const loadConversation = useCallback((c: Conversation) => {
+    seedIds(c.state.messages);
+    dispatch({ type: "load", state: c.state });
+    setDraftRef.current("");
+  }, []);
 
   const selectCitation = useCallback((docId: string, msgId: string) => {
     dispatch({ type: "select", id: msgId });
@@ -95,5 +128,5 @@ export function useChatSession(personas: Persona[], models: ModelInfo[], refresh
   );
   const question = current ? userMessageFor(state, current.id)?.text : lastUserQuestion(state)?.text;
 
-  return { state, dispatch, send, retry, askAgain, selectCitation, highlightDocId, draft, setDraft, pending: pendingCount(state) > 0, current, question, personaObj, personaName };
+  return { state, dispatch, send, askAs, retry, askAgain, regenerate, otherPersonaFor, newChat, loadConversation, selectCitation, highlightDocId, draft, setDraft, pending: pendingCount(state) > 0, current, question, personaObj, personaName };
 }

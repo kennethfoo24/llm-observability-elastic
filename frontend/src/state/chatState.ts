@@ -16,7 +16,8 @@ export type Action =
   | { type: "setPersona"; persona: string; label: string }
   | { type: "setModel"; model: string }
   | { type: "setEngine"; engine: Engine }
-  | { type: "send"; text: string; userId: string; assistantId: string }
+  | { type: "send"; text: string; userId: string; assistantId: string; persona?: string }
+  | { type: "load"; state: ChatState }
   | { type: "receive"; id: string; response: ChatResponse }
   | { type: "fail"; id: string; error: { status: number; code: string; hint?: string } }
   | { type: "retry"; id: string; model?: string }
@@ -25,6 +26,14 @@ export type Action =
 
 let counter = 0;
 export const newId = (): string => `m${++counter}`;
+
+/** After restoring a saved conversation, make sure newId() never repeats an id already in it. */
+export function seedIds(messages: Message[]): void {
+  for (const m of messages) {
+    const n = /^m(\d+)$/.exec(m.id);
+    if (n) counter = Math.max(counter, Number(n[1]));
+  }
+}
 
 export function initialState(persona: string, model: string): ChatState {
   return { persona, model, engine: "langchain", messages: [], selectedId: null, spendUsd: 0 };
@@ -67,9 +76,10 @@ export function reducer(state: ChatState, action: Action): ChatState {
     case "setEngine":
       return { ...state, engine: action.engine };
     case "send": {
-      const user: UserMsg = { id: action.userId, kind: "user", text: action.text, persona: state.persona };
+      const persona = action.persona ?? state.persona;
+      const user: UserMsg = { id: action.userId, kind: "user", text: action.text, persona };
       const assistant: AssistantMsg = {
-        id: action.assistantId, kind: "assistant", replyTo: user.id, persona: state.persona, model: state.model, engine: state.engine, status: "pending",
+        id: action.assistantId, kind: "assistant", replyTo: user.id, persona, model: state.model, engine: state.engine, status: "pending",
       };
       return { ...state, messages: [...state.messages, user, assistant], selectedId: assistant.id };
     }
@@ -83,6 +93,8 @@ export function reducer(state: ChatState, action: Action): ChatState {
       return mapAssistant(state, action.id, "error", (a) => ({ ...a, model: action.model ?? a.model, status: "pending", error: undefined, response: undefined }));
     case "select":
       return { ...state, selectedId: action.id };
+    case "load":
+      return action.state;
     case "reset":
       return initialState(state.persona, state.model);
   }

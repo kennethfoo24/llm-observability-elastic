@@ -185,3 +185,26 @@ test("retry with a model override still only works from the error state", () => 
   s = reducer(s, { type: "receive", id, response: resp() });
   expect(reducer(s, { type: "retry", id, model: "gemma" })).toBe(s);
 });
+
+import { seedIds } from "./chatState";
+
+test("load replaces the whole state", () => {
+  const saved = reducer(reducer(start(), sendAction("old")), { type: "setModel", model: "gemma" });
+  expect(reducer(start(), { type: "load", state: saved })).toBe(saved);
+});
+
+test("send with a persona override records that persona on both messages", () => {
+  const s = reducer(start(), { type: "send", text: "q", userId: newId(), assistantId: newId(), persona: "manager" });
+  expect(s.messages[0]).toMatchObject({ kind: "user", persona: "manager" });
+  expect(s.messages[1]).toMatchObject({ kind: "assistant", persona: "manager" });
+});
+
+test("seedIds: after seeding a state containing m4100, newId returns a larger id", () => {
+  seedIds([{ id: "m4100", kind: "divider", text: "x" }]);
+  const n = (id: string) => Number(id.slice(1));
+  expect(n(newId())).toBeGreaterThan(4100);
+});
+
+test("seedIds ignores non-numeric ids", () => {
+  expect(() => seedIds([{ id: "abc", kind: "divider", text: "x" }])).not.toThrow();
+});

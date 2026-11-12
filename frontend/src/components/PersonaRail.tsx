@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { Avatar } from "./Avatar";
 import type { Persona } from "../lib/types";
 
-export const personaLabel = (p: Persona) => `${p.name}, ${p.title}`;
+export { personaLabel } from "../lib/persona";
 
 type Props = { personas: Persona[]; selected: string; onSelect: (id: string) => void; disabled?: boolean };
 

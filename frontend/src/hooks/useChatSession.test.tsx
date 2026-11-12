@@ -182,3 +182,78 @@ test("reset clears the draft held by the session", () => {
   expect(result.current.draft).toBe("");
   expect(result.current.state.messages).toEqual([]);
 });
+
+import type { Conversation } from "../lib/history";
+
+const lastAssistantId = (r: { current: ReturnType<typeof useChatSession> }) =>
+  [...r.current.state.messages].reverse().find((m) => m.kind === "assistant")!.id;
+
+test("askAgain on Maya's answer switches to Daniel, adds the divider, and posts the same question as manager", async () => {
+  const chat = vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
+  const { result } = setup();
+  await act(async () => { await result.current.send("Salary bands?"); });
+  const id = lastAssistantId(result);
+  await act(async () => { result.current.askAgain(id); });
+  expect(chat).toHaveBeenLastCalledWith({ message: "Salary bands?", persona: "manager", model: "eis-gpt-mini", engine: "langchain" });
+  expect(result.current.state.persona).toBe("manager");
+  expect(result.current.state.messages.some((m) => m.kind === "divider" && m.text.includes("Daniel Ong"))).toBe(true);
+});
+
+test("regenerate on a Maya answer while Daniel is active switches back to Maya with the selected model", async () => {
+  const chat = vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
+  const { result } = setup();
+  await act(async () => { await result.current.send("Q"); });
+  const id = lastAssistantId(result);
+  act(() => result.current.dispatch({ type: "setPersona", persona: "manager", label: "Daniel Ong, Engineering Manager" }));
+  act(() => result.current.dispatch({ type: "setModel", model: "gemma" }));
+  await act(async () => { result.current.regenerate(id); });
+  expect(chat).toHaveBeenLastCalledWith({ message: "Q", persona: "employee", model: "gemma", engine: "langchain" });
+  expect(result.current.state.persona).toBe("employee");
+});
+
+test("askAgain and regenerate do nothing while a request is pending", async () => {
+  let resolve!: (r: ChatResponse) => void;
+  const chat = vi.spyOn(apiMod.api, "chat").mockResolvedValueOnce(ok()).mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+  const { result } = setup();
+  await act(async () => { await result.current.send("one"); });
+  const id = lastAssistantId(result);
+  act(() => { void result.current.send("two"); });
+  expect(chat).toHaveBeenCalledTimes(2);
+  await act(async () => { result.current.askAgain(id); result.current.regenerate(id); });
+  expect(chat).toHaveBeenCalledTimes(2);
+  await act(async () => { resolve(ok()); });
+});
+
+test("otherPersonaFor names the persona who did not ask that answer", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
+  const { result } = setup();
+  await act(async () => { await result.current.send("Q"); });
+  expect(result.current.otherPersonaFor(lastAssistantId(result))?.id).toBe("manager");
+});
+
+test("loadConversation restores everything and newChat then empties the thread", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
+  const { result } = setup();
+  await act(async () => { await result.current.send("First"); });
+  const saved: Conversation = { id: "c1", title: "First", createdAt: 1, updatedAt: 1, flagged: false, state: result.current.state };
+  act(() => result.current.newChat());
+  expect(result.current.state.messages).toHaveLength(0);
+  act(() => result.current.loadConversation(saved));
+  expect(result.current.state.messages).toHaveLength(2);
+  expect(result.current.state.spendUsd).toBeCloseTo(0.001);
+  act(() => result.current.newChat());
+  expect(result.current.state.messages).toHaveLength(0);
+});
+
+test("ids generated after loadConversation never collide with restored ids", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(ok());
+  const { result } = setup();
+  const restored: Conversation = {
+    id: "c9", title: "t", createdAt: 1, updatedAt: 1, flagged: false,
+    state: { ...result.current.state, messages: [{ id: "m9000", kind: "user", text: "old", persona: "employee" }, { id: "m9001", kind: "assistant", replyTo: "m9000", persona: "employee", model: "eis-gpt-mini", engine: "langchain", status: "done", response: ok() }] },
+  };
+  act(() => result.current.loadConversation(restored));
+  await act(async () => { await result.current.send("new"); });
+  const ids = result.current.state.messages.map((m) => m.id);
+  expect(new Set(ids).size).toBe(ids.length);
+});

@@ -6,7 +6,8 @@ import { PasswordGate } from "./components/PasswordGate";
 import { Header } from "./components/Header";
 import { AppShell } from "./components/AppShell";
 import { RailDisclosure } from "./components/RailDisclosure";
-import { PersonaRail, personaLabel } from "./components/PersonaRail";
+import { PersonaRail } from "./components/PersonaRail";
+import { personaLabel } from "./lib/persona";
 import { ModelControls } from "./components/ModelControls";
 import { ChatThread } from "./components/ChatThread";
 import { EmptyState } from "./components/EmptyState";
@@ -22,7 +23,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
   personas: Persona[]; models: ModelInfo[]; config: AppConfig | null; refreshModels: () => void; draftControl: DraftControl;
 }) {
   const session = useChatSession(personas, models, refreshModels, draftControl);
-  const { state, dispatch, send, retry, askAgain, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj, personaName } = session;
+  const { state, dispatch, send, retry, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj, personaName } = session;
   const [xrayOpen, setXrayOpen] = useState(false);
   // the one source of truth for "is the LLM Observability a column or a sheet"; 80rem matches Tailwind's xl, so it follows the user's font size like the layout does
   const xrayInline = useMediaQuery("(min-width: 80rem)");
@@ -51,7 +52,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
           <ChatThread
             messages={state.messages} models={models} pending={pending} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
             onSelect={(id) => { dispatch({ type: "select", id }); if (!xrayInline) setXrayOpen(true); }}
-            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id, modelKey) => void retry(id, modelKey)} onAskAgain={askAgain}
+            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id, modelKey) => void retry(id, modelKey)} onAskAgain={(text) => void send(text)}
           />
         ) : (
           <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
