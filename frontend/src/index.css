@@ -71,3 +71,10 @@
 @keyframes drift2 { to { transform: translate(-8%, -6%) scale(1.1); } }
 @keyframes drift3 { to { transform: translate(-6%, 8%) scale(.94); } }
 @media (prefers-reduced-motion: reduce) { .mesh i { animation: none; } }
+
+/* Curved inner corners of the View More tab */
+.view-tab::before, .view-tab::after { content: ""; position: absolute; right: 0; width: 24px; height: 24px; pointer-events: none; }
+.view-tab::before { top: -24px; background: radial-gradient(circle at 0 0, transparent 23.5px, var(--color-blue) 24px); }
+.view-tab::after { bottom: -24px; background: radial-gradient(circle at 0 100%, transparent 23.5px, var(--color-blue) 24px); }
+.view-tab:hover::before { background: radial-gradient(circle at 0 0, transparent 23.5px, var(--color-blue-strong) 24px); }
+.view-tab:hover::after { background: radial-gradient(circle at 0 100%, transparent 23.5px, var(--color-blue-strong) 24px); }

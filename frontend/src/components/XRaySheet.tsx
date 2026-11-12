@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { X } from "@phosphor-icons/react";
+import { CloseCircleIcon } from "./icons";
 
 // Shared across instances so nested or double locks restore the original value exactly once.
 let locks = 0;
@@ -20,7 +20,7 @@ function lockScroll() {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/* Below xl the LLM Observability is a bottom sheet (the grid shows it inline at xl, so the sheet is hidden there). It renders only while open. */
+/* On small screens the LLM Observability is a modal bottom sheet (ObservabilityDrawer picks it). It renders only while open. */
 export function XRaySheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -57,7 +57,7 @@ export function XRaySheet({ open, onClose, children }: { open: boolean; onClose:
   return (
     <AnimatePresence>
       {open && (
-        <div className="xl:hidden">
+        <div>
           <motion.div data-testid="xray-scrim" className="fixed inset-0 z-40 bg-ink/60" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} aria-hidden />
           <motion.div
             ref={dialogRef} role="dialog" aria-modal="true" aria-label="LLM Observability"
@@ -65,7 +65,7 @@ export function XRaySheet({ open, onClose, children }: { open: boolean; onClose:
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 140, damping: 20 }}
           >
             <button ref={closeRef} type="button" onClick={onClose} aria-label="Close LLM Observability" className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-control hover:bg-ink-2">
-              <X size={18} aria-hidden />
+              <CloseCircleIcon size={20} />
             </button>
             {children}
           </motion.div>
