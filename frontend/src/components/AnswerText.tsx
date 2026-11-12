@@ -1,4 +1,6 @@
 import Markdown from "react-markdown";
+import { SourceLogo } from "./BrandLogo";
+import { SOURCE_LABEL, sourceFor } from "../lib/sources";
 
 const ID = "[a-z0-9][a-z0-9-]{1,60}";
 // one id, or a list of ids separated by commas or semicolons: [a], [a, b], [a; b]
@@ -37,10 +39,13 @@ function citationPlugin(knownIds: ReadonlySet<string>) {
 
 const VALID_ID = /^[a-z0-9][a-z0-9-]{1,60}$/;
 
-export function AnswerText({ text, knownIds, onCitation }: { text: string; knownIds: ReadonlySet<string>; onCitation: (docId: string) => void }) {
+/** How a citation renders: its number and source logo, and where it links (undefined = no link, it only selects). */
+export type Citation = { href: (docId: string) => string | undefined; titleOf: (docId: string) => string; numberOf: (docId: string) => number };
+
+export function AnswerText({ text, knownIds, onCitation, citation }: { text: string; knownIds: ReadonlySet<string>; onCitation: (docId: string) => void; citation?: Citation }) {
   if (!text) return null;
   return (
-    <div className="min-w-0 max-w-full break-words text-[15.5px] leading-relaxed text-ink [overflow-wrap:anywhere] [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 first:[&_p]:mt-0 last:[&_p]:mb-0 [&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-control [&_pre]:bg-canvas [&_pre]:p-3 [&_code]:break-words [&_code]:font-mono [&_code]:text-[13px] [&_pre_code]:break-normal">
+    <div className="min-w-0 max-w-full break-words text-base leading-[1.75] text-ink [&>p]:font-medium [&_strong]:font-bold [overflow-wrap:anywhere] [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 first:[&_p]:mt-0 last:[&_p]:mb-0 [&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-control [&_pre]:bg-canvas [&_pre]:p-3 [&_code]:break-words [&_code]:font-mono [&_code]:text-[13px] [&_pre_code]:break-normal">
       <Markdown
         skipHtml
         remarkPlugins={[citationPlugin(knownIds)]}
@@ -48,15 +53,26 @@ export function AnswerText({ text, knownIds, onCitation }: { text: string; known
         components={{
           a: ({ href, children }) => {
             const id = href?.startsWith("cite:") ? href.slice(5) : "";
-            return VALID_ID.test(id) && knownIds.has(id) ? (
+            if (!(VALID_ID.test(id) && knownIds.has(id))) return <span>{children}</span>;
+            if (citation) {
+              const source = sourceFor(id);
+              const name = `${citation.titleOf(id)} · ${SOURCE_LABEL[source]}`;
+              const to = citation.href(id);
+              const cls = "num mx-0.5 inline-flex h-[22px] items-center gap-1 rounded-full bg-white px-2 align-baseline text-[11.5px] font-bold text-blue shadow-[0_0_0_1px_#dfe5f1] transition hover:-translate-y-px hover:shadow-[0_0_0_1.5px_var(--color-blue)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue";
+              const inner = <><SourceLogo source={source} /><span>{citation.numberOf(id)}</span></>;
+              return to ? (
+                <a href={to} target="_blank" rel="noopener noreferrer" aria-label={`${name}. Opens in Discover.`} title={`${name}. Opens in Discover.`} onClick={() => onCitation(id)} className={cls}>{inner}</a>
+              ) : (
+                <button type="button" aria-label={name} title={name} onClick={() => onCitation(id)} className={cls}>{inner}</button>
+              );
+            }
+            return (
               <button
                 type="button" onClick={() => onCitation(id)}
                 className="num mx-0.5 inline-block max-w-full break-all rounded-full bg-blue-soft px-2 py-0.5 align-baseline text-[12px] font-bold text-blue-strong transition hover:bg-blue hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
               >
                 {children}
               </button>
-            ) : (
-              <span>{children}</span>
             );
           },
           img: ({ alt }) => <span>{alt}</span>,

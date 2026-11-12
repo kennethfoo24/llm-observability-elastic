@@ -23,7 +23,7 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
   personas: Persona[]; models: ModelInfo[]; config: AppConfig | null; refreshModels: () => void; draftControl: DraftControl;
 }) {
   const session = useChatSession(personas, models, refreshModels, draftControl);
-  const { state, dispatch, send, retry, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj, personaName } = session;
+  const { state, dispatch, send, retry, askAgain, regenerate, selectCitation, highlightDocId, draft, setDraft, pending, current, question, personaObj } = session;
   const [xrayOpen, setXrayOpen] = useState(false);
   // the one source of truth for "is the LLM Observability a column or a sheet"; 80rem matches Tailwind's xl, so it follows the user's font size like the layout does
   const xrayInline = useMediaQuery("(min-width: 80rem)");
@@ -50,12 +50,13 @@ function Workspace({ personas, models, config, refreshModels, draftControl }: {
       thread={
         hasMessages ? (
           <ChatThread
-            messages={state.messages} models={models} pending={pending} selectedId={state.selectedId} askAgainAs={personaObj?.name ?? ""} personaName={personaName}
-            onSelect={(id) => { dispatch({ type: "select", id }); if (!xrayInline) setXrayOpen(true); }}
-            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline) setXrayOpen(true); }} onRetry={(id, modelKey) => void retry(id, modelKey)} onAskAgain={(text) => void send(text)}
+            messages={state.messages} models={models} personas={personas} pending={pending} selectedId={state.selectedId} kibanaUrl={config?.kibana_url}
+            onSelect={(id) => dispatch({ type: "select", id })} onOpenDetails={() => { if (!xrayInline) setXrayOpen(true); }}
+            onCitation={(docId, msgId) => { selectCitation(docId, msgId); if (!xrayInline && !config?.kibana_url) setXrayOpen(true); }}
+            onRetry={(id, modelKey) => void retry(id, modelKey)} onAskAgain={askAgain} onRegenerate={regenerate} onEdit={(t) => setDraft(t)}
           />
         ) : (
-          <EmptyState personaName={personaObj?.name ?? ""} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
+          <EmptyState persona={personaObj} suggestions={SUGGESTIONS[state.persona] ?? []} onPick={(q) => void send(q)} />
         )
       }
       composer={<Composer value={draft} onChange={setDraft} onSend={(t) => void send(t)} asking={asking} pending={pending} extra={<RedTeamMenu onPick={(t) => setDraft(draft.trim() ? `${draft}\n${t}` : t)} disabled={pending} />} />}

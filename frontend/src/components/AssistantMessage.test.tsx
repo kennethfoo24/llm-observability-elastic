@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import userEvent from "@testing-library/user-event";
 import { AssistantMessage } from "./AssistantMessage";
 import type { AssistantMsg } from "../state/chatState";
-import type { ChatResponse } from "../lib/types";
+import type { ChatResponse, Persona } from "../lib/types";
 
 const response = (over: Partial<ChatResponse> = {}): ChatResponse => ({
   answer: "You get 18 days [pto-policy].", blocked: false, block_reason: [], trace_id: "t1", persona: "employee", model: "gpt-5.4-mini", engine: "sdk",
@@ -18,16 +19,90 @@ const models = [
   { key: "eis-gpt-mini", label: "GPT-5.4 mini", provider: "eis" as const, model_id: "g1", available: true },
   { key: "gemma", label: "Gemma 4 31B (self-hosted)", provider: "gemma" as const, model_id: "gm", available: false },
 ];
-const base = { models, selected: false, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), personaName: "Maya Lim" };
+const maya: Persona = { id: "employee", name: "Maya Lim", title: "Software Engineer", can_read_docs: 6, total_docs: 20 };
+const daniel: Persona = { id: "manager", name: "Daniel Ong", title: "Engineering Manager", can_read_docs: 11, total_docs: 20 };
+const base = {
+  models, selected: false, onSelect: vi.fn(), onCitation: vi.fn(), onRetry: vi.fn(), personaName: "Maya Lim", persona: maya, otherPersona: daniel,
+  kibanaUrl: "https://kb.example", pending: false, onAskAgain: vi.fn(), onRegenerate: vi.fn(), onOpenDetails: vi.fn(),
+};
 
-test("a done answer shows text, a meta row and an Inspect control", async () => {
-  const onSelect = vi.fn();
-  render(<AssistantMessage {...base} onSelect={onSelect} msg={msg()} />);
+test("a done answer shows the text, a guardrail chip, the source count, and no old meta row or Inspect button", () => {
+  render(<AssistantMessage {...base} msg={msg()} />);
   expect(screen.getByText(/you get 18 days/i)).toBeInTheDocument();
-  expect(screen.getByText(/1 source/i)).toBeInTheDocument();
-  expect(screen.getByText("$0.00042")).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: /inspect/i }));
+  expect(screen.getByRole("button", { name: /guardrail passed/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /1 source/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /inspect/i })).toBeNull();
+  expect(screen.queryByText("$0.00042")).toBeNull();
+});
+
+test("clicking a status chip selects the answer and opens the details", async () => {
+  const onSelect = vi.fn();
+  const onOpenDetails = vi.fn();
+  render(<AssistantMessage {...base} onSelect={onSelect} onOpenDetails={onOpenDetails} msg={msg()} />);
+  await userEvent.click(screen.getByRole("button", { name: /guardrail passed/i }));
   expect(onSelect).toHaveBeenCalledWith("a1");
+  expect(onOpenDetails).toHaveBeenCalledWith("a1");
+});
+
+test("shows how many documents were hidden by access control, and nothing when none were", () => {
+  const hidden = [{ id: "salary-bands", title: "Salary Bands", classification: "confidential" }];
+  const { rerender } = render(<AssistantMessage {...base} msg={msg({ response: response({ hidden }) })} />);
+  expect(screen.getByText("1 document hidden by access control")).toBeInTheDocument();
+  rerender(<AssistantMessage {...base} msg={msg({ response: response({ hidden: [...hidden, { ...hidden[0], id: "x" }] }) })} />);
+  expect(screen.getByText("2 documents hidden by access control")).toBeInTheDocument();
+  rerender(<AssistantMessage {...base} msg={msg()} />);
+  expect(screen.queryByText(/hidden by access control/)).toBeNull();
+});
+
+test("a flagged answer gets a pink Flagged chip and a blocked one a Blocked chip", () => {
+  const flagged = response({ guardrail: { verdict: "FLAGGED", reasons: ["pii_salary"], status: "ok", latency_ms: 30, injection_score: 0.02 } });
+  const { rerender } = render(<AssistantMessage {...base} msg={msg({ response: flagged })} />);
+  expect(screen.getByRole("button", { name: /^flagged: salary figure/i })).toBeInTheDocument();
+  const blocked = response({ blocked: true, answer: "", block_reason: ["prompt_injection"], guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 30, injection_score: 0.9 } });
+  rerender(<AssistantMessage {...base} msg={msg({ response: blocked })} />);
+  expect(screen.getByRole("button", { name: /^blocked: prompt injection attempt/i })).toBeInTheDocument();
+});
+
+test("Ask again names the other persona and calls onAskAgain; Regenerate calls onRegenerate", async () => {
+  const onAskAgain = vi.fn();
+  const onRegenerate = vi.fn();
+  render(<AssistantMessage {...base} onAskAgain={onAskAgain} onRegenerate={onRegenerate} msg={msg()} />);
+  await userEvent.click(screen.getByRole("button", { name: "Ask again as Daniel Ong" }));
+  expect(onAskAgain).toHaveBeenCalledWith("a1");
+  await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+  expect(onRegenerate).toHaveBeenCalledWith("a1");
+});
+
+test("both action pills are disabled while a request is pending", () => {
+  render(<AssistantMessage {...base} pending msg={msg()} />);
+  expect(screen.getByRole("button", { name: "Ask again as Daniel Ong" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Regenerate" })).toBeDisabled();
+});
+
+test("there are no thumbs, copy or more buttons and no model or latency line above the answer", () => {
+  render(<AssistantMessage {...base} msg={msg()} />);
+  expect(screen.queryByRole("button", { name: /copy|helpful|thumb|more/i })).toBeNull();
+  expect(screen.queryByText(/FOO CORP HR/i)).toBeNull();
+});
+
+test("citations link to Discover for retrieved documents only", () => {
+  render(<AssistantMessage {...base} msg={msg({ response: response({ answer: "See [pto-policy] and [ghost]." }) })} />);
+  const link = screen.getByRole("link", { name: /Paid Time Off Policy · Confluence/ });
+  expect(link.getAttribute("href")).toContain("https://kb.example/app/discover");
+  expect(link.getAttribute("href")).toContain(encodeURIComponent("pto-policy").replace(/%2D/g, "-"));
+  expect(screen.queryByRole("link", { name: /ghost/ })).toBeNull();
+  expect(screen.getByText(/\[ghost\]/)).toBeInTheDocument();
+});
+
+test("without a Kibana URL a citation is a button, not a link", () => {
+  render(<AssistantMessage {...base} kibanaUrl={undefined} msg={msg()} />);
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(screen.getByRole("button", { name: /Paid Time Off Policy · Confluence/ })).toBeInTheDocument();
+});
+
+test("a done answer has no axe violations", async () => {
+  const { container } = render(<AssistantMessage {...base} msg={msg()} />);
+  expect(await axe(container)).toHaveNoViolations();
 });
 
 test("pending shows a busy skeleton instead of empty space", () => {
@@ -71,13 +146,6 @@ test("gemma offline and upstream errors show a recoverable error with retry", as
 test("an empty answer string is shown as a neutral message, not blank", () => {
   render(<AssistantMessage {...base} msg={msg({ response: response({ answer: "" }) })} />);
   expect(screen.getByText(/no answer was returned/i)).toBeInTheDocument();
-});
-
-test("citations in a done answer only chip documents that were retrieved", () => {
-  render(<AssistantMessage {...base} msg={msg({ response: response({ answer: "See [pto-policy] and [ghost]." }) })} />);
-  expect(screen.getByRole("button", { name: "pto-policy" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "ghost" })).toBeNull();
-  expect(screen.getByText(/\[ghost\]/)).toBeInTheDocument();
 });
 
 test("an error status with no error object still shows a generic recoverable error", async () => {

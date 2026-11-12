@@ -124,3 +124,37 @@ test("lists inside code spans and fences are untouched", () => {
   expect(container.textContent).toContain("[pto-policy, remote-work]");
   expect(container.textContent).toContain("[pto-policy; remote-work]");
 });
+
+const citation = (href?: (id: string) => string | undefined) => ({
+  href: href ?? ((id: string) => `https://kb.example/doc/${id}`),
+  titleOf: (id: string) => (id === "pto-policy" ? "Paid Time Off Policy" : "Remote Work Guidelines"),
+  numberOf: (id: string) => (id === "pto-policy" ? 1 : 2),
+});
+
+test("with a Discover link a citation is a new-tab link showing the source logo and number, and still reports the click", async () => {
+  const onCitation = vi.fn();
+  render(<AnswerText knownIds={KNOWN} text="18 days [pto-policy]." onCitation={onCitation} citation={citation()} />);
+  const link = screen.getByRole("link", { name: "Paid Time Off Policy · Confluence. Opens in Discover." });
+  expect(link).toHaveAttribute("href", "https://kb.example/doc/pto-policy");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  expect(link).toHaveTextContent("1");
+  expect(link).not.toHaveTextContent("pto-policy");
+  await userEvent.click(link);
+  expect(onCitation).toHaveBeenCalledWith("pto-policy");
+});
+
+test("without a link target a citation is a button that selects", async () => {
+  const onCitation = vi.fn();
+  render(<AnswerText knownIds={KNOWN} text="18 days [pto-policy]." onCitation={onCitation} citation={citation(() => undefined)} />);
+  expect(screen.queryByRole("link")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Paid Time Off Policy · Confluence" }));
+  expect(onCitation).toHaveBeenCalledWith("pto-policy");
+});
+
+test("a citation id that was not retrieved is plain text, never a link or button", () => {
+  render(<AnswerText knownIds={KNOWN} text="See [ghost-doc] here." onCitation={vi.fn()} citation={citation()} />);
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(screen.queryByRole("button")).toBeNull();
+  expect(screen.getByText(/ghost-doc/)).toBeInTheDocument();
+});

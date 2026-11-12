@@ -1,8 +1,20 @@
-export function UserMessage({ text }: { text: string }) {
+import { Avatar } from "./Avatar";
+import { EditIcon } from "./icons";
+
+/* A question: the asker's photo, the text, and a round edit button that puts the text back in the prompt bar. */
+export function UserMessage({ text, name, personaId, onEdit }: { text: string; name: string; personaId?: string; onEdit?: (text: string) => void }) {
   return (
-    <div className="flex justify-end">
-      {/* The one intentional exception to the shape rule: the tail corner (rounded-br-[6px]) marks the speaker. */}
-      <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-card rounded-br-[6px] bg-blue px-4 py-2.5 text-white">{text}</p>
+    <div className="flex items-center gap-2.5 text-[15px] text-text">
+      <Avatar name={name} personaId={personaId} size={28} />
+      <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{text}</p>
+      {onEdit && (
+        <button
+          type="button" aria-label="Edit and resend" title="Edit and resend" onClick={() => onEdit(text)}
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
+        >
+          <EditIcon size={16} />
+        </button>
+      )}
     </div>
   );
 }
