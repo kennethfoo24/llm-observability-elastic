@@ -17,10 +17,12 @@ const SOURCE_MARK: Partial<Record<SourceKey, { url: string; color: string; onDar
 };
 
 function Mask({ url, color, size, opacity }: { url: string; color: string; size: number; opacity?: number }) {
+  // quoted and escaped: Vite may inline a small SVG as a data URI, and an unquoted url() with spaces or quotes in it is dropped by the browser
+  const mark = `url("${url.replace(/"/g, "%22")}") center / contain no-repeat`;
   return (
     <span
       aria-hidden className="inline-block shrink-0 align-middle"
-      style={{ width: size, height: size, background: color, opacity, WebkitMask: `url(${url}) center / contain no-repeat`, mask: `url(${url}) center / contain no-repeat` }}
+      style={{ width: size, height: size, background: color, opacity, WebkitMask: mark, mask: mark }}
     />
   );
 }

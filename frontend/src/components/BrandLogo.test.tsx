@@ -22,3 +22,9 @@ describe("BrandLogo", () => {
     }
   });
 });
+
+test("the mask url is quoted so an inlined data URI logo is not dropped by the browser", () => {
+  const { container } = render(<ModelLogo model={{ key: "eis-gpt-mini", provider: "eis", model_id: "gpt-5.4-mini" }} />);
+  const style = (container.firstElementChild as HTMLElement).getAttribute("style") ?? "";
+  expect(style).toMatch(/url\(["']/);
+});
