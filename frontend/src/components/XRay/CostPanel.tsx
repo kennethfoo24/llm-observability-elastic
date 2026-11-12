@@ -1,9 +1,7 @@
 import { formatCost, formatTokens } from "../../lib/format";
-import { costDashboardUrl } from "../../lib/kibanaLinks";
-import { ExtLink } from "./ExtLink";
 import type { ChatResponse } from "../../lib/types";
 
-export function CostPanel({ r, kibanaUrl }: { r: ChatResponse; kibanaUrl?: string }) {
+export function CostPanel({ r }: { r: ChatResponse }) {
   const stat = (label: string, value: number) => (
     <div className="min-w-0">
       <dt className="text-xs text-on-ink-muted">{label}</dt>
@@ -22,7 +20,6 @@ export function CostPanel({ r, kibanaUrl }: { r: ChatResponse; kibanaUrl?: strin
         {stat("Thinking tokens", r.usage.thinking_tokens)}
       </dl>
       <p className="num mt-4 break-all text-xs text-on-ink-muted">{r.model}</p>
-      {kibanaUrl && <div className="mt-4"><ExtLink href={costDashboardUrl(kibanaUrl)}>Open cost dashboard</ExtLink></div>}
     </div>
   );
 }

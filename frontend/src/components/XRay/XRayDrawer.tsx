@@ -1,7 +1,10 @@
 import { useId } from "react";
 import { motion } from "motion/react";
 import { ExtLink } from "./ExtLink";
-import { owaspDashboardUrl, qualityDashboardUrl, traceUrl } from "../../lib/kibanaLinks";
+import { costDashboardUrl, devToolsUrl, owaspDashboardUrl, qualityDashboardUrl, qualityDevToolsUrl, responseLogUrl, traceUrl } from "../../lib/kibanaLinks";
+import { DEVTOOLS_HELP, QUALITY_HELP } from "../../lib/copy";
+import { qualityInput } from "../../lib/quality";
+import { ExternalIcon } from "../icons";
 import { CostPanel } from "./CostPanel";
 import { GuardrailStrip } from "./GuardrailStrip";
 import { QualityPanel } from "./QualityPanel";
@@ -15,13 +18,26 @@ import type { GuardrailConfig } from "../../lib/kibanaLinks";
 
 type Props = { msg: AssistantMsg | null; persona: Persona | undefined; question: string | undefined; kibanaUrl: string | undefined; securityKibanaUrl?: string | null; guardrailConfig?: GuardrailConfig; qualityPipeline?: string; highlightDocId: string | null };
 
-function Section({ title, action, children }: { title: string; action?: { label: string; href: string }; children: React.ReactNode }) {
+type Link = { label: string; href: string };
+
+/* The title can itself be a link (Dev Tools, with the hint as its tooltip); `actions` are the small links stacked on the right. */
+function Section({ title, titleLink, actions, children }: { title: string; titleLink?: { href: string; hint: string }; actions?: Link[]; children: React.ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="min-w-0 border-t border-ink-line px-5 py-5 first:border-t-0">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 id={id} className="text-sm font-semibold">{title}</h3>
-        {action && <ExtLink href={action.href} icon={false} className="text-xs font-medium text-blue-bright hover:underline">{action.label} ↗</ExtLink>}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <h3 id={id} className="text-sm font-semibold">
+          {titleLink ? (
+            <a href={titleLink.href} target="_blank" rel="noreferrer noopener" title={`${titleLink.hint} Opens in a new tab.`} className="inline-flex items-center gap-1.5 underline decoration-ink-line decoration-dotted underline-offset-4 hover:decoration-current">
+              {title}<ExternalIcon size={13} />
+            </a>
+          ) : title}
+        </h3>
+        {actions && actions.length > 0 && (
+          <div className="flex flex-col items-end gap-1">
+            {actions.map((a) => <ExtLink key={a.label} href={a.href} icon={false} className="text-xs font-medium text-blue-bright hover:underline">{a.label} ↗</ExtLink>)}
+          </div>
+        )}
       </div>
       {children}
     </section>
@@ -40,6 +56,8 @@ function Skeleton() {
 
 export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUrl, guardrailConfig, qualityPipeline, highlightDocId }: Props) {
   const r = msg?.response;
+  const guardrailDevTools = r && kibanaUrl && question && guardrailConfig ? devToolsUrl(kibanaUrl, question, guardrailConfig) : null;
+  const qualityDevTools = r && kibanaUrl && question && qualityPipeline ? qualityDevToolsUrl(kibanaUrl, qualityInput(r, question), qualityPipeline) : null;
   const findings = useFindings(r?.trace_id, msg?.status === "done" && !!r && !r.blocked);
   return (
     <div className="min-w-0 pb-8">
@@ -62,21 +80,20 @@ export function XRayDrawer({ msg, persona, question, kibanaUrl, securityKibanaUr
 
       {msg?.status === "done" && r && (
         <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 140, damping: 20 }}>
-          <Section title="Guardrail"><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} prompt={question} guardrailConfig={guardrailConfig} /></Section>
-          <Section title="Security" action={kibanaUrl ? { label: "OWASP Top 10 dashboard", href: owaspDashboardUrl(kibanaUrl) } : undefined}><SecurityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
-          <Section title="Quality" action={kibanaUrl ? { label: "Quality dashboard", href: qualityDashboardUrl(kibanaUrl) } : undefined}><QualityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} prompt={question} qualityPipeline={qualityPipeline} /></Section>
-          <Section title="Trace">
+          <Section title="Guardrail" titleLink={guardrailDevTools ? { href: guardrailDevTools, hint: DEVTOOLS_HELP } : undefined}><GuardrailStrip r={r} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
+          <Section title="Security" actions={kibanaUrl ? [{ label: "OWASP Top 10 dashboard", href: owaspDashboardUrl(kibanaUrl) }] : undefined}><SecurityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} securityKibanaUrl={securityKibanaUrl} /></Section>
+          <Section
+            title="Quality" titleLink={qualityDevTools ? { href: qualityDevTools, hint: QUALITY_HELP } : undefined}
+            actions={kibanaUrl ? [{ label: "Quality dashboard", href: qualityDashboardUrl(kibanaUrl) }, ...(r.trace_id ? [{ label: "Log", href: responseLogUrl(kibanaUrl, r.trace_id) }] : [])] : undefined}
+          ><QualityPanel r={r} findings={findings} kibanaUrl={kibanaUrl} /></Section>
+          <Section title="Trace" actions={kibanaUrl && r.trace_id ? [{ label: "Trace", href: traceUrl(kibanaUrl, r.trace_id) }] : undefined}>
             <Waterfall stages={r.stages} verdict={r.guardrail.verdict} scored={r.guardrail.injection_score !== null} />
-            {kibanaUrl && r.trace_id ? (
-              <ExtLink href={traceUrl(kibanaUrl, r.trace_id)} className="mt-4 inline-flex items-center gap-2 rounded-control border border-ink-line px-3 py-2 text-sm font-medium transition hover:bg-ink-2">Open trace in Kibana</ExtLink>
-            ) : (
-              <p className="mt-4 text-xs text-on-ink-muted">Trace link unavailable</p>
-            )}
+            {!(kibanaUrl && r.trace_id) && <p className="mt-4 text-xs text-on-ink-muted">Trace link unavailable</p>}
           </Section>
           <Section title="Retrieval">
             <Retrieval docs={r.docs} hidden={r.hidden} personaName={persona?.name ?? "this person"} highlightDocId={highlightDocId} kibanaUrl={kibanaUrl} />
           </Section>
-          <Section title="Cost"><CostPanel r={r} kibanaUrl={kibanaUrl} /></Section>
+          <Section title="Cost" actions={kibanaUrl ? [{ label: "Cost", href: costDashboardUrl(kibanaUrl) }] : undefined}><CostPanel r={r} /></Section>
         </motion.div>
       )}
     </div>

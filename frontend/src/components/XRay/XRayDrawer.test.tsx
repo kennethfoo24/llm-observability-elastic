@@ -33,7 +33,7 @@ test("pending shows a busy skeleton", () => {
 test("a done answer shows every section and the Kibana deep link", () => {
   render(<XRayDrawer {...props} msg={msg(response())} />);
   for (const h of ["Guardrail", "Security", "Quality", "Trace", "Retrieval", "Cost"]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
-  const link = screen.getByRole("link", { name: /open trace in kibana/i });
+  const link = screen.getByRole("link", { name: /^trace/i });
   expect(link).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/4bf92f3577b34da6a3ce929d0e0e4736");
   expect(link).toHaveAttribute("target", "_blank");
   expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
@@ -92,7 +92,7 @@ test("degraded guardrail shows a Degraded badge", () => {
 
 test("missing kibana url or trace id shows a muted note instead of a broken link", () => {
   render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
-  expect(screen.queryByRole("link", { name: /open trace/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^trace/i })).toBeNull();
   expect(screen.getByText(/trace link unavailable/i)).toBeInTheDocument();
 });
 
@@ -142,7 +142,7 @@ test("scores are rounded to at most two decimals", () => {
 
 test("a missing trace id shows the unavailable note and never prints the id", () => {
   render(<XRayDrawer {...props} msg={msg(response({ trace_id: "" }))} />);
-  expect(screen.queryByRole("link", { name: /open trace/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^trace/i })).toBeNull();
   expect(screen.getByText(/trace link unavailable/i)).toBeInTheDocument();
 });
 
@@ -184,7 +184,7 @@ test("two drawers mounted together never share section ids", () => {
 
 test("the Kibana link encodes the trace id and says it opens in a new tab", () => {
   render(<XRayDrawer {...props} msg={msg(response({ trace_id: "a/b c" }))} />);
-  const link = screen.getByRole("link", { name: /open trace in kibana/i });
+  const link = screen.getByRole("link", { name: /^trace/i });
   expect(link).toHaveAttribute("href", "https://kb.example/app/apm/link-to/trace/a%2Fb%20c");
   expect(link).toHaveTextContent("(opens in a new tab)");
 });
@@ -284,48 +284,48 @@ test("document titles are plain text without a Kibana URL", () => {
 
 test("the cost section links to the cost dashboard, hidden without a Kibana URL", () => {
   const { unmount } = render(<XRayDrawer {...props} msg={msg(response())} />);
-  expect(screen.getByRole("link", { name: /open cost dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-overview");
+  expect(screen.getByRole("link", { name: /^cost/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/glassbox-overview");
   unmount();
   render(<XRayDrawer {...props} kibanaUrl={undefined} msg={msg(response())} />);
-  expect(screen.queryByRole("link", { name: /open cost dashboard/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^cost/i })).toBeNull();
 });
 
 const gr = { models: { injection: "inj__model", ner: "ner__model" }, pipeline: "genai-guardrail" };
 
 test("Dev Tools link shows for clean and flagged verdicts, built from this message prompt", () => {
   const { unmount } = render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response())} />);
-  const link = within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: /try it in dev tools/i });
+  const link = within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: "Guardrail" });
   expect(link.getAttribute("href")).toMatch(/^https:\/\/kb\.example\/app\/dev_tools#\/console\?load_from=data:text\/plain,/);
-  expect(within(screen.getByRole("region", { name: "Guardrail" })).getByText(/needs a kibana login/i)).toBeInTheDocument();
+  expect(link).toHaveAttribute("title", expect.stringMatching(/needs a kibana login/i));
   unmount();
   render(<XRayDrawer {...props} guardrailConfig={gr} msg={msg(response({ guardrail: { verdict: "FLAGGED", reasons: ["pii_email"], status: "ok", latency_ms: 3, injection_score: 0.1 } }))} />);
-  expect(within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: /try it in dev tools/i })).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "Guardrail" })).getByRole("link", { name: "Guardrail" })).toBeInTheDocument();
 });
 
 test("Dev Tools link is hidden without kibana url, guardrail config or prompt", () => {
   const { unmount } = render(<XRayDrawer {...props} kibanaUrl={undefined} guardrailConfig={gr} msg={msg(response())} />);
-  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Guardrail" })).toBeNull();
   unmount();
   const u2 = render(<XRayDrawer {...props} msg={msg(response())} />);
-  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Guardrail" })).toBeNull();
   u2.unmount();
   render(<XRayDrawer {...props} question={undefined} guardrailConfig={gr} msg={msg(response())} />);
-  expect(screen.queryByRole("link", { name: /dev tools/i })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Guardrail" })).toBeNull();
 });
 
 test("an answered response shows Quality with its links and no checklist of untriggered checks", () => {
   render(<XRayDrawer {...props} qualityPipeline="genai-quality" msg={msg(response())} />);
   const q = screen.getByRole("region", { name: "Quality" });
   expect(within(q).getByText(/5 to 10 seconds/)).toBeInTheDocument();
-  const dev = within(q).getByRole("link", { name: /try it in dev tools/i });
+  const dev = within(q).getByRole("link", { name: "Quality" });
   const text = decompressFromEncodedURIComponent(dev.getAttribute("href")!.split("load_from=data:text/plain,")[1])!;
   expect(text).toContain("POST _ingest/pipeline/genai-quality/_simulate");
-  expect(within(q).getByRole("link", { name: /open the response log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
+  expect(within(q).getByRole("link", { name: /^log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
   expect(within(q).getByRole("link", { name: /^quality dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/c594777c-8647-4005-8b0c-b1fc7f14dbf1?_g=(filters:!())");
   expect(within(q).queryByText("What Elastic checks on this answer")).toBeNull();
   expect(within(q).queryByRole("list")).toBeNull();
   expect(within(screen.getByRole("region", { name: "Security" })).getByRole("link", { name: /^owasp top 10 dashboard/i })).toHaveAttribute("href", "https://kb.example/app/dashboards#/view/ea67e371-a99e-43ab-b3a8-eb577af00c58?_g=(filters:!())");
-  expect(within(q).getByText(/needs a kibana login/i)).toBeInTheDocument();
+  expect(dev).toHaveAttribute("title", expect.stringMatching(/needs a kibana login/i));
 });
 
 test("a blocked response says there is nothing to score under Quality", () => {
@@ -338,7 +338,7 @@ test("without a Kibana url the quality links are hidden; without the pipeline on
   const q = () => screen.getByRole("region", { name: "Quality" });
   expect(within(q()).queryAllByRole("link")).toHaveLength(0);
   rerender(<XRayDrawer {...props} msg={msg(response())} />);
-  expect(within(q()).queryByRole("link", { name: /dev tools/i })).toBeNull();
+  expect(within(q()).queryByRole("link", { name: "Quality" })).toBeNull();
   expect(within(q()).getAllByRole("link")).toHaveLength(2);
 });
 
@@ -357,7 +357,7 @@ test("without a Kibana URL there are no dashboard header links", () => {
 test("both Try it in Dev Tools links still render when their inputs exist", () => {
   const gr = { models: { injection: "inj", ner: "ner" }, pipeline: "genai-guardrail" };
   render(<XRayDrawer {...props} guardrailConfig={gr} qualityPipeline="genai-quality" msg={msg(response())} />);
-  expect(screen.getAllByRole("link", { name: /try it in dev tools/i })).toHaveLength(2);
+  expect(screen.getAllByRole("link", { name: /^(guardrail|quality)$/i })).toHaveLength(2);
 });
 
 test("the header is the title alone: no subtitle paragraph and no question quote", () => {
@@ -381,4 +381,35 @@ test("a hidden document has a logo but no link", () => {
   const hidden = screen.getByText(/project aurora/i).closest("li")!;
   expect(hidden.querySelector("a")).toBeNull();
   expect(hidden.querySelector('[aria-hidden="true"]')).not.toBeNull();
+});
+
+test("the old buttons are gone: no Try it in Dev Tools, Open trace, Open cost dashboard or Open the response log", () => {
+  const gr2 = { models: { injection: "i", ner: "n" }, pipeline: "genai-guardrail" };
+  render(<XRayDrawer {...props} guardrailConfig={gr2} qualityPipeline="genai-quality" msg={msg(response())} />);
+  expect(screen.queryByRole("link", { name: /try it in dev tools|open trace|open cost|open the response log/i })).toBeNull();
+  expect(screen.queryByText(/runs the same elastic hosted models/i)).toBeNull();
+});
+
+test("Guardrail and Quality titles are links to Dev Tools, and plain headings without one", () => {
+  const gr2 = { models: { injection: "i", ner: "n" }, pipeline: "genai-guardrail" };
+  const { unmount } = render(<XRayDrawer {...props} guardrailConfig={gr2} qualityPipeline="genai-quality" msg={msg(response())} />);
+  for (const t of ["Guardrail", "Quality"]) {
+    const heading = screen.getByRole("heading", { name: t });
+    expect(within(heading).getByRole("link", { name: t }).getAttribute("href")).toContain("/app/dev_tools#/console?load_from=");
+    expect(within(heading).getByRole("link", { name: t })).toHaveAttribute("target", "_blank");
+  }
+  unmount();
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  expect(within(screen.getByRole("heading", { name: "Guardrail" })).queryByRole("link")).toBeNull();
+});
+
+test("Trace, Cost, Quality dashboard and Log are header links named after their section", () => {
+  render(<XRayDrawer {...props} msg={msg(response())} />);
+  const trace = screen.getByRole("region", { name: "Trace" });
+  expect(within(trace).getByRole("link", { name: /^trace/i }).getAttribute("href")).toContain("/app/apm/link-to/trace/");
+  expect(within(screen.getByRole("region", { name: "Cost" })).getByRole("link", { name: /^cost/i })).toBeInTheDocument();
+  const q = within(screen.getByRole("region", { name: "Quality" }));
+  const links = q.getAllByRole("link");
+  expect(links.map((l) => l.textContent?.replace(/\s*\(opens in a new tab\)/, "").trim())).toEqual(["Quality dashboard ↗", "Log ↗"]);
+  expect(q.getByRole("link", { name: /^log/i }).getAttribute("href")).toContain("https://kb.example/app/discover#/?_a=");
 });

@@ -1,11 +1,11 @@
 import { ShieldCrossIcon, ShieldIcon, ShieldTickIcon } from "../icons";
 import { formatMs } from "../../lib/format";
-import { alertsUrl, devToolsUrl, traceUrl, type GuardrailConfig } from "../../lib/kibanaLinks";
-import { DETECTION_INTERVAL_MINUTES, DEVTOOLS_HELP } from "../../lib/copy";
+import { alertsUrl, traceUrl } from "../../lib/kibanaLinks";
+import { DETECTION_INTERVAL_MINUTES } from "../../lib/copy";
 import { ExtLink } from "./ExtLink";
 import type { ChatResponse } from "../../lib/types";
 
-export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl, prompt, guardrailConfig }: { r: ChatResponse; kibanaUrl?: string; securityKibanaUrl?: string | null; prompt?: string; guardrailConfig?: GuardrailConfig }) {
+export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl }: { r: ChatResponse; kibanaUrl?: string; securityKibanaUrl?: string | null }) {
   const g = r.guardrail;
   const flagged = g.verdict === "FLAGGED";
   const scored = typeof g.injection_score === "number" && Number.isFinite(g.injection_score);
@@ -14,7 +14,6 @@ export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl, prompt, guardr
   const Icon = r.blocked || flagged ? ShieldCrossIcon : patternsOnly || g.verdict === "UNKNOWN" ? ShieldIcon : ShieldTickIcon;
   const word = r.blocked ? "Blocked" : flagged ? "Flagged" : patternsOnly ? "Patterns only" : g.verdict === "UNKNOWN" ? "Unscored" : "Clean";
   const tone = r.blocked || flagged ? "text-flag" : patternsOnly || g.verdict === "UNKNOWN" ? "text-on-ink-muted" : "text-clean";
-  const devTools = kibanaUrl && prompt && guardrailConfig ? devToolsUrl(kibanaUrl, prompt, guardrailConfig) : null;
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
@@ -40,12 +39,6 @@ export function GuardrailStrip({ r, kibanaUrl, securityKibanaUrl, prompt, guardr
           {securityKibanaUrl && (
             <p className="text-xs text-on-ink-muted">{`Detections run every ${DETECTION_INTERVAL_MINUTES === 1 ? "minute" : `${DETECTION_INTERVAL_MINUTES} minutes`}, so the alert can take a few minutes to appear.`}</p>
           )}
-        </div>
-      )}
-      {devTools && (
-        <div className="mt-3 grid gap-2">
-          <div className="flex flex-wrap gap-2"><ExtLink href={devTools}>Try it in Dev Tools</ExtLink></div>
-          <p className="text-xs text-on-ink-muted">{DEVTOOLS_HELP}</p>
         </div>
       )}
     </div>
