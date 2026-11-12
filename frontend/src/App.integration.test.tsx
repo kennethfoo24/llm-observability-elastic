@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { auth } from "./lib/api";
@@ -22,75 +22,175 @@ const answer = (over: Partial<ChatResponse>): ChatResponse => ({
   stages: [{ name: "guardrail.check", ms: 30 }, { name: "retrieval.hybrid", ms: 100 }, { name: "prompt.build", ms: 2 }, { name: "llm.generate", ms: 500 }], ...over,
 });
 
+/* Every media query answers the same: true = laptop (inline sidebar, side drawer), false = phone (off-canvas sidebar, bottom sheet). */
+function viewport(wide: boolean) {
+  vi.spyOn(window, "matchMedia").mockImplementation(((q: string) => ({
+    matches: wide, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia);
+}
+
 beforeEach(() => {
   auth.set("pw");
+  viewport(true);
   vi.spyOn(apiMod.api, "personas").mockResolvedValue(personas);
   vi.spyOn(apiMod.api, "models").mockResolvedValue(models);
   vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "https://kb", company: "Foo Corp" });
 });
 
-test("ask a suggested question, see the answer, the cost and the LLM Observability", async () => {
+async function askPto() {
+  await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
+  await screen.findByText(/employees get 18 days/i);
+}
+
+test("ask a suggested question: the answer and the session cost show, and the observability panel stays closed", async () => {
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
-  await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
-  expect(await screen.findByText(/employees get 18 days/i)).toBeInTheDocument();
-  const xray = screen.getByRole("region", { name: "LLM Observability" });
-  expect(await within(xray).findByText("Paid Time Off Policy")).toBeInTheDocument();
-  expect(within(xray).getByText(/hidden from maya lim/i)).toBeInTheDocument();
-  expect(screen.getAllByText("$0.0004").length).toBeGreaterThan(0);
+  await askPto();
+  expect(screen.getByText("$0.0004")).toBeInTheDocument();
+  expect(screen.queryByRole("complementary", { name: "LLM Observability" })).toBeNull();
 });
 
-test("switching persona offers to ask the same question again and the new answer differs", async () => {
+test("the View More tab opens the observability panel with the retrieval detail and Escape closes it", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "View More" }));
+  const panel = await screen.findByRole("complementary", { name: "LLM Observability" });
+  expect(await within(panel).findByText("Paid Time Off Policy")).toBeInTheDocument();
+  expect(within(panel).getByText(/hidden from maya lim/i)).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("complementary", { name: "LLM Observability" })).toBeNull());
+});
+
+test("clicking a status chip opens the panel", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: /guardrail passed/i }));
+  expect(await screen.findByRole("complementary", { name: "LLM Observability" })).toBeInTheDocument();
+});
+
+test("a citation is a Discover link and clicking it does not open the panel", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("link", { name: /Paid Time Off Policy · Confluence/ }));
+  expect(screen.queryByRole("complementary", { name: "LLM Observability" })).toBeNull();
+});
+
+test("with no Kibana URL a citation is a button that opens the panel and highlights the cited document", async () => {
+  vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "", company: "Foo Corp" });
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: /Paid Time Off Policy · Confluence/ }));
+  const panel = await screen.findByRole("complementary", { name: "LLM Observability" });
+  expect(within(panel).getByText("Paid Time Off Policy").closest("[data-highlighted]")).toHaveAttribute("data-highlighted", "true");
+});
+
+test("a finished conversation is listed under Today after New chat and clicking it restores both messages", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+  await waitFor(() => expect(screen.queryByText(/employees get 18 days/i)).toBeNull());
+  const today = screen.getByRole("region", { name: "Today" });
+  const row = within(today).getByRole("button", { name: "How many PTO days do I get?" });
+  await userEvent.click(row);
+  expect(await screen.findByText(/employees get 18 days/i)).toBeInTheDocument();
+  expect(screen.getByText("$0.0004")).toBeInTheDocument();
+});
+
+test("Ask again as Daniel Ong switches the persona, adds the divider and posts as manager", async () => {
   const chat = vi.spyOn(apiMod.api, "chat")
     .mockResolvedValueOnce(answer({ answer: "I could not find that.", docs: [], persona: "employee" }))
-    .mockResolvedValueOnce(answer({ answer: "The L4 band is 98,000 to 125,000 dollars [salary-bands].", docs: [{ id: "salary-bands", title: "Salary Bands L3 to L5", classification: "confidential", score: 4 }], hidden: [], persona: "manager" }));
+    .mockResolvedValueOnce(answer({ answer: "The L4 band is 98,000 to 125,000 dollars.", docs: [], persona: "manager" }));
   render(<App />);
   await userEvent.type(await screen.findByRole("textbox", { name: /your question/i }), "What are the salary bands for L3 to L5?{Enter}");
   expect(await screen.findByText(/could not find that/i)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
-  await userEvent.click(await screen.findByRole("button", { name: /ask again as daniel ong/i }));
+  await userEvent.click(screen.getByRole("button", { name: "Ask again as Daniel Ong" }));
   expect(await screen.findByText(/98,000 to 125,000/i)).toBeInTheDocument();
   expect(chat).toHaveBeenLastCalledWith({ message: "What are the salary bands for L3 to L5?", persona: "manager", model: "eis-gpt-mini", engine: "langchain" });
+  expect(screen.getByRole("button", { name: /Asking as Daniel Ong/ })).toBeInTheDocument();
+  expect(screen.getByText(/Now asking as Daniel Ong/)).toBeInTheDocument();
 });
 
-test("a blocked red-team prompt shows the block card and the LLM Observability says nothing was billed", async () => {
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({ blocked: true, answer: "", block_reason: ["prompt_injection"], docs: [], hidden: [], cost_usd: 0, guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 25, injection_score: 0.99 }, stages: [{ name: "guardrail.check", ms: 25 }] }));
+test("a blocked prompt shows the block card and its conversation gets the pink dot", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({ blocked: true, answer: "", block_reason: ["prompt_injection"], docs: [], hidden: [], cost_usd: 0, guardrail: { verdict: "FLAGGED", reasons: ["prompt_injection"], status: "ok", latency_ms: 30, injection_score: 0.9 } }));
   render(<App />);
-  await userEvent.click(await screen.findByRole("button", { name: /red team/i }));
+  await userEvent.click(await screen.findByRole("button", { name: "Red team prompts" }));
   await userEvent.click(await screen.findByRole("button", { name: /ignore previous instructions/i }));
-  await userEvent.click(screen.getByRole("button", { name: /send/i }));
+  await userEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(await screen.findByRole("heading", { name: /blocked by the guardrail/i })).toBeInTheDocument();
-  expect(screen.getByText(/stopped before any search or model call/i)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getAllByTitle("Blocked or flagged")).toHaveLength(1));
 });
 
-test("the offline Gemma model is visible but cannot be selected", async () => {
+test("reloading lists the saved conversation but opens an empty chat", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  const first = render(<App />);
+  await askPto();
+  first.unmount();
+  render(<App />);
+  expect(await screen.findByRole("heading", { name: "Ask anything" })).toBeInTheDocument();
+  expect(screen.queryByText(/employees get 18 days/i)).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Today" })).getByRole("button", { name: "How many PTO days do I get?" })).toBeInTheDocument();
+});
+
+test("while a request is pending New chat and the history rows are disabled", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValueOnce(answer({}));
+  render(<App />);
+  await askPto();
+  let release!: (r: ChatResponse) => void;
+  vi.spyOn(apiMod.api, "chat").mockReturnValueOnce(new Promise((r) => { release = r; }));
+  await userEvent.type(screen.getByRole("textbox", { name: /your question/i }), "second{Enter}");
+  expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "How many PTO days do I get?" })).toBeDisabled();
+  release(answer({}));
+  await waitFor(() => expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled());
+});
+
+test("deleting the active conversation starts a fresh chat", async () => {
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "Delete How many PTO days do I get?" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+  expect(await screen.findByRole("heading", { name: "Ask anything" })).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Today" })).toBeNull();
+});
+
+test("the app keeps working when browser storage is blocked", async () => {
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("full", "QuotaExceededError"); });
+  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
+  render(<App />);
+  await askPto();
+  expect(screen.getByText("$0.0004")).toBeInTheDocument();
+});
+
+test("the offline Gemma model is visible in the picker but cannot be selected", async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole("button", { name: /^model:/i }));
   const gemma = await screen.findByRole("radio", { name: /gemma/i });
   expect(gemma).toBeDisabled();
-  expect(screen.getByText("Offline")).toBeInTheDocument();
+  expect(screen.getByText(/Offline · Self-hosted/)).toBeInTheDocument();
 });
 
-test("new conversation clears the thread and the session cost", async () => {
+test("the edit button on a question puts its text back in the prompt bar", async () => {
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
-  await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
-  await screen.findByText(/employees get 18 days/i);
-  await userEvent.click(screen.getByRole("button", { name: /new conversation/i }));
-  await waitFor(() => expect(screen.queryByText(/employees get 18 days/i)).toBeNull());
-  expect(screen.getByText("$0")).toBeInTheDocument();
+  await askPto();
+  await userEvent.click(screen.getByRole("button", { name: "Edit and resend" }));
+  expect(screen.getByRole("textbox", { name: /your question/i })).toHaveValue("How many PTO days do I get?");
 });
 
 test("a 401 mid-session returns to the gate, keeps the typed draft, and unlocking restores it without looping", async () => {
-  // the real request() notifies the unauthorized subscribers on a 401 and throws ApiError(401)
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })));
   render(<App />);
   const box = await screen.findByRole("textbox", { name: /your question/i });
   await userEvent.type(box, "my unsent draft");
-  await userEvent.click(screen.getByRole("button", { name: /send/i }));
+  await userEvent.click(screen.getByRole("button", { name: "Send" }));
   const pw = await screen.findByLabelText(/demo password/i);
   expect(auth.get()).toBe("");
-  // no reload loop: the bootstrap endpoints were each called once so far
   expect(apiMod.api.personas).toHaveBeenCalledTimes(1);
   await userEvent.type(pw, "pw{Enter}");
   expect(await screen.findByRole("textbox", { name: /your question/i })).toHaveValue("my unsent draft");
@@ -99,161 +199,37 @@ test("a 401 mid-session returns to the gate, keeps the typed draft, and unlockin
 });
 
 test("an upstream error shows a recoverable inline error with a retry that works", async () => {
-  vi.spyOn(apiMod.api, "chat")
-    .mockRejectedValueOnce(new apiMod.ApiError(503, "gemma_offline"))
-    .mockResolvedValueOnce(answer({}));
+  vi.spyOn(apiMod.api, "chat").mockRejectedValueOnce(new apiMod.ApiError(503, "gemma_offline")).mockResolvedValueOnce(answer({}));
   render(<App />);
   await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
-  const retry = await screen.findByRole("button", { name: /try again|retry/i });
-  await userEvent.click(retry);
+  await userEvent.click(await screen.findByRole("button", { name: /try again|retry/i }));
   expect(await screen.findByText(/employees get 18 days/i)).toBeInTheDocument();
-});
-
-function mockViewport(wide: boolean) {
-  let matches = wide;
-  const listeners = new Set<(e: { matches: boolean }) => void>();
-  vi.spyOn(window, "matchMedia").mockImplementation((q: string) => ({
-    get matches() { return matches; }, media: q, onchange: null,
-    addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.add(cb),
-    removeEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.delete(cb),
-    addListener() {}, removeListener() {}, dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
-  return { set: (v: boolean) => { matches = v; act(() => listeners.forEach((cb) => cb({ matches: v }))); } };
-}
-const mockSmall = (small: boolean) => mockViewport(!small);
-
-async function askPto() {
-  await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
-  await screen.findByText(/employees get 18 days/i);
-}
-
-test("on a small screen the message Inspect button opens the LLM Observability sheet, Escape closes it and focus returns", async () => {
-  mockSmall(true);
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  expect(screen.queryByRole("button", { name: /inspect LLM Observability/i })).toBeNull();
-  const inspect = screen.getByRole("button", { name: /guardrail passed/i });
-  await userEvent.click(inspect);
-  const dialog = await screen.findByRole("dialog", { name: "LLM Observability" });
-  expect(dialog).toHaveAttribute("aria-modal", "true");
-  expect(screen.getByRole("button", { name: /close LLM Observability/i })).toHaveFocus();
-  await userEvent.keyboard("{Escape}");
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
-  await waitFor(() => expect(screen.getByRole("button", { name: /guardrail passed/i })).toHaveFocus());
-});
-
-test("on desktop the message Inspect button only selects, it does not open the sheet", async () => {
-  mockSmall(false);
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  await userEvent.click(screen.getByRole("button", { name: /guardrail passed/i }));
-  expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull();
-});
-
-test("clicking the scrim closes the LLM Observability sheet", async () => {
-  mockSmall(true);
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  await userEvent.click(screen.getByRole("button", { name: /guardrail passed/i }));
-  await screen.findByRole("dialog", { name: "LLM Observability" });
-  await userEvent.click(screen.getByTestId("xray-scrim"));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
-});
-
-test("the rail disclosure is collapsed by default, toggles aria-expanded and keeps the summary current after a persona change", async () => {
-  render(<App />);
-  const toggle = await screen.findByRole("button", { name: /change person or model/i });
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getAllByText(/asking as/i, { selector: "p" }).map((p) => p.textContent)).toContain("Asking as Maya Lim, GPT-5.4 mini");
-  await userEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toContainElement(screen.getByRole("radio", { name: /daniel ong/i }));
-  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getAllByText(/asking as/i, { selector: "p" }).map((p) => p.textContent)).toContain("Asking as Daniel Ong, GPT-5.4 mini");
-  await userEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-});
-
-test("picking a model by click closes the open disclosure and returns focus to its toggle, picking a persona keeps it open", async () => {
-  render(<App />);
-  const toggle = await screen.findByRole("button", { name: /change person or model/i });
-  await userEvent.click(toggle);
-  await userEvent.click(screen.getByRole("radio", { name: /daniel ong/i }));
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await userEvent.click(screen.getByRole("button", { name: /^model:/i }));
-  await userEvent.click(await screen.findByRole("radio", { name: /gpt-5\.4 mini/i }));
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(toggle).toHaveFocus();
-});
-
-test("arrowing through the models with the keyboard does not close the disclosure", async () => {
-  render(<App />);
-  const toggle = await screen.findByRole("button", { name: /change person or model/i });
-  await userEvent.click(toggle);
-  await userEvent.click(screen.getByRole("button", { name: /^model:/i }));
-  (await screen.findByRole("radio", { name: /gpt-5\.4 mini/i })).focus();
-  await userEvent.keyboard("{ArrowDown}");
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
 });
 
 test("the red-team pick appends to a non-empty draft on a new line and sets an empty one", async () => {
   render(<App />);
   const box = await screen.findByRole("textbox", { name: /your question/i });
-  await userEvent.click(screen.getByRole("button", { name: /red team/i }));
-  await userEvent.click(await screen.findByRole("button", { name: /ignore previous instructions/i }));
+  await userEvent.click(screen.getByRole("button", { name: "Red team prompts" }));
+  await userEvent.click(await screen.findByRole("button", { name: /email address/i }));
   const first = (box as HTMLTextAreaElement).value;
-  expect(first).toMatch(/ignore previous instructions/i);
-  await userEvent.clear(box);
-  await userEvent.type(box, "my own text");
-  await userEvent.click(screen.getByRole("button", { name: /red team/i }));
-  await userEvent.click(await screen.findByRole("button", { name: /ignore previous instructions/i }));
-  expect((box as HTMLTextAreaElement).value).toBe(`my own text\n${first}`);
+  expect(first).toMatch(/alex\.tan@/);
+  await userEvent.click(screen.getByRole("button", { name: "Red team prompts" }));
+  await userEvent.click(await screen.findByRole("button", { name: /salary figure/i }));
+  expect((box as HTMLTextAreaElement).value.startsWith(`${first}\n`)).toBe(true);
 });
 
-test("reset clears the typed draft", async () => {
+test("on a phone the sidebar is off-canvas: the menu opens it, choosing New chat closes it, and View More is a bottom sheet", async () => {
+  viewport(false);
   vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
   render(<App />);
-  await askPto();
-  const box = screen.getByRole("textbox", { name: /your question/i });
-  await userEvent.type(box, "half typed");
-  await userEvent.click(screen.getByRole("button", { name: /new conversation/i }));
-  await waitFor(() => expect(box).toHaveValue(""));
-});
-
-test("below xl, with no Kibana URL, a citation click opens the sheet and highlights the cited document", async () => {
-  mockSmall(true);
-  vi.spyOn(apiMod.api, "config").mockResolvedValue({ kibana_url: "", company: "Foo Corp" });
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  await userEvent.click(screen.getByRole("button", { name: /Paid Time Off Policy · Confluence/ }));
-  const dialog = await screen.findByRole("dialog", { name: "LLM Observability" });
-  expect(within(dialog).getByText("Paid Time Off Policy").closest("[data-highlighted]")).toHaveAttribute("data-highlighted", "true");
-});
-
-test("a citation is a Discover link; clicking it does not open the sheet", async () => {
-  mockSmall(true);
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  await userEvent.click(screen.getByRole("link", { name: /Paid Time Off Policy · Confluence/ }));
-  expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull();
-});
-
-test("growing past xl closes the open sheet and releases the scroll lock", async () => {
-  const vp = mockSmall(true);
-  vi.spyOn(apiMod.api, "chat").mockResolvedValue(answer({}));
-  render(<App />);
-  await askPto();
-  document.body.style.overflow = "";
-  await userEvent.click(screen.getByRole("button", { name: /guardrail passed/i }));
-  await screen.findByRole("dialog", { name: "LLM Observability" });
-  expect(document.body.style.overflow).toBe("hidden");
-  vp.set(true);
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "LLM Observability" })).toBeNull());
-  expect(document.body.style.overflow).toBe("");
+  expect(screen.queryByRole("heading", { name: "FOO CORP HR" })).toBeNull();
+  await userEvent.click(await screen.findByRole("button", { name: "Open conversations" }));
+  const dialog = await screen.findByRole("dialog", { name: "Conversation history" });
+  expect(within(dialog).getByRole("heading", { name: "FOO CORP HR" })).toBeInTheDocument();
+  await userEvent.click(within(dialog).getByRole("button", { name: "New chat" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Conversation history" })).toBeNull());
+  await userEvent.click(await screen.findByRole("button", { name: /how many pto days/i }));
+  await screen.findByText(/employees get 18 days/i);
+  await userEvent.click(screen.getByRole("button", { name: "View More" }));
+  expect(await screen.findByRole("dialog", { name: "LLM Observability" })).toHaveAttribute("aria-modal", "true");
 });

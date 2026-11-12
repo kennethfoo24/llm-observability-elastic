@@ -8,6 +8,7 @@ expect.extend(axeMatchers);
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
   vi.restoreAllMocks();
 });
 
