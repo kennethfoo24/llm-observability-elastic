@@ -9,17 +9,17 @@ People in the app: Maya Lim (Software Engineer, role employee) and Daniel Ong (E
 1. Run `deploy/scripts/demo_up.sh` (add `--gemma` at least 10 minutes ahead if you will show Gemma).
 2. Open https://107-178-251-254.sslip.io and enter the password from `backend/secrets/app_password.txt`. Do not show the file on screen.
 3. Open Kibana in a second tab: APM service `glassbox-backend`, the dashboard `LLM Observability: Overview`, and the Security alerts page.
-4. Pick GPT-5.4 mini as the model and Direct SDK as the engine.
+4. Pick GPT-5.4 mini in the model picker (bottom left of the sidebar).
 5. Provider usage: EIS token usage is under Billing and subscription, Usage, Inference in Elastic Cloud (it lags real traffic).
 
 ## Step 1: Same question, different person (2 minutes) - pillar: access control (DLS)
 
 | Do | Say | Expect |
 |---|---|---|
-| Select Maya Lim in the rail. Type `What are the salary bands for L3 to L5?` and send. | "Maya is a software engineer. She asks about pay bands, which only managers can read." | An answer saying the documents do not contain it. No citation. |
-| Click Inspect on the answer to open the LLM Observability drawer. Scroll to "Hidden by DLS". | "The search ran as Maya. Elasticsearch itself removed the restricted document before the model ever saw it. Here is the ghost card of what she cannot see." | A ghost card for `salary-bands` (Salary Bands L3 to L5, Confidential) with a lock icon. The restricted HR and executive documents show as ghost cards too. |
-| Close the drawer. Select Daniel Ong in the rail, then click "Ask again as Daniel Ong" under the answer. | "Same question, same model, now as the Engineering Manager." | A real answer with the L3, L4 and L5 bands that cites `[salary-bands]`. |
-| Inspect again. | "Daniel's document list includes the salary bands. The HR and executive documents are still hidden from him." | `salary-bands` in the document list, and fewer ghost cards than for Maya. |
+| Maya Lim is the person in the bottom-left picker. Type `What are the salary bands for L3 to L5?` and send. | "Maya is a software engineer. She asks about pay bands, which only managers can read." | An answer saying the documents do not contain it. No citation. |
+| Click the "documents hidden by access control" tag under the answer (or the View More tab) to open the LLM Observability panel. Scroll to Retrieval, "Hidden by DLS". | "The search ran as Maya. Elasticsearch itself removed the restricted document before the model ever saw it. Here is the ghost card of what she cannot see." | A ghost card for `salary-bands` (Salary Bands L3 to L5, Confidential) with a lock icon. The restricted HR and executive documents show as ghost cards too. |
+| Close the panel. Click "Ask again as Daniel Ong" under the answer: the app switches to Daniel and sends the same question. | "Same question, same model, now as the Engineering Manager." | A real answer with the L3, L4 and L5 bands that cites `[salary-bands]`. |
+| Open View More again. | "Daniel's document list includes the salary bands. The HR and executive documents are still hidden from him." | `salary-bands` in the document list, and fewer ghost cards than for Maya. |
 
 Key point: the control is document level security in the data layer, not a prompt instruction.
 
@@ -27,14 +27,14 @@ Key point: the control is document level security in the data layer, not a promp
 
 | Do | Say | Expect |
 |---|---|---|
-| In the LLM Observability drawer click "Open trace in Kibana". | "Every answer links to its trace." | Kibana APM opens a new tab on the trace. |
+| In the View More panel, Trace section, click "Open trace in Kibana". | "Every answer links to its trace." | Kibana APM opens a new tab on the trace. |
 | Walk the waterfall from the top. | "The request enters the API, then the guardrail check, then hybrid search in Elasticsearch, then prompt build, then the LLM call through the Elastic Inference Service." | Spans `POST /api/chat`, `guardrail.check`, `retrieval.hybrid`, `prompt.build`, `chat gpt-5.4-mini`. |
 | Click the `chat` span and open its attributes. | "Prompt and response are captured on the span, plus token counts and the cost." | `gen_ai.input.messages`, `gen_ai.output.messages`, token counts, and `app.genai.cost_usd` on the root span. |
 | Back in the app switch the engine to LangChain and ask `How many PTO days do I get?` as Maya. Open its trace. | "Same product, a different framework. The instrumentation still shows each step nested under the chain." | Stages `guardrail.check`, `retrieval.hybrid`, `llm.generate`, plus an `invoke_workflow RunnableSequence` span. The trace arrives about 1 minute after the request. |
 
 ## Step 3: OWASP and quality (3 minutes) - pillar: guardrails, security and quality
 
-Open the Red team menu (sections Security and Quality; the texts are in `frontend/src/lib/prompts.ts`). Input checks run before the model; output and quality checks run after the answer, asynchronously (about 5 to 10 seconds). After each answered prompt open "Output guardrail and quality" in the LLM Observability panel and read "What Elastic checks on this answer" (one row per check with what Elastic does and in which pipeline step; the OWASP id opens the official OWASP page and "See it in Kibana" opens the matching dashboard), then use "Open the response log" (Discover, `logs-genai_response*` by trace id) or "Try it in Dev Tools" (simulates the `genai-quality` pipeline on that answer). Both need a Kibana login.
+Open the Red team menu (the pink shield icon next to the Send button; sections Security and Quality; the texts are in `frontend/src/lib/prompts.ts`). Input checks run before the model; output and quality checks run after the answer, asynchronously (about 5 to 10 seconds). After each answered prompt open "Output guardrail and quality" in the LLM Observability panel and read "What Elastic checks on this answer" (one row per check with what Elastic does and in which pipeline step; the OWASP id opens the official OWASP page and "See it in Kibana" opens the matching dashboard), then use "Open the response log" (Discover, `logs-genai_response*` by trace id) or "Try it in Dev Tools" (simulates the `genai-quality` pipeline on that answer). Both need a Kibana login.
 
 | Do | Say | Expect |
 |---|---|---|
@@ -49,7 +49,7 @@ Open the Red team menu (sections Security and Quality; the texts are in `fronten
 | Language mismatch demo: open any English answer's "Try it in Dev Tools" and edit `genai.response_text` to a French or Spanish sentence of 30 or more characters. | "If the assistant ever answers in a different language than the question, this flags it." | `quality.lang_mismatch` true. |
 | Red team, Quality: "Rude and negative", then "Positive feedback". | "User sentiment is read by the LLM judge on three classes; the eland model's binary label is kept as the raw signal." | `quality.user_sentiment` negative, then positive. `quality.sentiment_label` is the raw binary signal (neutral prompts read NEGATIVE), so alerts use `user_sentiment`. |
 | Red team, Quality: "Unanswerable" (CEO's favourite colour). | "Failures to answer are tracked too." | `quality.answered` is false. |
-| Click "Conversation quality dashboard", then "OWASP coverage dashboard". | "Every answer rolls up here: sentiment, language, topic, answered, and each OWASP risk." | Dashboards `glassbox-quality` and `glassbox-owasp`. Allow a minute for the latest answers to appear. |
+| In View More, click "Quality dashboard" (Quality header), then "OWASP Top 10 dashboard" (Security header). | "Every answer rolls up here: sentiment, language, topic, answered, and each OWASP risk." | The hand-made quality and OWASP Top 10 dashboards (not in `elastic/`, see README Pending). Allow a minute for the latest answers to appear. |
 
 Exact findings depend on the live model answers, so treat the Expect column as what to look for.
 
@@ -87,6 +87,7 @@ Run `deploy/scripts/demo_down.sh` (add `--teardown` to remove the load balancer 
 ## LLM Observability deep links
 
 - Flagged or blocked prompt: in the Guardrail section click "See where it was blocked" (APM trace, span `guardrail.check`) and "View detection in Elastic Security" (Alerts filtered to rule `glassbox-flagged-prompts`). The alert can take a few minutes to appear.
+- Citations: click a citation number in an answer (the small logo and number) to open that document in Kibana Discover. The logos (Confluence, SharePoint, Google Drive, Database) show where such documents could be ingested from with Elastic connectors; the demo documents were indexed by hand.
 - Retrieval: click a document title to open it in Kibana Discover (Kibana login needed; your Kibana role applies, not the persona). Hidden cards have no link.
 - Model and cost: "Open cost dashboard" opens `LLM Observability: Overview`.
 
